@@ -1,0 +1,9 @@
+<resources>
+    <!-- Base application theme. Compose supplies the actual Material 3 theme at runtime
+         (see ui/theme/Theme.kt); this XML theme only needs to exist for the manifest and
+         to avoid a flash-of-unstyled-content before Compose takes over. -->
+    <style name="Theme.Podcaster" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>
