@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Rotating Token Show</title>
+    <item>
+      <title>Episode One</title>
+      <pubDate>Mon, 01 Jan 2024 08:00:00 +0000</pubDate>
+      <itunes:duration>15:00</itunes:duration>
+      <enclosure url="https://dts.podtrac.com/redirect.mp3/cdn.example.com/ep1.mp3?updated=1700099999" length="100" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>
