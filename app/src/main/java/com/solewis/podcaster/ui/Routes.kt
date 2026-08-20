@@ -11,4 +11,7 @@ sealed interface Route {
 
     @Serializable
     data class Show(val podcastId: Long) : Route
+
+    @Serializable
+    data object NowPlaying : Route
 }

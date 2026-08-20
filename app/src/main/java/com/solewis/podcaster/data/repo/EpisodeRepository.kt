@@ -18,11 +18,19 @@ class EpisodeRepository(private val episodeDao: EpisodeDao) {
         episodeDao.setProgress(episodeId, positionMillis, isPlayed, System.currentTimeMillis())
     }
 
+    suspend fun backfillDuration(episodeId: String, durationMillis: Long) {
+        episodeDao.backfillDuration(episodeId, durationMillis)
+    }
+
     /**
      * [EpisodeListItem] (what the show list holds) deliberately omits `enclosureUrl` - it's a
      * lightweight list projection. This fetches the one field playback actually needs, packaged
      * with the podcast title the caller already has on hand (avoiding a second podcast lookup
      * here just to build an "artist" string).
+     *
+     * A finished episode always starts over from 0 rather than resuming - there is nothing left
+     * to resume to, and a stale near-the-end position would otherwise flash briefly before the
+     * next completion check corrected it.
      */
     suspend fun getPlayable(episodeId: String, podcastTitle: String): PlayableEpisode? {
         val entity = episodeDao.getById(episodeId) ?: return null
@@ -31,7 +39,8 @@ class EpisodeRepository(private val episodeDao: EpisodeDao) {
             title = entity.title,
             podcastTitle = podcastTitle,
             artworkUrl = entity.artworkUrl,
-            mediaUrl = entity.enclosureUrl
+            mediaUrl = entity.enclosureUrl,
+            startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
         )
     }
 }

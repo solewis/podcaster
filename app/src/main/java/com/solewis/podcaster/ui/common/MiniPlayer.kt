@@ -1,5 +1,6 @@
 package com.solewis.podcaster.ui.common
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,12 +25,12 @@ import com.solewis.podcaster.player.PlaybackUiState
  * so it survives navigation and never re-subscribes to [PlaybackUiState] on a screen change.
  */
 @Composable
-fun MiniPlayer(playback: PlaybackUiState, onTogglePlayPause: () -> Unit) {
+fun MiniPlayer(playback: PlaybackUiState, onTogglePlayPause: () -> Unit, onExpand: () -> Unit) {
     if (playback.episodeId == null) return
 
     Surface(tonalElevation = 3.dp) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onExpand).padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {

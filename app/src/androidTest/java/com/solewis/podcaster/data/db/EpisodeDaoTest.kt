@@ -249,4 +249,27 @@ class EpisodeDaoTest {
 
         assertThat(podcastDao.getById(podcastId)!!.sortOrder).isEqualTo(SortOrder.OLDEST_FIRST)
     }
+
+    @Test
+    fun backfillDuration_sets_duration_and_marks_it_exact() = runTest {
+        episodeDao.insertNew(listOf(episode(id = "ep1", feedPosition = 0)))
+        assertThat(episodeDao.getById("ep1")!!.durationIsExact).isFalse()
+
+        episodeDao.backfillDuration("ep1", 1_234_000L)
+
+        val updated = episodeDao.getById("ep1")!!
+        assertThat(updated.durationMillis).isEqualTo(1_234_000L)
+        assertThat(updated.durationIsExact).isTrue()
+    }
+
+    @Test
+    fun backfillDuration_can_correct_an_already_exact_value_that_actually_changed() = runTest {
+        episodeDao.insertNew(listOf(episode(id = "ep1", feedPosition = 0)))
+        episodeDao.backfillDuration("ep1", 1_000_000L)
+
+        // The player reports a different (more accurate) duration on a later playback.
+        episodeDao.backfillDuration("ep1", 1_050_000L)
+
+        assertThat(episodeDao.getById("ep1")!!.durationMillis).isEqualTo(1_050_000L)
+    }
 }

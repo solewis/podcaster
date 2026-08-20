@@ -2,21 +2,37 @@ package com.solewis.podcaster.player
 
 import android.content.ComponentName
 import android.content.Context
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.solewis.podcaster.data.repo.PlayableEpisode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.guava.await
+import kotlinx.coroutines.launch
 
 data class PlaybackUiState(
     val episodeId: String? = null,
     val title: String? = null,
     val podcastTitle: String? = null,
-    val isPlaying: Boolean = false
+    val artworkUrl: String? = null,
+    val isPlaying: Boolean = false,
+    val speed: Float = 1f
+)
+
+/** Deliberately separate from [PlaybackUiState]: position ticks every 500ms while playing, and
+ * nothing should recompose off that except an actual scrubber/progress indicator. */
+data class ProgressUiState(
+    val positionMillis: Long = 0,
+    val durationMillis: Long? = null
 )
 
 /**
@@ -28,10 +44,29 @@ data class PlaybackUiState(
  */
 class PlayerConnection(private val context: Context) {
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var controller: MediaController? = null
 
     private val _state = MutableStateFlow(PlaybackUiState())
     val state: StateFlow<PlaybackUiState> = _state.asStateFlow()
+
+    private val _progress = MutableStateFlow(ProgressUiState())
+    val progress: StateFlow<ProgressUiState> = _progress.asStateFlow()
+
+    init {
+        scope.launch {
+            while (true) {
+                delay(PROGRESS_TICK_MILLIS)
+                val mediaController = controller
+                if (mediaController != null && _state.value.isPlaying) {
+                    _progress.value = ProgressUiState(
+                        positionMillis = mediaController.currentPosition,
+                        durationMillis = mediaController.duration.takeIf { it != C.TIME_UNSET }
+                    )
+                }
+            }
+        }
+    }
 
     private suspend fun controller(): MediaController {
         controller?.let { return it }
@@ -59,8 +94,14 @@ class PlayerConnection(private val context: Context) {
                 _state.value = _state.value.copy(
                     episodeId = mediaItem?.mediaId,
                     title = mediaItem?.mediaMetadata?.title?.toString(),
-                    podcastTitle = mediaItem?.mediaMetadata?.artist?.toString()
+                    podcastTitle = mediaItem?.mediaMetadata?.artist?.toString(),
+                    artworkUrl = mediaItem?.mediaMetadata?.artworkUri?.toString()
                 )
+                _progress.value = ProgressUiState()
+            }
+
+            override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+                _state.value = _state.value.copy(speed = playbackParameters.speed)
             }
         })
         controller = newController
@@ -69,7 +110,7 @@ class PlayerConnection(private val context: Context) {
 
     suspend fun play(episode: PlayableEpisode) {
         val mediaController = controller()
-        mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode))
+        mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
         mediaController.prepare()
         mediaController.play()
     }
@@ -77,5 +118,25 @@ class PlayerConnection(private val context: Context) {
     suspend fun togglePlayPause() {
         val mediaController = controller()
         if (mediaController.isPlaying) mediaController.pause() else mediaController.play()
+    }
+
+    suspend fun seekTo(positionMillis: Long) {
+        controller().seekTo(positionMillis)
+    }
+
+    suspend fun skipForward() {
+        controller().seekForward()
+    }
+
+    suspend fun skipBack() {
+        controller().seekBack()
+    }
+
+    suspend fun setSpeed(speed: Float) {
+        controller().setPlaybackSpeed(speed)
+    }
+
+    private companion object {
+        const val PROGRESS_TICK_MILLIS = 500L
     }
 }

@@ -31,6 +31,8 @@ import com.solewis.podcaster.AppContainer
 import com.solewis.podcaster.ui.common.MiniPlayer
 import com.solewis.podcaster.ui.library.LibraryScreen
 import com.solewis.podcaster.ui.library.LibraryViewModel
+import com.solewis.podcaster.ui.nowplaying.NowPlayingScreen
+import com.solewis.podcaster.ui.nowplaying.NowPlayingViewModel
 import com.solewis.podcaster.ui.search.SearchScreen
 import com.solewis.podcaster.ui.search.SearchViewModel
 import com.solewis.podcaster.ui.show.ShowScreen
@@ -56,7 +58,8 @@ fun PodcasterRoot(container: AppContainer) {
             Column {
                 MiniPlayer(
                     playback = playback,
-                    onTogglePlayPause = { scope.launch { container.playerConnection.togglePlayPause() } }
+                    onTogglePlayPause = { scope.launch { container.playerConnection.togglePlayPause() } },
+                    onExpand = { navController.navigate(Route.NowPlaying) }
                 )
                 NavigationBar {
                     topLevelRoutes.forEach { topLevel ->
@@ -114,6 +117,12 @@ fun PodcasterRoot(container: AppContainer) {
                     }
                 )
                 ShowScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+            }
+            composable<Route.NowPlaying> {
+                val viewModel: NowPlayingViewModel = viewModel(
+                    factory = viewModelFactory { initializer { NowPlayingViewModel(container.playerConnection) } }
+                )
+                NowPlayingScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
             }
         }
     }

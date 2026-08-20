@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -120,10 +119,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                                 EpisodeRow(
                                     episode = listItem.item,
                                     isHighlighted = listItem.item.id == highlightedEpisodeId,
-                                    onPlay = { viewModel.play(listItem.item.id) },
-                                    onDebugSetProgress = { positionMillis, isPlayed ->
-                                        viewModel.debugSetProgress(listItem.item.id, positionMillis, isPlayed)
-                                    }
+                                    onPlay = { viewModel.play(listItem.item.id) }
                                 )
                                 HorizontalDivider()
                             }
@@ -195,8 +191,7 @@ private fun JumpToLastListenedPill(jump: JumpPillUi, onClick: () -> Unit, modifi
 private fun EpisodeRow(
     episode: EpisodeListItem,
     isHighlighted: Boolean,
-    onPlay: () -> Unit,
-    onDebugSetProgress: (positionMillis: Long, isPlayed: Boolean) -> Unit
+    onPlay: () -> Unit
 ) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isHighlighted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
@@ -246,16 +241,6 @@ private fun EpisodeRow(
             }
             progressText?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
-            }
-
-            // DEBUG ONLY - stands in for real playback until Phase 4/5. Delete this Row (and
-            // ShowViewModel.debugSetProgress) once the real player writes progress.
-            Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(onClick = {
-                    val duration = episode.durationMillis ?: 30 * 60_000L
-                    onDebugSetProgress((duration * 0.4).toLong(), false)
-                }) { Text("DEBUG: 40% played") }
-                TextButton(onClick = { onDebugSetProgress(0, true) }) { Text("DEBUG: mark complete") }
             }
         }
 
