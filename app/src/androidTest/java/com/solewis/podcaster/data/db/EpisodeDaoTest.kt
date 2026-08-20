@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.solewis.podcaster.data.db.entity.EpisodeEntity
 import com.solewis.podcaster.data.db.entity.PodcastEntity
+import com.solewis.podcaster.data.db.model.SortOrder
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -213,5 +214,39 @@ class EpisodeDaoTest {
         val result = episodeDao.observeListForPodcast(podcastId).first().map { it.id }
 
         assertThat(result).containsExactly("ep2", "ep3", "ep1").inOrder()
+    }
+
+    @Test
+    fun setProgress_records_position_and_stamps_lastPlayedAt_as_the_jump_anchor() = runTest {
+        episodeDao.insertNew(listOf(episode(id = "ep1", feedPosition = 0)))
+
+        episodeDao.setProgress(id = "ep1", positionMillis = 12_345L, isPlayed = false, now = 9999L)
+
+        val updated = episodeDao.getById("ep1")!!
+        assertThat(updated.positionMillis).isEqualTo(12_345L)
+        assertThat(updated.isPlayed).isFalse()
+        assertThat(updated.lastPlayedAt).isEqualTo(9999L)
+        assertThat(updated.playedAt).isNull()
+    }
+
+    @Test
+    fun setProgress_marking_played_stamps_playedAt_too() = runTest {
+        episodeDao.insertNew(listOf(episode(id = "ep1", feedPosition = 0)))
+
+        episodeDao.setProgress(id = "ep1", positionMillis = 0L, isPlayed = true, now = 5000L)
+
+        val updated = episodeDao.getById("ep1")!!
+        assertThat(updated.isPlayed).isTrue()
+        assertThat(updated.playedAt).isEqualTo(5000L)
+        assertThat(updated.lastPlayedAt).isEqualTo(5000L)
+    }
+
+    @Test
+    fun setSortOrder_persists_the_per_show_toggle() = runTest {
+        assertThat(podcastDao.getById(podcastId)!!.sortOrder).isEqualTo(SortOrder.NEWEST_FIRST)
+
+        podcastDao.setSortOrder(podcastId, SortOrder.OLDEST_FIRST)
+
+        assertThat(podcastDao.getById(podcastId)!!.sortOrder).isEqualTo(SortOrder.OLDEST_FIRST)
     }
 }

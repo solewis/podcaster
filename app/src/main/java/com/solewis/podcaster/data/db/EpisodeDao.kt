@@ -89,9 +89,15 @@ interface EpisodeDao {
     fun observeListForPodcast(podcastId: Long): Flow<List<EpisodeListItem>>
 
     /**
-     * The headline feature's data source: the episode this show was most recently played, if
-     * any. Backed by the `(podcastId, lastPlayedAt)` index, so this is a single index range scan
-     * rather than a table sweep even on a show with thousands of episodes.
+     * The episode this show was most recently played, if any. Backed by the
+     * `(podcastId, lastPlayedAt)` index, so this is a single index range scan rather than a table
+     * sweep even on a show with thousands of episodes.
+     *
+     * Not currently called: the Show screen's jump target ([com.solewis.podcaster.domain.JumpTargetResolver])
+     * computes this from the full episode list it already holds in memory, which is simpler and
+     * guaranteed consistent with what's on screen. This query earns its keep once the Library
+     * screen's "Continue listening" row exists (a later phase), which needs a cheap per-podcast
+     * answer *without* loading every episode of every show.
      */
     @Query(
         """
@@ -112,4 +118,22 @@ interface EpisodeDao {
      */
     @Query("DELETE FROM episodes WHERE podcastId = :podcastId AND id IN (:ids) AND lastPlayedAt IS NULL")
     suspend fun deleteIfNeverPlayed(podcastId: Long, ids: List<String>)
+
+    /**
+     * Records playback activity. This is the one entry point for mutating playback state -
+     * whether from the Phase 3 debug seeding (no player exists yet) or, from Phase 5 onward, the
+     * real player's progress writer. `lastPlayedAt` is always stamped to [now], since that's the
+     * jump-target anchor - see [getLastListened] and [com.solewis.podcaster.domain.JumpTargetResolver].
+     */
+    @Query(
+        """
+        UPDATE episodes SET
+            positionMillis = :positionMillis,
+            isPlayed = :isPlayed,
+            lastPlayedAt = :now,
+            playedAt = CASE WHEN :isPlayed THEN :now ELSE playedAt END
+        WHERE id = :id
+        """
+    )
+    suspend fun setProgress(id: String, positionMillis: Long, isPlayed: Boolean, now: Long)
 }
