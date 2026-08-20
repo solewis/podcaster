@@ -51,6 +51,15 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    lint {
+        // Custom ExoPlayer caching and MediaSession artwork loading both require touching
+        // Media3's @UnstableApi surface - there is no stable alternative for this functionality,
+        // and every real Media3 app makes this same deliberate tradeoff (including Media3's own
+        // sample apps, which disable this same check). The module-wide Kotlin compiler opt-in
+        // above covers compilation; this covers AGP's separate lint pass for the same annotation.
+        disable += "UnsafeOptInUsageError"
+    }
 }
 
 room {
@@ -62,6 +71,10 @@ room {
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        // Almost all of Media3's cache/datasource surface (SimpleCache, CacheDataSource,
+        // DataSourceBitmapLoader, ...) is marked @UnstableApi. Opting in module-wide is the
+        // standard approach for Media3 apps rather than annotating every call site individually.
+        freeCompilerArgs.add("-opt-in=androidx.media3.common.util.UnstableApi")
     }
 }
 
@@ -92,6 +105,10 @@ dependencies {
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.session)
+    implementation(libs.kotlinx.coroutines.guava)
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)

@@ -17,4 +17,21 @@ class EpisodeRepository(private val episodeDao: EpisodeDao) {
     suspend fun setProgress(episodeId: String, positionMillis: Long, isPlayed: Boolean) {
         episodeDao.setProgress(episodeId, positionMillis, isPlayed, System.currentTimeMillis())
     }
+
+    /**
+     * [EpisodeListItem] (what the show list holds) deliberately omits `enclosureUrl` - it's a
+     * lightweight list projection. This fetches the one field playback actually needs, packaged
+     * with the podcast title the caller already has on hand (avoiding a second podcast lookup
+     * here just to build an "artist" string).
+     */
+    suspend fun getPlayable(episodeId: String, podcastTitle: String): PlayableEpisode? {
+        val entity = episodeDao.getById(episodeId) ?: return null
+        return PlayableEpisode(
+            episodeId = entity.id,
+            title = entity.title,
+            podcastTitle = podcastTitle,
+            artworkUrl = entity.artworkUrl,
+            mediaUrl = entity.enclosureUrl
+        )
+    }
 }

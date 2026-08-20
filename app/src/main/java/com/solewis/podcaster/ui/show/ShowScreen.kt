@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -119,6 +120,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                                 EpisodeRow(
                                     episode = listItem.item,
                                     isHighlighted = listItem.item.id == highlightedEpisodeId,
+                                    onPlay = { viewModel.play(listItem.item.id) },
                                     onDebugSetProgress = { positionMillis, isPlayed ->
                                         viewModel.debugSetProgress(listItem.item.id, positionMillis, isPlayed)
                                     }
@@ -193,6 +195,7 @@ private fun JumpToLastListenedPill(jump: JumpPillUi, onClick: () -> Unit, modifi
 private fun EpisodeRow(
     episode: EpisodeListItem,
     isHighlighted: Boolean,
+    onPlay: () -> Unit,
     onDebugSetProgress: (positionMillis: Long, isPlayed: Boolean) -> Unit
 ) {
     val backgroundColor by animateColorAsState(
@@ -256,13 +259,17 @@ private fun EpisodeRow(
             }
         }
 
-        if (episode.isPlayed) {
-            Icon(
-                Icons.Default.CheckCircle,
-                contentDescription = "Played",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 8.dp)
-            )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            IconButton(onClick = onPlay) {
+                Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+            }
+            if (episode.isPlayed) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Played",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
