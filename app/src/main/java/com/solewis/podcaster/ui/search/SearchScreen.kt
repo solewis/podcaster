@@ -62,7 +62,12 @@ fun SearchScreen(viewModel: SearchViewModel) {
                     }
                 }
                 else -> LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
-                    items(state.results, key = { it.feedUrl }) { result ->
+                    // No custom key: iTunes Search can return two different catalog entries
+                    // (different collectionIds) that point at the identical feedUrl - crashed
+                    // with "Key ... was already used" on a real search before this was found.
+                    // The list is fully replaced on every query anyway, so the default
+                    // positional key is fine.
+                    items(state.results) { result ->
                         SearchResultRow(
                             result = result,
                             isSubscribing = state.subscribingFeedUrl == result.feedUrl,
