@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Declared explicitly even though OkHttp/Coil's own manifests already merge this in -
+         self-documenting, and doesn't rely on a transitive dependency continuing to declare it. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:name=".PodcasterApp"
         android:allowBackup="true"
@@ -21,6 +29,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- No POST_NOTIFICATIONS request: media sessions are exempt from notification
+             consent on Android 13+, verified before building this - the notification still
+             shows without it. -->
+        <service
+            android:name=".player.PlaybackService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

@@ -8,6 +8,7 @@ import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.domain.JumpTargetResolver
+import com.solewis.podcaster.player.PlayerConnection
 import com.solewis.podcaster.ui.common.formatDuration
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +19,8 @@ import kotlinx.coroutines.launch
 class ShowViewModel(
     private val podcastId: Long,
     private val podcastRepository: PodcastRepository,
-    private val episodeRepository: EpisodeRepository
+    private val episodeRepository: EpisodeRepository,
+    private val playerConnection: PlayerConnection
 ) : ViewModel() {
 
     data class UiState(
@@ -48,6 +50,14 @@ class ShowViewModel(
      */
     fun debugSetProgress(episodeId: String, positionMillis: Long, isPlayed: Boolean) {
         viewModelScope.launch { episodeRepository.setProgress(episodeId, positionMillis, isPlayed) }
+    }
+
+    fun play(episodeId: String) {
+        val podcastTitle = state.value.podcast?.title ?: return
+        viewModelScope.launch {
+            val playable = episodeRepository.getPlayable(episodeId, podcastTitle) ?: return@launch
+            playerConnection.play(playable)
+        }
     }
 
     private fun buildUiState(podcast: PodcastEntity?, episodes: List<EpisodeListItem>): UiState {
