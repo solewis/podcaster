@@ -7,6 +7,9 @@ sealed interface Route {
     data object Library : Route
 
     @Serializable
+    data object AllEpisodes : Route
+
+    @Serializable
     data object Search : Route
 
     @Serializable

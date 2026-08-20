@@ -44,9 +44,9 @@ class ShowViewModel(
     }
 
     fun play(episodeId: String) {
-        val podcastTitle = state.value.podcast?.title ?: return
+        val podcast = state.value.podcast ?: return
         viewModelScope.launch {
-            val playable = episodeRepository.getPlayable(episodeId, podcastTitle) ?: return@launch
+            val playable = episodeRepository.getPlayable(episodeId, podcast.title, podcast.artworkUrl) ?: return@launch
             playerConnection.play(playable)
         }
     }

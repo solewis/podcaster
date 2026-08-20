@@ -3,6 +3,7 @@ package com.solewis.podcaster.ui
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Feed
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -28,6 +29,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.solewis.podcaster.AppContainer
+import com.solewis.podcaster.ui.allepisodes.AllEpisodesScreen
+import com.solewis.podcaster.ui.allepisodes.AllEpisodesViewModel
 import com.solewis.podcaster.ui.common.MiniPlayer
 import com.solewis.podcaster.ui.library.LibraryScreen
 import com.solewis.podcaster.ui.library.LibraryViewModel
@@ -50,6 +53,7 @@ fun PodcasterRoot(container: AppContainer) {
 
     val topLevelRoutes = listOf(
         TopLevelRoute(Route.Library, "Library", Icons.Default.LibraryMusic),
+        TopLevelRoute(Route.AllEpisodes, "Episodes", Icons.AutoMirrored.Filled.Feed),
         TopLevelRoute(Route.Search, "Search", Icons.Default.Search)
     )
 
@@ -93,6 +97,14 @@ fun PodcasterRoot(container: AppContainer) {
                 LibraryScreen(viewModel = viewModel, onOpenShow = { podcastId ->
                     navController.navigate(Route.Show(podcastId))
                 })
+            }
+            composable<Route.AllEpisodes> {
+                val viewModel: AllEpisodesViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { AllEpisodesViewModel(container.episodeRepository, container.playerConnection) }
+                    }
+                )
+                AllEpisodesScreen(viewModel = viewModel)
             }
             composable<Route.Search> {
                 val viewModel: SearchViewModel = viewModel(

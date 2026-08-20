@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.solewis.podcaster.data.db.entity.EpisodeEntity
+import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import kotlinx.coroutines.flow.Flow
 
@@ -120,9 +121,8 @@ interface EpisodeDao {
     suspend fun deleteIfNeverPlayed(podcastId: Long, ids: List<String>)
 
     /**
-     * Records playback activity. This is the one entry point for mutating playback state -
-     * whether from the Phase 3 debug seeding (no player exists yet) or, from Phase 5 onward, the
-     * real player's progress writer. `lastPlayedAt` is always stamped to [now], since that's the
+     * Records playback activity - the one entry point for mutating playback state, written by
+     * the player's progress writer. `lastPlayedAt` is always stamped to [now], since that's the
      * jump-target anchor - see [getLastListened] and [com.solewis.podcaster.domain.JumpTargetResolver].
      */
     @Query(
@@ -150,4 +150,27 @@ interface EpisodeDao {
         """
     )
     suspend fun backfillDuration(id: String, durationMillis: Long)
+
+    /**
+     * Every episode across every subscription, newest-published first, for the "All Episodes"
+     * feed. Joined against `podcasts` because a cross-show list has to say which show each row
+     * belongs to - the single-show list ([observeListForPodcast]) already knows that from the
+     * screen it's on and has no use for the extra columns.
+     *
+     * Not paginated: this is a personal, single-user library, and the per-show list already
+     * establishes that a plain in-memory list is fine at the scale one person's subscriptions
+     * reach (a single show alone was tested at 2952 episodes with no issue). Revisit only if a
+     * real library ever makes this noticeably slow.
+     */
+    @Query(
+        """
+        SELECT e.id, e.podcastId, p.title AS podcastTitle, p.artworkUrl AS podcastArtworkUrl,
+               e.title, e.pubDateMillis, e.durationMillis, e.displayNumber, e.episodeType,
+               e.artworkUrl, e.positionMillis, e.isPlayed, e.lastPlayedAt
+        FROM episodes e
+        JOIN podcasts p ON p.id = e.podcastId
+        ORDER BY (e.pubDateMillis IS NULL) ASC, e.pubDateMillis DESC
+        """
+    )
+    fun observeAllEpisodes(): Flow<List<EpisodeFeedItem>>
 }
