@@ -2,6 +2,7 @@ package com.solewis.podcaster.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.PodcastSearchResult
 import com.solewis.podcaster.data.repo.SearchRepository
 import com.solewis.podcaster.data.repo.SubscribeResult
@@ -15,7 +16,8 @@ import kotlinx.coroutines.launch
 
 class SearchViewModel(
     private val searchRepository: SearchRepository,
-    private val subscriptionRepository: SubscriptionRepository
+    private val subscriptionRepository: SubscriptionRepository,
+    private val podcastRepository: PodcastRepository
 ) : ViewModel() {
 
     data class UiState(
@@ -24,13 +26,23 @@ class SearchViewModel(
         val isSearching: Boolean = false,
         val error: String? = null,
         val subscribingFeedUrl: String? = null,
-        val subscribedFeedUrls: Set<String> = emptySet()
+        // feedUrl -> podcastId, driven live by Room rather than local bookkeeping, so a
+        // subscription made elsewhere (e.g. the show preview screen) is reflected here too.
+        val subscribedFeedUrls: Map<String, Long> = emptyMap()
     )
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     private var searchJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            podcastRepository.observeSubscribedFeedUrls().collect { subscribed ->
+                _state.value = _state.value.copy(subscribedFeedUrls = subscribed)
+            }
+        }
+    }
 
     fun onQueryChange(query: String) {
         _state.value = _state.value.copy(query = query)
@@ -62,14 +74,18 @@ class SearchViewModel(
                 seedTitle = result.title,
                 seedArtworkUrl = result.artworkUrl
             )
+            // subscribedFeedUrls itself updates via the observeSubscribedFeedUrls collector above.
             _state.value = when (outcome) {
-                is SubscribeResult.Success, is SubscribeResult.AlreadySubscribed -> _state.value.copy(
-                    subscribingFeedUrl = null,
-                    subscribedFeedUrls = _state.value.subscribedFeedUrls + result.feedUrl
-                )
+                is SubscribeResult.Success, is SubscribeResult.AlreadySubscribed ->
+                    _state.value.copy(subscribingFeedUrl = null)
                 is SubscribeResult.Failure -> _state.value.copy(subscribingFeedUrl = null, error = outcome.message)
             }
         }
+    }
+
+    fun unsubscribe(feedUrl: String) {
+        val podcastId = _state.value.subscribedFeedUrls[feedUrl] ?: return
+        viewModelScope.launch { podcastRepository.unsubscribe(podcastId) }
     }
 
     private companion object {

@@ -14,10 +14,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -27,17 +29,22 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.solewis.podcaster.data.repo.PodcastSearchResult
+import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -> Unit) {
     val state by viewModel.state.collectAsState()
+    var pendingUnsubscribe by remember { mutableStateOf<PodcastSearchResult?>(null) }
 
     Scaffold(topBar = { TopAppBar(title = { Text("Search") }) }) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -47,6 +54,13 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 placeholder = { Text("Search podcasts") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (state.query.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onQueryChange("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                        }
+                    }
+                },
                 singleLine = true
             )
 
@@ -74,12 +88,24 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
                             isSubscribing = state.subscribingFeedUrl == result.feedUrl,
                             isSubscribed = result.feedUrl in state.subscribedFeedUrls,
                             onClick = { onOpenShow(result) },
-                            onSubscribe = { viewModel.subscribe(result) }
+                            onSubscribe = { viewModel.subscribe(result) },
+                            onUnsubscribe = { pendingUnsubscribe = result }
                         )
                     }
                 }
             }
         }
+    }
+
+    pendingUnsubscribe?.let { result ->
+        UnsubscribeConfirmDialog(
+            podcastTitle = result.title,
+            onConfirm = {
+                viewModel.unsubscribe(result.feedUrl)
+                pendingUnsubscribe = null
+            },
+            onDismiss = { pendingUnsubscribe = null }
+        )
     }
 }
 
@@ -89,7 +115,8 @@ private fun SearchResultRow(
     isSubscribing: Boolean,
     isSubscribed: Boolean,
     onClick: () -> Unit,
-    onSubscribe: () -> Unit
+    onSubscribe: () -> Unit,
+    onUnsubscribe: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -109,8 +136,8 @@ private fun SearchResultRow(
         }
         when {
             isSubscribing -> CircularProgressIndicator(modifier = Modifier.size(24.dp))
-            isSubscribed -> Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Check, contentDescription = "Subscribed", tint = MaterialTheme.colorScheme.primary)
+            isSubscribed -> IconButton(onClick = onUnsubscribe) {
+                Icon(Icons.Default.Check, contentDescription = "Subscribed - tap to unsubscribe", tint = MaterialTheme.colorScheme.primary)
             }
             else -> TextButton(onClick = onSubscribe) { Text("Subscribe") }
         }

@@ -111,7 +111,13 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.Search> {
                 val viewModel: SearchViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { SearchViewModel(container.searchRepository, container.subscriptionRepository) }
+                        initializer {
+                            SearchViewModel(
+                                container.searchRepository,
+                                container.subscriptionRepository,
+                                container.podcastRepository
+                            )
+                        }
                     }
                 )
                 SearchScreen(
