@@ -3,9 +3,16 @@ package com.solewis.podcaster
 import android.app.Application
 
 /**
- * Application entry point. Once real dependencies exist (Room, OkHttp, the player), this class
- * will own a single [AppContainer] instance constructed here and read from both Compose (via a
- * CompositionLocal) and the playback service (via `application as PodcasterApp`). Increment 1
- * has no dependencies yet, so there is nothing to construct.
+ * Application entry point. Owns the single [AppContainer] instance, read from Compose via
+ * [LocalAppContainer] and, once the playback service exists (Phase 4+), via
+ * `application as PodcasterApp`.
  */
-class PodcasterApp : Application()
+class PodcasterApp : Application() {
+    lateinit var container: AppContainer
+        private set
+
+    override fun onCreate() {
+        super.onCreate()
+        container = AppContainer(this)
+    }
+}

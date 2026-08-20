@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>A Serial Audio Drama</title>
+    <itunes:type>serial</itunes:type>
+    
+    <item>
+      <title>Chapter 1</title>
+      <guid isPermaLink="false">serial-ep-1</guid>
+      <pubDate>01 Jan 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>21:00</itunes:duration>
+      <itunes:episode>1</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/serial/chapter1.mp3" length="500000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Chapter 2</title>
+      <guid isPermaLink="false">serial-ep-2</guid>
+      <pubDate>02 Jan 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>22:00</itunes:duration>
+      <itunes:episode>2</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/serial/chapter2.mp3" length="500000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Chapter 3</title>
+      <guid isPermaLink="false">serial-ep-3</guid>
+      <pubDate>03 Jan 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>23:00</itunes:duration>
+      <itunes:episode>3</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/serial/chapter3.mp3" length="500000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Chapter 4</title>
+      <guid isPermaLink="false">serial-ep-4</guid>
+      <pubDate>04 Jan 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>24:00</itunes:duration>
+      <itunes:episode>4</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/serial/chapter4.mp3" length="500000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Chapter 5</title>
+      <guid isPermaLink="false">serial-ep-5</guid>
+      <pubDate>05 Jan 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>25:00</itunes:duration>
+      <itunes:episode>5</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/serial/chapter5.mp3" length="500000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Chapter 6</title>
+      <guid isPermaLink="false">serial-ep-6</guid>
+      <pubDate>06 Jan 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>26:00</itunes:duration>
+      <itunes:episode>6</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/serial/chapter6.mp3" length="500000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Chapter 7</title>
+      <guid isPermaLink="false">serial-ep-7</guid>
+      <pubDate>07 Jan 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>27:00</itunes:duration>
+      <itunes:episode>7</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/serial/chapter7.mp3" length="500000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Chapter 8</title>
+      <guid isPermaLink="false">serial-ep-8</guid>
+      <pubDate>08 Jan 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>28:00</itunes:duration>
+      <itunes:episode>8</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/serial/chapter8.mp3" length="500000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Chapter 9</title>
+      <guid isPermaLink="false">serial-ep-9</guid>
+      <pubDate>09 Jan 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>29:00</itunes:duration>
+      <itunes:episode>9</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/serial/chapter9.mp3" length="500000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Chapter 10</title>
+      <guid isPermaLink="false">serial-ep-10</guid>
+      <pubDate>10 Jan 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>30:00</itunes:duration>
+      <itunes:episode>10</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/serial/chapter10.mp3" length="500000" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>

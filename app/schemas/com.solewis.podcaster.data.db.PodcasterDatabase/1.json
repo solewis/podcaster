@@ -1,0 +1,341 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "7185bd5281641ea568d75c74646ff3c5",
+    "entities": [
+      {
+        "tableName": "podcasts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `feedUrl` TEXT NOT NULL, `itunesCollectionId` INTEGER, `title` TEXT NOT NULL, `author` TEXT, `description` TEXT, `artworkUrl` TEXT, `websiteUrl` TEXT, `feedKind` TEXT, `subscribedAt` INTEGER NOT NULL, `lastRefreshedAt` INTEGER, `lastRefreshFailedAt` INTEGER, `lastRefreshError` TEXT, `httpEtag` TEXT DEFAULT NULL, `httpLastModified` TEXT DEFAULT NULL, `sortOrder` TEXT NOT NULL DEFAULT 'NEWEST_FIRST', `playbackSpeedOverride` REAL, `autoPlayNextOverride` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "feedUrl",
+            "columnName": "feedUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itunesCollectionId",
+            "columnName": "itunesCollectionId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "author",
+            "columnName": "author",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "artworkUrl",
+            "columnName": "artworkUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "websiteUrl",
+            "columnName": "websiteUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "feedKind",
+            "columnName": "feedKind",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "subscribedAt",
+            "columnName": "subscribedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastRefreshedAt",
+            "columnName": "lastRefreshedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastRefreshFailedAt",
+            "columnName": "lastRefreshFailedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastRefreshError",
+            "columnName": "lastRefreshError",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "httpEtag",
+            "columnName": "httpEtag",
+            "affinity": "TEXT",
+            "defaultValue": "NULL"
+          },
+          {
+            "fieldPath": "httpLastModified",
+            "columnName": "httpLastModified",
+            "affinity": "TEXT",
+            "defaultValue": "NULL"
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'NEWEST_FIRST'"
+          },
+          {
+            "fieldPath": "playbackSpeedOverride",
+            "columnName": "playbackSpeedOverride",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "autoPlayNextOverride",
+            "columnName": "autoPlayNextOverride",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_podcasts_feedUrl",
+            "unique": true,
+            "columnNames": [
+              "feedUrl"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_podcasts_feedUrl` ON `${TABLE_NAME}` (`feedUrl`)"
+          }
+        ]
+      },
+      {
+        "tableName": "episodes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `podcastId` INTEGER NOT NULL, `stableKey` TEXT NOT NULL, `stableKeySource` TEXT NOT NULL, `title` TEXT NOT NULL, `descriptionHtml` TEXT, `pubDateMillis` INTEGER, `enclosureUrl` TEXT NOT NULL, `enclosureBytes` INTEGER, `enclosureMimeType` TEXT, `durationMillis` INTEGER, `durationIsExact` INTEGER NOT NULL DEFAULT 0, `artworkUrl` TEXT, `itunesEpisodeNumber` INTEGER, `itunesSeason` INTEGER, `episodeType` TEXT NOT NULL DEFAULT 'full', `webPageUrl` TEXT, `feedPosition` INTEGER NOT NULL, `chronoIndex` INTEGER, `displayNumber` INTEGER, `positionMillis` INTEGER NOT NULL DEFAULT 0, `isPlayed` INTEGER NOT NULL DEFAULT 0, `lastPlayedAt` INTEGER, `playedAt` INTEGER, `firstSeenAt` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`podcastId`) REFERENCES `podcasts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "podcastId",
+            "columnName": "podcastId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stableKey",
+            "columnName": "stableKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stableKeySource",
+            "columnName": "stableKeySource",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descriptionHtml",
+            "columnName": "descriptionHtml",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pubDateMillis",
+            "columnName": "pubDateMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "enclosureUrl",
+            "columnName": "enclosureUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enclosureBytes",
+            "columnName": "enclosureBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "enclosureMimeType",
+            "columnName": "enclosureMimeType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "durationMillis",
+            "columnName": "durationMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "durationIsExact",
+            "columnName": "durationIsExact",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "artworkUrl",
+            "columnName": "artworkUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "itunesEpisodeNumber",
+            "columnName": "itunesEpisodeNumber",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "itunesSeason",
+            "columnName": "itunesSeason",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "episodeType",
+            "columnName": "episodeType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'full'"
+          },
+          {
+            "fieldPath": "webPageUrl",
+            "columnName": "webPageUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "feedPosition",
+            "columnName": "feedPosition",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chronoIndex",
+            "columnName": "chronoIndex",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "displayNumber",
+            "columnName": "displayNumber",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "positionMillis",
+            "columnName": "positionMillis",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "isPlayed",
+            "columnName": "isPlayed",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "lastPlayedAt",
+            "columnName": "lastPlayedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "playedAt",
+            "columnName": "playedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "firstSeenAt",
+            "columnName": "firstSeenAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_episodes_podcastId_chronoIndex",
+            "unique": false,
+            "columnNames": [
+              "podcastId",
+              "chronoIndex"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_episodes_podcastId_chronoIndex` ON `${TABLE_NAME}` (`podcastId`, `chronoIndex`)"
+          },
+          {
+            "name": "index_episodes_podcastId_lastPlayedAt",
+            "unique": false,
+            "columnNames": [
+              "podcastId",
+              "lastPlayedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_episodes_podcastId_lastPlayedAt` ON `${TABLE_NAME}` (`podcastId`, `lastPlayedAt`)"
+          },
+          {
+            "name": "index_episodes_podcastId_stableKey",
+            "unique": true,
+            "columnNames": [
+              "podcastId",
+              "stableKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_episodes_podcastId_stableKey` ON `${TABLE_NAME}` (`podcastId`, `stableKey`)"
+          },
+          {
+            "name": "index_episodes_lastPlayedAt",
+            "unique": false,
+            "columnNames": [
+              "lastPlayedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_episodes_lastPlayedAt` ON `${TABLE_NAME}` (`lastPlayedAt`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "podcasts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "podcastId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7185bd5281641ea568d75c74646ff3c5')"
+    ]
+  }
+}

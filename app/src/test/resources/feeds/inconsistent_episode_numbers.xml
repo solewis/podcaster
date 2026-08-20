@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Inconsistent Numbering Show</title>
+    <itunes:type>episodic</itunes:type>
+    <item>
+      <title>Has number 1</title>
+      <guid isPermaLink="false">inc-1</guid>
+      <pubDate>Wed, 01 Mar 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>30:00</itunes:duration>
+      <itunes:episode>1</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/inc/1.mp3" length="100" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Missing number</title>
+      <guid isPermaLink="false">inc-2</guid>
+      <pubDate>Wed, 08 Mar 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>31:00</itunes:duration>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/inc/2.mp3" length="100" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Duplicate number 1</title>
+      <guid isPermaLink="false">inc-3</guid>
+      <pubDate>Wed, 15 Mar 2023 08:00:00 +0000</pubDate>
+      <itunes:duration>32:00</itunes:duration>
+      <itunes:episode>1</itunes:episode>
+      <itunes:episodeType>full</itunes:episodeType>
+      <enclosure url="https://example.com/inc/3.mp3" length="100" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>

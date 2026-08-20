@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Duplicate Guid Show</title>
+    <itunes:type>episodic</itunes:type>
+    
+    <item>
+      <title>Duplicate Guid Episode 1</title>
+      <guid isPermaLink="false">static-guid-does-not-change</guid>
+      <pubDate>Mon, 01 Jan 2024 08:00:00 +0000</pubDate>
+      <itunes:duration>00:11:00</itunes:duration>
+      <enclosure url="https://example.com/audio/ep1.mp3?token=abc1" length="1000000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Duplicate Guid Episode 2</title>
+      <guid isPermaLink="false">static-guid-does-not-change</guid>
+      <pubDate>Mon, 02 Jan 2024 08:00:00 +0000</pubDate>
+      <itunes:duration>00:12:00</itunes:duration>
+      <enclosure url="https://example.com/audio/ep2.mp3?token=abc2" length="1000000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Duplicate Guid Episode 3</title>
+      <guid isPermaLink="false">static-guid-does-not-change</guid>
+      <pubDate>Mon, 03 Jan 2024 08:00:00 +0000</pubDate>
+      <itunes:duration>00:13:00</itunes:duration>
+      <enclosure url="https://example.com/audio/ep3.mp3?token=abc3" length="1000000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Duplicate Guid Episode 4</title>
+      <guid isPermaLink="false">static-guid-does-not-change</guid>
+      <pubDate>Mon, 04 Jan 2024 08:00:00 +0000</pubDate>
+      <itunes:duration>00:14:00</itunes:duration>
+      <enclosure url="https://example.com/audio/ep4.mp3?token=abc4" length="1000000" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Duplicate Guid Episode 5</title>
+      <guid isPermaLink="false">static-guid-does-not-change</guid>
+      <pubDate>Mon, 05 Jan 2024 08:00:00 +0000</pubDate>
+      <itunes:duration>00:15:00</itunes:duration>
+      <enclosure url="https://example.com/audio/ep5.mp3?token=abc5" length="1000000" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>
