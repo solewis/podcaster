@@ -40,6 +40,8 @@ import com.solewis.podcaster.ui.search.SearchScreen
 import com.solewis.podcaster.ui.search.SearchViewModel
 import com.solewis.podcaster.ui.show.ShowScreen
 import com.solewis.podcaster.ui.show.ShowViewModel
+import com.solewis.podcaster.ui.showpreview.ShowPreviewScreen
+import com.solewis.podcaster.ui.showpreview.ShowPreviewViewModel
 import kotlinx.coroutines.launch
 
 @Composable
@@ -112,7 +114,47 @@ fun PodcasterRoot(container: AppContainer) {
                         initializer { SearchViewModel(container.searchRepository, container.subscriptionRepository) }
                     }
                 )
-                SearchScreen(viewModel = viewModel)
+                SearchScreen(
+                    viewModel = viewModel,
+                    onOpenShow = { result ->
+                        navController.navigate(
+                            Route.ShowPreview(
+                                feedUrl = result.feedUrl,
+                                itunesCollectionId = result.itunesCollectionId,
+                                title = result.title,
+                                author = result.author,
+                                artworkUrl = result.artworkUrl
+                            )
+                        )
+                    }
+                )
+            }
+            composable<Route.ShowPreview> { entry ->
+                val route = entry.toRoute<Route.ShowPreview>()
+                val viewModel: ShowPreviewViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer {
+                            ShowPreviewViewModel(
+                                feedUrl = route.feedUrl,
+                                itunesCollectionId = route.itunesCollectionId,
+                                seedTitle = route.title,
+                                seedArtworkUrl = route.artworkUrl,
+                                showPreviewRepository = container.showPreviewRepository,
+                                subscriptionRepository = container.subscriptionRepository,
+                                playerConnection = container.playerConnection
+                            )
+                        }
+                    }
+                )
+                ShowPreviewScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onSubscribed = { podcastId ->
+                        navController.navigate(Route.Show(podcastId)) {
+                            popUpTo<Route.ShowPreview> { inclusive = true }
+                        }
+                    }
+                )
             }
             composable<Route.Show> { entry ->
                 val route = entry.toRoute<Route.Show>()

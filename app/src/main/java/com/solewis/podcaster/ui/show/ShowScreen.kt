@@ -52,10 +52,13 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
 import coil3.compose.AsyncImage
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.domain.JumpTargetResolver
+import com.solewis.podcaster.ui.common.EpisodeDetailSheet
+import com.solewis.podcaster.ui.common.EpisodeDetailUi
 import com.solewis.podcaster.ui.common.formatDuration
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 import kotlinx.coroutines.delay
@@ -72,6 +75,13 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
 
     var highlightedEpisodeId by remember { mutableStateOf<String?>(null) }
     var isJumpTargetVisible by remember { mutableStateOf(false) }
+    var selectedEpisode by remember { mutableStateOf<EpisodeListItem?>(null) }
+    var selectedEpisodeDescription by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(selectedEpisode?.id) {
+        selectedEpisodeDescription = null
+        selectedEpisode?.let { selectedEpisodeDescription = viewModel.descriptionFor(it.id) }
+    }
 
     val jump = state.jump
     LaunchedEffect(listState, jump?.episodeId) {
@@ -119,6 +129,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                                 EpisodeRow(
                                     episode = listItem.item,
                                     isHighlighted = listItem.item.id == highlightedEpisodeId,
+                                    onClick = { selectedEpisode = listItem.item },
                                     onPlay = { viewModel.play(listItem.item.id) }
                                 )
                                 HorizontalDivider()
@@ -151,6 +162,23 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                 )
             }
         }
+    }
+
+    selectedEpisode?.let { episode ->
+        val numberLabel = episode.displayNumber?.let { "Ep $it" }
+            ?: episode.episodeType.takeIf { it != "full" }?.replaceFirstChar(Char::uppercase)
+        EpisodeDetailSheet(
+            episode = EpisodeDetailUi(
+                title = episode.title,
+                numberLabel = numberLabel,
+                dateLabel = formatEpisodeDate(episode.pubDateMillis),
+                durationLabel = formatDuration(episode.durationMillis),
+                description = selectedEpisodeDescription,
+                isPlayed = episode.isPlayed
+            ),
+            onPlay = { viewModel.play(episode.id) },
+            onDismiss = { selectedEpisode = null }
+        )
     }
 }
 
@@ -191,6 +219,7 @@ private fun JumpToLastListenedPill(jump: JumpPillUi, onClick: () -> Unit, modifi
 private fun EpisodeRow(
     episode: EpisodeListItem,
     isHighlighted: Boolean,
+    onClick: () -> Unit,
     onPlay: () -> Unit
 ) {
     val backgroundColor by animateColorAsState(
@@ -206,6 +235,7 @@ private fun EpisodeRow(
             .then(
                 if (isHighlighted) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier
             )
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top
     ) {

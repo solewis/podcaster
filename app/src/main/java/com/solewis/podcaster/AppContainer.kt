@@ -11,6 +11,7 @@ import com.solewis.podcaster.data.remote.ItunesSearchApi
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.SearchRepository
+import com.solewis.podcaster.data.repo.ShowPreviewRepository
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.player.PlayerConnection
 import java.io.File
@@ -37,6 +38,7 @@ class AppContainer(context: Context) {
     val subscriptionRepository = SubscriptionRepository(database.podcastDao(), database.episodeDao(), feedFetcher)
     val episodeRepository = EpisodeRepository(database.episodeDao())
     val podcastRepository = PodcastRepository(database.podcastDao())
+    val showPreviewRepository = ShowPreviewRepository(feedFetcher)
 
     /**
      * Must be a process-wide singleton: a second [SimpleCache] instance pointed at the same

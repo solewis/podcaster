@@ -51,6 +51,8 @@ class ShowViewModel(
         }
     }
 
+    suspend fun descriptionFor(episodeId: String): String? = episodeRepository.getDescription(episodeId)
+
     private fun buildUiState(podcast: PodcastEntity?, episodes: List<EpisodeListItem>): UiState {
         if (podcast == null) return UiState(podcast = null, isLoading = episodes.isEmpty())
 

@@ -16,5 +16,14 @@ sealed interface Route {
     data class Show(val podcastId: Long) : Route
 
     @Serializable
+    data class ShowPreview(
+        val feedUrl: String,
+        val itunesCollectionId: Long?,
+        val title: String,
+        val author: String?,
+        val artworkUrl: String?
+    ) : Route
+
+    @Serializable
     data object NowPlaying : Route
 }

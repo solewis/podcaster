@@ -1,5 +1,6 @@
 package com.solewis.podcaster.ui.search
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,7 +36,7 @@ import com.solewis.podcaster.data.repo.PodcastSearchResult
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(viewModel: SearchViewModel) {
+fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -> Unit) {
     val state by viewModel.state.collectAsState()
 
     Scaffold(topBar = { TopAppBar(title = { Text("Search") }) }) { innerPadding ->
@@ -72,6 +73,7 @@ fun SearchScreen(viewModel: SearchViewModel) {
                             result = result,
                             isSubscribing = state.subscribingFeedUrl == result.feedUrl,
                             isSubscribed = result.feedUrl in state.subscribedFeedUrls,
+                            onClick = { onOpenShow(result) },
                             onSubscribe = { viewModel.subscribe(result) }
                         )
                     }
@@ -86,10 +88,14 @@ private fun SearchResultRow(
     result: PodcastSearchResult,
     isSubscribing: Boolean,
     isSubscribed: Boolean,
+    onClick: () -> Unit,
     onSubscribe: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(

@@ -3,6 +3,7 @@ package com.solewis.podcaster.data.repo
 import com.solewis.podcaster.data.db.EpisodeDao
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.EpisodeListItem
+import com.solewis.podcaster.domain.HtmlToText
 import kotlinx.coroutines.flow.Flow
 
 class EpisodeRepository(private val episodeDao: EpisodeDao) {
@@ -19,6 +20,15 @@ class EpisodeRepository(private val episodeDao: EpisodeDao) {
     suspend fun backfillDuration(episodeId: String, durationMillis: Long) {
         episodeDao.backfillDuration(episodeId, durationMillis)
     }
+
+    /**
+     * The full show notes, converted to plain text - loaded on demand, by id, only when an
+     * episode's detail sheet is opened. [EpisodeListItem]/[EpisodeFeedItem] deliberately omit
+     * this: it can be several KB of HTML per row, which a list of hundreds of episodes has no
+     * business holding in memory just to render titles and durations.
+     */
+    suspend fun getDescription(episodeId: String): String? =
+        HtmlToText.toPlainText(episodeDao.getById(episodeId)?.descriptionHtml)
 
     /**
      * [EpisodeListItem]/[EpisodeFeedItem] (what the list screens hold) deliberately omit
