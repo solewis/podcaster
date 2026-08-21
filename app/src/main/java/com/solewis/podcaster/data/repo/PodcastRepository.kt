@@ -2,15 +2,17 @@ package com.solewis.podcaster.data.repo
 
 import com.solewis.podcaster.data.db.PodcastDao
 import com.solewis.podcaster.data.db.entity.PodcastEntity
+import com.solewis.podcaster.data.db.model.HomeShowSummary
 import com.solewis.podcaster.data.db.model.SortOrder
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-/** Read access to subscriptions for the Library screen - kept separate from
+/** Read access to subscriptions for the Home/Subscriptions screens - kept separate from
  * [SubscriptionRepository], which owns the subscribe/refresh write path. */
 class PodcastRepository(private val podcastDao: PodcastDao) {
     fun observeAll(): Flow<List<PodcastEntity>> = podcastDao.observeAll()
     fun observeById(id: Long): Flow<PodcastEntity?> = podcastDao.observeById(id)
+    fun observeHomeOrder(): Flow<List<HomeShowSummary>> = podcastDao.observeHomeOrder()
 
     /** feedUrl -> podcastId, for screens (like Search) that only know a show by its feed URL. */
     fun observeSubscribedFeedUrls(): Flow<Map<String, Long>> =

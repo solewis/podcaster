@@ -4,16 +4,13 @@ import kotlinx.serialization.Serializable
 
 sealed interface Route {
     @Serializable
-    data object Library : Route
-
-    @Serializable
-    data object AllEpisodes : Route
+    data object Home : Route
 
     @Serializable
     data object Search : Route
 
     @Serializable
-    data object Queue : Route
+    data object Activity : Route
 
     @Serializable
     data class Show(val podcastId: Long) : Route

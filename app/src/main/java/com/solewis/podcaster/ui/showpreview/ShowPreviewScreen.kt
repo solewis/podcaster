@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.clickable
@@ -34,7 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.domain.FeedToEpisodesMapper
 import com.solewis.podcaster.ui.common.EpisodeDetailSheet
@@ -60,7 +63,7 @@ fun ShowPreviewScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.preview?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -84,6 +87,7 @@ fun ShowPreviewScreen(
                             PreviewHeader(
                                 title = preview.title,
                                 author = preview.author,
+                                episodeCount = preview.episodes.size,
                                 description = preview.description,
                                 artworkUrl = preview.artworkUrl,
                                 isSubscribing = state.isSubscribing,
@@ -123,32 +127,59 @@ fun ShowPreviewScreen(
     }
 }
 
+/** Mirrors [com.solewis.podcaster.ui.show.ShowScreen]'s header shape: name, episode count, and
+ * artwork up top, the primary action (Subscribe here; sort/refresh once subscribed) below that,
+ * then a divider, description, and another divider before the episode list - the same "podcast
+ * detail" page whether or not you've subscribed yet. */
 @Composable
 private fun PreviewHeader(
     title: String,
     author: String?,
+    episodeCount: Int,
     description: String?,
     artworkUrl: String?,
     isSubscribing: Boolean,
     isSubscribed: Boolean,
     onSubscribe: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        Row(verticalAlignment = Alignment.Top) {
-            PodcastArtwork(
-                artworkUrl = artworkUrl,
-                modifier = Modifier.size(80.dp),
-                shape = MaterialTheme.shapes.large
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        author?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 2.dp)
             )
-            Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleLarge)
-                author?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-            }
         }
+        Text(
+            "$episodeCount episodes",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+        PodcastArtwork(
+            artworkUrl = artworkUrl,
+            modifier = Modifier.size(160.dp),
+            shape = MaterialTheme.shapes.extraLarge
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
         Button(
             onClick = onSubscribe,
             enabled = !isSubscribing && !isSubscribed,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
             when {
                 isSubscribing -> CircularProgressIndicator(modifier = Modifier.size(18.dp))
@@ -159,10 +190,23 @@ private fun PreviewHeader(
                 else -> Text("Subscribe")
             }
         }
-        description?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp))
-        }
     }
+
+    HorizontalDivider()
+    description?.takeIf(String::isNotBlank)?.let {
+        Text(
+            it,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)
+        )
+        HorizontalDivider()
+    }
+    Text(
+        "Episodes",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+    )
 }
 
 @Composable

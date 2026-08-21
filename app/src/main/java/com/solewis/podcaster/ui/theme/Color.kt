@@ -3,22 +3,23 @@ package com.solewis.podcaster.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * A deliberately calm, low-saturation palette: a muted teal for primary actions and progress
- * (focus, not urgency), warm stone for secondary accents, and a soft clay for the rare tertiary
- * highlight - against warm-neutral surfaces rather than stark white/black, which read calmer at
- * the reading distances a text-heavy episode list sits at.
+ * Calm doesn't mean washed out: a confident, more saturated teal carries every primary action
+ * and accent (still a "focus" hue, not an urgent one), warm stone for secondary accents, and a
+ * soft clay for the rare tertiary highlight - against warm-neutral surfaces rather than stark
+ * white/black. One vivid accent against a quiet neutral base, rather than everything muted at
+ * once, which is what read as bland rather than minimalist.
  */
 
-// Primary - muted teal.
-val TealLight = Color(0xFF4C6B63)
+// Primary - a confident teal.
+val TealLight = Color(0xFF0F766E)
 val OnTealLight = Color(0xFFFFFFFF)
-val TealContainerLight = Color(0xFFCEE9E0)
-val OnTealContainerLight = Color(0xFF092019)
+val TealContainerLight = Color(0xFFB8ECE1)
+val OnTealContainerLight = Color(0xFF00201C)
 
-val TealDark = Color(0xFFA5D0C4)
-val OnTealDark = Color(0xFF12352C)
-val TealContainerDark = Color(0xFF334B44)
-val OnTealContainerDark = Color(0xFFBFE8DC)
+val TealDark = Color(0xFF5EEAD4)
+val OnTealDark = Color(0xFF00382F)
+val TealContainerDark = Color(0xFF0B544C)
+val OnTealContainerDark = Color(0xFFBBF5E9)
 
 // Secondary - warm stone.
 val StoneLight = Color(0xFF6B5F52)

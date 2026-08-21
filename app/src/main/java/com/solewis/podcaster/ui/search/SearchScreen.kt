@@ -1,6 +1,7 @@
 package com.solewis.podcaster.ui.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.repo.PodcastSearchResult
 import com.solewis.podcaster.ui.common.PodcastArtwork
@@ -44,12 +48,20 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
     val state by viewModel.state.collectAsState()
     var pendingUnsubscribe by remember { mutableStateOf<PodcastSearchResult?>(null) }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Search") }) }) { innerPadding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text("Search", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                }
+            )
+        }
+    ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             OutlinedTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChange,
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 placeholder = { Text("Search podcasts") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
@@ -59,7 +71,8 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
                         }
                     }
                 },
-                singleLine = true
+                singleLine = true,
+                shape = MaterialTheme.shapes.extraLarge
             )
 
             when {
@@ -69,11 +82,14 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
                 state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(state.error ?: "", color = MaterialTheme.colorScheme.error)
                 }
-                state.results.isEmpty() && state.query.isNotBlank() -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No shows found")
-                    }
-                }
+                state.query.isBlank() -> SearchPrompt(
+                    icon = Icons.Default.Search,
+                    message = "Find your next favorite podcast"
+                )
+                state.results.isEmpty() -> SearchPrompt(
+                    icon = Icons.Default.SearchOff,
+                    message = "No shows found"
+                )
                 else -> LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                     // No custom key: iTunes Search can return two different catalog entries
                     // (different collectionIds) that point at the identical feedUrl - crashed
@@ -104,6 +120,21 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
             },
             onDismiss = { pendingUnsubscribe = null }
         )
+    }
+}
+
+@Composable
+private fun SearchPrompt(icon: ImageVector, message: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(48.dp)
+            )
+            Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

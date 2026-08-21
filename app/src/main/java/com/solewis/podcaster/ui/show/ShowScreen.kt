@@ -3,6 +3,7 @@ package com.solewis.podcaster.ui.show
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,10 +22,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,9 +54,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.clickable
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.domain.JumpTargetResolver
@@ -107,24 +109,10 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.podcast?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    state.podcast?.let { podcast ->
-                        TextButton(onClick = viewModel::toggleSortOrder) {
-                            Text(if (podcast.sortOrder == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first")
-                        }
-                    }
-                    if (isRefreshing) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp).padding(horizontal = 12.dp))
-                    } else {
-                        IconButton(onClick = viewModel::refresh) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Check for new episodes")
-                        }
                     }
                 }
             )
@@ -142,7 +130,12 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                 ) {
                     items(state.items, key = { it.key }) { listItem ->
                         when (listItem) {
-                            is ShowListItem.Header -> ShowHeader(listItem)
+                            is ShowListItem.Header -> ShowHeader(
+                                header = listItem,
+                                isRefreshing = isRefreshing,
+                                onRefresh = viewModel::refresh,
+                                onToggleSortOrder = viewModel::toggleSortOrder
+                            )
                             is ShowListItem.Episode -> {
                                 EpisodeRow(
                                     episode = listItem.item,
@@ -201,25 +194,84 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
     }
 }
 
+/**
+ * Name, episode count, and artwork up top; the sort/refresh controls in the slot a preview
+ * screen's Subscribe button would occupy; then a divider, the show's own description (if the
+ * feed has one), another divider, and an "Episodes" label - mirroring
+ * [com.solewis.podcaster.ui.showpreview.ShowPreviewScreen]'s header shape, since it's the same
+ * "podcast detail" page whether or not you're subscribed yet.
+ */
 @Composable
-private fun ShowHeader(header: ShowListItem.Header) {
+private fun ShowHeader(
+    header: ShowListItem.Header,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    onToggleSortOrder: () -> Unit
+) {
     val podcast = header.podcast
-    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.Top) {
-        PodcastArtwork(
-            artworkUrl = podcast.artworkUrl,
-            modifier = Modifier.size(80.dp),
-            shape = MaterialTheme.shapes.large
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            podcast.title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
         )
-        Column(modifier = Modifier.padding(start = 12.dp)) {
-            Text(podcast.title, style = MaterialTheme.typography.titleLarge)
-            podcast.author?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        podcast.author?.let {
             Text(
-                "${header.episodeCount} episodes",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 4.dp)
+                it,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 2.dp)
             )
         }
+        Text(
+            "${header.episodeCount} episodes",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+        PodcastArtwork(
+            artworkUrl = podcast.artworkUrl,
+            modifier = Modifier.size(160.dp),
+            shape = MaterialTheme.shapes.extraLarge
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onToggleSortOrder) {
+                Text(if (podcast.sortOrder == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first")
+            }
+            if (isRefreshing) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp).padding(horizontal = 12.dp))
+            } else {
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Check for new episodes")
+                }
+            }
+        }
     }
+
+    HorizontalDivider()
+    podcast.description?.takeIf(String::isNotBlank)?.let {
+        Text(
+            it,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)
+        )
+        HorizontalDivider()
+    }
+    Text(
+        "Episodes",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+    )
 }
 
 @Composable

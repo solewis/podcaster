@@ -1,4 +1,4 @@
-package com.solewis.podcaster.ui.library
+package com.solewis.podcaster.ui.subscriptions
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,7 +12,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class LibraryViewModel(
+/** The vertical, manageable view of every subscription - unsubscribe and refresh-all live here,
+ * distinct from Home's browsing-only horizontal strip. */
+class SubscriptionsViewModel(
     private val podcastRepository: PodcastRepository,
     private val subscriptionRepository: SubscriptionRepository
 ) : ViewModel() {
