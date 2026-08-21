@@ -6,10 +6,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -41,9 +43,9 @@ import com.solewis.podcaster.ui.common.formatEpisodeDate
 fun HomeScreen(viewModel: HomeViewModel, onOpenShow: (Long) -> Unit) {
     val state by viewModel.state.collectAsState()
 
-    Scaffold { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            ScreenTitle("Podcaster")
+    Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding).statusBarsPadding()) {
+            ScreenTitle("Library")
             if (state.subscriptions.isEmpty()) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text("No shows yet - search to subscribe to one.", style = MaterialTheme.typography.bodyLarge)

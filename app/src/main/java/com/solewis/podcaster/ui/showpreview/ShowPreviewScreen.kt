@@ -6,10 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -22,6 +26,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
@@ -45,6 +50,7 @@ import com.solewis.podcaster.domain.FeedToEpisodesMapper
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeDetailSheet
 import com.solewis.podcaster.ui.common.EpisodeDetailUi
+import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.formatDuration
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 
@@ -63,29 +69,55 @@ fun ShowPreviewScreen(
         state.subscribedPodcastId?.let(onSubscribed)
     }
 
-    Scaffold { innerPadding ->
+    Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
+        // Deliberately no statusBarsPadding on this outer Column - see the matching comment in
+        // ShowScreen for why: the banner Surface below needs its color to reach the true top of
+        // the screen, under the status bar, with statusBarsPadding applied just inside it instead.
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             val preview = state.preview
+            val isSubscribed = state.subscribedPodcastId != null
 
             Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                Column {
+                Column(modifier = Modifier.statusBarsPadding()) {
                     BackButtonRow(onBack)
                     preview?.let {
-                        Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
-                            Text(
-                                it.title,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            it.author?.let { author ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    author,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 2.dp)
+                                    it.title,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
+                                it.author?.let { author ->
+                                    Text(
+                                        author,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(56.dp))
+                        }
+                        Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+                            if (isSubscribed) {
+                                OutlinedButton(onClick = {}, enabled = false) {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Text("Subscribed", modifier = Modifier.padding(start = 4.dp))
+                                }
+                            } else {
+                                Button(onClick = viewModel::subscribe, enabled = !state.isSubscribing) {
+                                    if (state.isSubscribing) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp).padding(end = 8.dp))
+                                    }
+                                    Text("Subscribe")
+                                }
                             }
                         }
                     }
@@ -100,17 +132,6 @@ fun ShowPreviewScreen(
                     Text(state.error ?: "", color = MaterialTheme.colorScheme.error)
                 }
                 preview != null -> {
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        Button(onClick = viewModel::subscribe, enabled = !state.isSubscribing) {
-                            if (state.isSubscribing) {
-                                CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
-                            } else {
-                                Icon(Icons.Default.Check, contentDescription = null)
-                            }
-                            Text("Subscribe", modifier = Modifier.padding(start = 4.dp))
-                        }
-                    }
-
                     SecondaryTabRow(selectedTabIndex = selectedTab) {
                         Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Episodes") })
                         Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("About") })

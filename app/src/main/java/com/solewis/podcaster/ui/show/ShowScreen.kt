@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -68,6 +70,7 @@ import com.solewis.podcaster.domain.JumpTargetResolver
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeDetailSheet
 import com.solewis.podcaster.ui.common.EpisodeDetailUi
+import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 import com.solewis.podcaster.ui.common.formatDuration
 import com.solewis.podcaster.ui.common.formatEpisodeDate
@@ -119,30 +122,48 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
+        // Deliberately no statusBarsPadding on this outer Column - the banner Surface below
+        // needs to paint its color all the way to the true top of the screen, under the status
+        // bar. statusBarsPadding is applied just inside the Surface instead, so only the back
+        // button/title/artwork/subscribe content (not the color itself) is inset from it.
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             val podcast = state.podcast
 
             Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                Column {
+                Column(modifier = Modifier.statusBarsPadding()) {
                     BackButtonRow(onBack)
                     podcast?.let {
-                        Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
-                            Text(
-                                it.title,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            it.author?.let { author ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    author,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 2.dp)
+                                    it.title,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
+                                it.author?.let { author ->
+                                    Text(
+                                        author,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(56.dp))
+                        }
+                        Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+                            OutlinedButton(onClick = { pendingUnsubscribe = true }) {
+                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("Subscribed", modifier = Modifier.padding(start = 4.dp))
                             }
                         }
                     }
@@ -150,13 +171,6 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
             }
 
             if (podcast != null) {
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    OutlinedButton(onClick = { pendingUnsubscribe = true }) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text("Subscribed", modifier = Modifier.padding(start = 4.dp))
-                    }
-                }
-
                 SecondaryTabRow(selectedTabIndex = selectedTab) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Episodes") })
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("About") })

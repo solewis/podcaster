@@ -14,6 +14,8 @@ class PodcastRepository(private val podcastDao: PodcastDao) {
     fun observeById(id: Long): Flow<PodcastEntity?> = podcastDao.observeById(id)
     fun observeHomeOrder(): Flow<List<HomeShowSummary>> = podcastDao.observeHomeOrder()
 
+    suspend fun findByFeedUrl(feedUrl: String): PodcastEntity? = podcastDao.findByFeedUrl(feedUrl)
+
     /** feedUrl -> podcastId, for screens (like Search) that only know a show by its feed URL. */
     fun observeSubscribedFeedUrls(): Flow<Map<String, Long>> =
         podcastDao.observeAll().map { podcasts -> podcasts.associate { it.feedUrl to it.id } }

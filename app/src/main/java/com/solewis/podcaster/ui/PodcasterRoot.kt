@@ -1,7 +1,11 @@
 package com.solewis.podcaster.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Home
@@ -65,6 +69,12 @@ fun PodcasterRoot(container: AppContainer) {
     val isNowPlaying = currentDestination?.hasRoute(Route.NowPlaying::class) == true
 
     Scaffold(
+        // Leaves the status bar inset for each screen to handle itself (most via ScreenTitle/
+        // BackButtonRow's own windowInsetsPadding) rather than reserving it here too - every
+        // screen nests its own Scaffold below this one, and each of those defaults to reserving
+        // the *same* safe-drawing insets again, so reserving it at both levels was quietly
+        // doubling the status-bar-sized gap at the top of every single screen.
+        contentWindowInsets = WindowInsets.safeDrawing.exclude(WindowInsets.statusBars),
         bottomBar = {
             if (!isNowPlaying) {
                 Column {
@@ -175,6 +185,7 @@ fun PodcasterRoot(container: AppContainer) {
                                 seedArtworkUrl = route.artworkUrl,
                                 showPreviewRepository = container.showPreviewRepository,
                                 subscriptionRepository = container.subscriptionRepository,
+                                podcastRepository = container.podcastRepository,
                                 playerConnection = container.playerConnection
                             )
                         }
