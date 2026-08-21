@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
@@ -36,7 +35,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SnackbarHost
@@ -48,13 +46,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -66,17 +64,15 @@ import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
-import com.solewis.podcaster.domain.JumpTargetResolver
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.SubscribeButton
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
-import com.solewis.podcaster.ui.common.formatDuration
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import androidx.compose.ui.platform.testTag
@@ -95,7 +91,6 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var highlightedEpisodeId by remember { mutableStateOf<String?>(null) }
-    var isJumpTargetVisible by remember { mutableStateOf(false) }
     var pendingUnsubscribe by remember { mutableStateOf(false) }
 
     LaunchedEffect(refreshError) {
@@ -107,13 +102,13 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     }
 
     val jump = state.jump
-    LaunchedEffect(listState, jump?.episodeId) {
-        if (jump == null) {
-            isJumpTargetVisible = false
-        } else {
-            snapshotFlow { listState.layoutInfo.visibleItemsInfo.any { it.key == jump.episodeId } }
-                .distinctUntilChanged()
-                .collect { visible -> isJumpTargetVisible = visible }
+    // derivedStateOf (not a LaunchedEffect+snapshotFlow collector) so this reflects the list's
+    // actual current layout on every recomposition - the effect-based version only updated once
+    // the collector had a chance to run, which is why the pill stayed hidden until the user
+    // scrolled even when the jump target was never on screen to begin with.
+    val isJumpTargetVisible by remember(jump?.episodeId) {
+        derivedStateOf {
+            jump != null && listState.layoutInfo.visibleItemsInfo.any { it.key == jump.episodeId }
         }
     }
 
@@ -155,13 +150,14 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                 }
                             }
                             Spacer(modifier = Modifier.width(12.dp))
-                            PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(56.dp))
+                            PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(72.dp))
                         }
                         Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
-                            OutlinedButton(onClick = { pendingUnsubscribe = true }) {
-                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Subscribed", modifier = Modifier.padding(start = 4.dp))
-                            }
+                            SubscribeButton(
+                                isSubscribed = true,
+                                isBusy = false,
+                                onClick = { pendingUnsubscribe = true }
+                            )
                         }
                     }
                 }

@@ -17,16 +17,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
@@ -50,7 +47,9 @@ import com.solewis.podcaster.domain.FeedToEpisodesMapper
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeDetailSheet
 import com.solewis.podcaster.ui.common.EpisodeDetailUi
+import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.SubscribeButton
 import com.solewis.podcaster.ui.common.formatDuration
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 
@@ -103,22 +102,15 @@ fun ShowPreviewScreen(
                                 }
                             }
                             Spacer(modifier = Modifier.width(12.dp))
-                            PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(56.dp))
+                            PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(72.dp))
                         }
                         Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
-                            if (isSubscribed) {
-                                OutlinedButton(onClick = {}, enabled = false) {
-                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Text("Subscribed", modifier = Modifier.padding(start = 4.dp))
-                                }
-                            } else {
-                                Button(onClick = viewModel::subscribe, enabled = !state.isSubscribing) {
-                                    if (state.isSubscribing) {
-                                        CircularProgressIndicator(modifier = Modifier.size(18.dp).padding(end = 8.dp))
-                                    }
-                                    Text("Subscribe")
-                                }
-                            }
+                            SubscribeButton(
+                                isSubscribed = isSubscribed,
+                                isBusy = state.isSubscribing,
+                                enabled = !isSubscribed,
+                                onClick = viewModel::subscribe
+                            )
                         }
                     }
                 }
@@ -142,6 +134,7 @@ fun ShowPreviewScreen(
                             items(preview.episodes) { episode ->
                                 PreviewEpisodeRow(
                                     episode = episode,
+                                    fallbackArtworkUrl = preview.artworkUrl,
                                     onClick = { selectedEpisode = episode },
                                     onPlay = { viewModel.play(episode) }
                                 )
@@ -192,6 +185,7 @@ private fun AboutTab(preview: ShowPreview, modifier: Modifier = Modifier) {
 @Composable
 private fun PreviewEpisodeRow(
     episode: FeedToEpisodesMapper.MappedEpisode,
+    fallbackArtworkUrl: String?,
     onClick: () -> Unit,
     onPlay: () -> Unit
 ) {
@@ -199,11 +193,17 @@ private fun PreviewEpisodeRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top
     ) {
+        PodcastArtwork(
+            artworkUrl = episode.artworkUrl ?: fallbackArtworkUrl,
+            modifier = Modifier.size(EpisodeArtworkSize)
+        )
+
         Column(
             // Tappable to open episode details; only the play icon has its own click target,
             // matching the nested-clickable pattern used elsewhere (e.g. MiniPlayer).
             modifier = Modifier
                 .weight(1f)
+                .padding(start = 12.dp)
                 .clickable(onClick = onClick)
         ) {
             val numberLabel = episode.displayNumber?.let { "Ep $it" }
