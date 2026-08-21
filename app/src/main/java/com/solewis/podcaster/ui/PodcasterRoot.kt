@@ -3,6 +3,7 @@ package com.solewis.podcaster.ui
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Feed
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -28,13 +29,19 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.solewis.podcaster.AppContainer
+import com.solewis.podcaster.ui.allepisodes.AllEpisodesScreen
+import com.solewis.podcaster.ui.allepisodes.AllEpisodesViewModel
 import com.solewis.podcaster.ui.common.MiniPlayer
 import com.solewis.podcaster.ui.library.LibraryScreen
 import com.solewis.podcaster.ui.library.LibraryViewModel
+import com.solewis.podcaster.ui.nowplaying.NowPlayingScreen
+import com.solewis.podcaster.ui.nowplaying.NowPlayingViewModel
 import com.solewis.podcaster.ui.search.SearchScreen
 import com.solewis.podcaster.ui.search.SearchViewModel
 import com.solewis.podcaster.ui.show.ShowScreen
 import com.solewis.podcaster.ui.show.ShowViewModel
+import com.solewis.podcaster.ui.showpreview.ShowPreviewScreen
+import com.solewis.podcaster.ui.showpreview.ShowPreviewViewModel
 import kotlinx.coroutines.launch
 
 @Composable
@@ -48,6 +55,7 @@ fun PodcasterRoot(container: AppContainer) {
 
     val topLevelRoutes = listOf(
         TopLevelRoute(Route.Library, "Library", Icons.Default.LibraryMusic),
+        TopLevelRoute(Route.AllEpisodes, "Episodes", Icons.AutoMirrored.Filled.Feed),
         TopLevelRoute(Route.Search, "Search", Icons.Default.Search)
     )
 
@@ -56,7 +64,8 @@ fun PodcasterRoot(container: AppContainer) {
             Column {
                 MiniPlayer(
                     playback = playback,
-                    onTogglePlayPause = { scope.launch { container.playerConnection.togglePlayPause() } }
+                    onTogglePlayPause = { scope.launch { container.playerConnection.togglePlayPause() } },
+                    onExpand = { navController.navigate(Route.NowPlaying) }
                 )
                 NavigationBar {
                     topLevelRoutes.forEach { topLevel ->
@@ -91,13 +100,61 @@ fun PodcasterRoot(container: AppContainer) {
                     navController.navigate(Route.Show(podcastId))
                 })
             }
+            composable<Route.AllEpisodes> {
+                val viewModel: AllEpisodesViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { AllEpisodesViewModel(container.episodeRepository, container.playerConnection) }
+                    }
+                )
+                AllEpisodesScreen(viewModel = viewModel)
+            }
             composable<Route.Search> {
                 val viewModel: SearchViewModel = viewModel(
                     factory = viewModelFactory {
                         initializer { SearchViewModel(container.searchRepository, container.subscriptionRepository) }
                     }
                 )
-                SearchScreen(viewModel = viewModel)
+                SearchScreen(
+                    viewModel = viewModel,
+                    onOpenShow = { result ->
+                        navController.navigate(
+                            Route.ShowPreview(
+                                feedUrl = result.feedUrl,
+                                itunesCollectionId = result.itunesCollectionId,
+                                title = result.title,
+                                author = result.author,
+                                artworkUrl = result.artworkUrl
+                            )
+                        )
+                    }
+                )
+            }
+            composable<Route.ShowPreview> { entry ->
+                val route = entry.toRoute<Route.ShowPreview>()
+                val viewModel: ShowPreviewViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer {
+                            ShowPreviewViewModel(
+                                feedUrl = route.feedUrl,
+                                itunesCollectionId = route.itunesCollectionId,
+                                seedTitle = route.title,
+                                seedArtworkUrl = route.artworkUrl,
+                                showPreviewRepository = container.showPreviewRepository,
+                                subscriptionRepository = container.subscriptionRepository,
+                                playerConnection = container.playerConnection
+                            )
+                        }
+                    }
+                )
+                ShowPreviewScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onSubscribed = { podcastId ->
+                        navController.navigate(Route.Show(podcastId)) {
+                            popUpTo<Route.ShowPreview> { inclusive = true }
+                        }
+                    }
+                )
             }
             composable<Route.Show> { entry ->
                 val route = entry.toRoute<Route.Show>()
@@ -114,6 +171,12 @@ fun PodcasterRoot(container: AppContainer) {
                     }
                 )
                 ShowScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+            }
+            composable<Route.NowPlaying> {
+                val viewModel: NowPlayingViewModel = viewModel(
+                    factory = viewModelFactory { initializer { NowPlayingViewModel(container.playerConnection) } }
+                )
+                NowPlayingScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
             }
         }
     }

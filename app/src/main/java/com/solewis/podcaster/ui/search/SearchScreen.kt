@@ -1,5 +1,6 @@
 package com.solewis.podcaster.ui.search
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,7 +36,7 @@ import com.solewis.podcaster.data.repo.PodcastSearchResult
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(viewModel: SearchViewModel) {
+fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -> Unit) {
     val state by viewModel.state.collectAsState()
 
     Scaffold(topBar = { TopAppBar(title = { Text("Search") }) }) { innerPadding ->
@@ -62,11 +63,17 @@ fun SearchScreen(viewModel: SearchViewModel) {
                     }
                 }
                 else -> LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
-                    items(state.results, key = { it.feedUrl }) { result ->
+                    // No custom key: iTunes Search can return two different catalog entries
+                    // (different collectionIds) that point at the identical feedUrl - crashed
+                    // with "Key ... was already used" on a real search before this was found.
+                    // The list is fully replaced on every query anyway, so the default
+                    // positional key is fine.
+                    items(state.results) { result ->
                         SearchResultRow(
                             result = result,
                             isSubscribing = state.subscribingFeedUrl == result.feedUrl,
                             isSubscribed = result.feedUrl in state.subscribedFeedUrls,
+                            onClick = { onOpenShow(result) },
                             onSubscribe = { viewModel.subscribe(result) }
                         )
                     }
@@ -81,10 +88,14 @@ private fun SearchResultRow(
     result: PodcastSearchResult,
     isSubscribing: Boolean,
     isSubscribed: Boolean,
+    onClick: () -> Unit,
     onSubscribe: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(

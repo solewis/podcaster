@@ -6,5 +6,6 @@ data class PlayableEpisode(
     val title: String,
     val podcastTitle: String,
     val artworkUrl: String?,
-    val mediaUrl: String
+    val mediaUrl: String,
+    val startPositionMillis: Long
 )

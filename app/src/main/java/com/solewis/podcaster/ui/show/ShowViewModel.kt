@@ -43,22 +43,15 @@ class ShowViewModel(
         viewModelScope.launch { podcastRepository.setSortOrder(podcastId, next) }
     }
 
-    /**
-     * DEBUG ONLY - stands in for the real player (Phase 4+) so the jump-to-last-listened feature
-     * is demonstrable and testable before any playback code exists. Delete this along with its
-     * call sites in `ShowScreen`/`EpisodeRow` once `ProgressWriter` lands in Phase 5.
-     */
-    fun debugSetProgress(episodeId: String, positionMillis: Long, isPlayed: Boolean) {
-        viewModelScope.launch { episodeRepository.setProgress(episodeId, positionMillis, isPlayed) }
-    }
-
     fun play(episodeId: String) {
-        val podcastTitle = state.value.podcast?.title ?: return
+        val podcast = state.value.podcast ?: return
         viewModelScope.launch {
-            val playable = episodeRepository.getPlayable(episodeId, podcastTitle) ?: return@launch
+            val playable = episodeRepository.getPlayable(episodeId, podcast.title, podcast.artworkUrl) ?: return@launch
             playerConnection.play(playable)
         }
     }
+
+    suspend fun descriptionFor(episodeId: String): String? = episodeRepository.getDescription(episodeId)
 
     private fun buildUiState(podcast: PodcastEntity?, episodes: List<EpisodeListItem>): UiState {
         if (podcast == null) return UiState(podcast = null, isLoading = episodes.isEmpty())

@@ -45,10 +45,12 @@ class EpisodeDaoTest {
         title: String = "Episode $feedPosition",
         positionMillis: Long = 0,
         isPlayed: Boolean = false,
-        lastPlayedAt: Long? = null
+        lastPlayedAt: Long? = null,
+        pubDateMillis: Long? = null,
+        podcastIdOverride: Long = podcastId
     ) = EpisodeEntity(
         id = id,
-        podcastId = podcastId,
+        podcastId = podcastIdOverride,
         stableKey = id,
         stableKeySource = "guid",
         title = title,
@@ -59,6 +61,7 @@ class EpisodeDaoTest {
         positionMillis = positionMillis,
         isPlayed = isPlayed,
         lastPlayedAt = lastPlayedAt,
+        pubDateMillis = pubDateMillis,
         firstSeenAt = 1000L
     )
 
@@ -248,5 +251,79 @@ class EpisodeDaoTest {
         podcastDao.setSortOrder(podcastId, SortOrder.OLDEST_FIRST)
 
         assertThat(podcastDao.getById(podcastId)!!.sortOrder).isEqualTo(SortOrder.OLDEST_FIRST)
+    }
+
+    @Test
+    fun backfillDuration_sets_duration_and_marks_it_exact() = runTest {
+        episodeDao.insertNew(listOf(episode(id = "ep1", feedPosition = 0)))
+        assertThat(episodeDao.getById("ep1")!!.durationIsExact).isFalse()
+
+        episodeDao.backfillDuration("ep1", 1_234_000L)
+
+        val updated = episodeDao.getById("ep1")!!
+        assertThat(updated.durationMillis).isEqualTo(1_234_000L)
+        assertThat(updated.durationIsExact).isTrue()
+    }
+
+    @Test
+    fun backfillDuration_can_correct_an_already_exact_value_that_actually_changed() = runTest {
+        episodeDao.insertNew(listOf(episode(id = "ep1", feedPosition = 0)))
+        episodeDao.backfillDuration("ep1", 1_000_000L)
+
+        // The player reports a different (more accurate) duration on a later playback.
+        episodeDao.backfillDuration("ep1", 1_050_000L)
+
+        assertThat(episodeDao.getById("ep1")!!.durationMillis).isEqualTo(1_050_000L)
+    }
+
+    @Test
+    fun observeAllEpisodes_spans_every_podcast_ordered_newest_published_first() = runTest {
+        val otherPodcastId = podcastDao.insert(
+            PodcastEntity(feedUrl = "https://example.com/other.xml", title = "Other Show", subscribedAt = 1000L)
+        )
+        episodeDao.insertNew(
+            listOf(
+                episode(id = "ep1", feedPosition = 0, pubDateMillis = 1000L),
+                episode(id = "ep2", feedPosition = 1, pubDateMillis = 3000L),
+                episode(id = "other-ep1", feedPosition = 0, pubDateMillis = 2000L, podcastIdOverride = otherPodcastId)
+            )
+        )
+
+        val result = episodeDao.observeAllEpisodes().first().map { it.id }
+
+        assertThat(result).containsExactly("ep2", "other-ep1", "ep1").inOrder()
+    }
+
+    @Test
+    fun observeAllEpisodes_includes_the_joined_podcast_title_and_artwork() = runTest {
+        podcastDao.insert(
+            PodcastEntity(
+                feedUrl = "https://example.com/artwork-test.xml",
+                title = "Show With Artwork",
+                artworkUrl = "https://example.com/art.jpg",
+                subscribedAt = 1000L
+            )
+        ).let { showId ->
+            episodeDao.insertNew(listOf(episode(id = "art-ep1", feedPosition = 0, podcastIdOverride = showId)))
+        }
+
+        val result = episodeDao.observeAllEpisodes().first().single { it.id == "art-ep1" }
+
+        assertThat(result.podcastTitle).isEqualTo("Show With Artwork")
+        assertThat(result.podcastArtworkUrl).isEqualTo("https://example.com/art.jpg")
+    }
+
+    @Test
+    fun observeAllEpisodes_sorts_episodes_with_no_pub_date_last() = runTest {
+        episodeDao.insertNew(
+            listOf(
+                episode(id = "dated", feedPosition = 0, pubDateMillis = 1000L),
+                episode(id = "undated", feedPosition = 1, pubDateMillis = null)
+            )
+        )
+
+        val result = episodeDao.observeAllEpisodes().first().map { it.id }
+
+        assertThat(result).containsExactly("dated", "undated").inOrder()
     }
 }
