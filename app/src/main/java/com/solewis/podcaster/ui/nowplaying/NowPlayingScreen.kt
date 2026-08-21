@@ -14,10 +14,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -45,7 +48,7 @@ import com.solewis.podcaster.ui.common.formatTimer
 
 private const val SKIP_SECONDS = 15
 
-private val SPEEDS = listOf(0.8f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,9 +140,6 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                         modifier = Modifier.size(36.dp)
                     )
                 }
-                IconButton(onClick = viewModel::skipToNext) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "Skip to next episode", modifier = Modifier.size(36.dp))
-                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -151,11 +151,31 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
 
 @Composable
 private fun SpeedControl(currentSpeed: Float, onSpeedChange: (Float) -> Unit) {
-    TextButton(onClick = {
-        val currentIndex = SPEEDS.indexOfFirst { it == currentSpeed }.takeIf { it >= 0 } ?: 1
-        val next = SPEEDS[(currentIndex + 1) % SPEEDS.size]
-        onSpeedChange(next)
-    }) {
-        Text("Speed: ${currentSpeed}x")
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        TextButton(onClick = { expanded = true }) {
+            Text("Speed: ${formatSpeed(currentSpeed)}x")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SPEEDS.forEach { speed ->
+                DropdownMenuItem(
+                    text = { Text("${formatSpeed(speed)}x") },
+                    leadingIcon = if (speed == currentSpeed) {
+                        { Icon(Icons.Default.Check, contentDescription = null) }
+                    } else {
+                        null
+                    },
+                    onClick = {
+                        onSpeedChange(speed)
+                        expanded = false
+                    }
+                )
+            }
+        }
     }
 }
+
+/** "1.0" reads worse than "1" for a whole-number speed; fractional speeds print as-is. */
+private fun formatSpeed(speed: Float): String =
+    if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()

@@ -222,7 +222,7 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.NowPlaying> {
                 val viewModel: NowPlayingViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { NowPlayingViewModel(container.playerConnection, container.queueRepository) }
+                        initializer { NowPlayingViewModel(container.playerConnection) }
                     }
                 )
                 NowPlayingScreen(viewModel = viewModel, onBack = { navController.popBackStack() })

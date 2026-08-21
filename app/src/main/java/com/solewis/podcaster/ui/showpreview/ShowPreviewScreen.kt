@@ -77,7 +77,7 @@ fun ShowPreviewScreen(
             val preview = state.preview
             val isSubscribed = state.subscribedPodcastId != null
 
-            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.statusBarsPadding()) {
                     BackButtonRow(onBack)
                     preview?.let {

@@ -132,7 +132,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             val podcast = state.podcast
 
-            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.statusBarsPadding()) {
                     BackButtonRow(onBack)
                     podcast?.let {
