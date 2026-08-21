@@ -21,6 +21,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    sourceSets {
+        // Bundles exported schema JSON as a test asset so MigrationTestHelper can load each past
+        // version by number instead of needing the actual entity/@Database classes from that version.
+        getByName("androidTest").assets.srcDirs("$projectDir/schemas")
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -109,6 +115,8 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
     implementation(libs.kotlinx.coroutines.guava)
+
+    implementation(libs.work.runtime.ktx)
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)

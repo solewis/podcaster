@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.repo.EpisodeRepository
+import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.player.PlayerConnection
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -12,6 +13,7 @@ import kotlinx.coroutines.launch
 
 class AllEpisodesViewModel(
     private val episodeRepository: EpisodeRepository,
+    private val queueRepository: QueueRepository,
     private val playerConnection: PlayerConnection
 ) : ViewModel() {
 
@@ -24,5 +26,9 @@ class AllEpisodesViewModel(
                 ?: return@launch
             playerConnection.play(playable)
         }
+    }
+
+    fun enqueue(episode: EpisodeFeedItem) {
+        viewModelScope.launch { queueRepository.enqueue(episode.id) }
     }
 }

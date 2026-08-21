@@ -38,6 +38,7 @@ class PlaybackService : MediaSessionService() {
 
         progressWriter = ProgressWriter(player, container.episodeRepository, lifecycleScope)
         player.addListener(progressWriter)
+        player.addListener(AutoAdvancer(player, container.queueRepository, lifecycleScope))
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = mediaSession

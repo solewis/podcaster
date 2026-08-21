@@ -6,6 +6,7 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.solewis.podcaster.data.remote.HttpClient
+import com.solewis.podcaster.work.RefreshAllWorker
 
 /**
  * Application entry point. Owns the single [AppContainer] instance, read from Compose via
@@ -19,6 +20,7 @@ class PodcasterApp : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        RefreshAllWorker.schedule(this)
     }
 
     /**

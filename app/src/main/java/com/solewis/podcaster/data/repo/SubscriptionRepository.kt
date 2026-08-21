@@ -10,6 +10,11 @@ import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.domain.EpisodeIdentity
 import com.solewis.podcaster.domain.FeedToEpisodesMapper
 import com.solewis.podcaster.domain.HtmlToText
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 sealed class SubscribeResult {
     data class Success(val podcastId: Long) : SubscribeResult()
@@ -129,6 +134,18 @@ class SubscriptionRepository(
 
         podcastDao.recordRefreshSuccess(podcastId, fetchResult.etag, fetchResult.lastModified, timestamp)
         return RefreshResult.Success(episodesAdded = newEntities.size)
+    }
+
+    /**
+     * Refreshes every subscription, capped at [maxConcurrent] in flight at once - shared by the
+     * Library screen's pull-to-refresh and the periodic background worker, so both follow the
+     * same "don't hammer every feed host at once" rule.
+     */
+    suspend fun refreshAll(maxConcurrent: Int = 3): List<RefreshResult> = coroutineScope {
+        val semaphore = Semaphore(maxConcurrent)
+        podcastDao.getAllIds()
+            .map { id -> async { semaphore.withPermit { refresh(id) } } }
+            .awaitAll()
     }
 
     private fun FeedToEpisodesMapper.MappedEpisode.toEntity(podcastId: Long, firstSeenAt: Long) = EpisodeEntity(

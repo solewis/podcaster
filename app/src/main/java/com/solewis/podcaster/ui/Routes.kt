@@ -13,6 +13,9 @@ sealed interface Route {
     data object Search : Route
 
     @Serializable
+    data object Queue : Route
+
+    @Serializable
     data class Show(val podcastId: Long) : Route
 
     @Serializable

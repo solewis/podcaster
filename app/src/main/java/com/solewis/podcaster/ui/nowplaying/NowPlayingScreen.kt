@@ -15,10 +15,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.Forward30
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -42,7 +41,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.solewis.podcaster.ui.common.formatDuration
+import com.solewis.podcaster.ui.common.SkipIcon
+import com.solewis.podcaster.ui.common.formatTimer
+
+private const val SKIP_SECONDS = 15
 
 private val SPEEDS = listOf(0.8f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
@@ -112,15 +114,20 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatDuration(sliderPositionMillis.toLong()) ?: "0m", style = MaterialTheme.typography.labelSmall)
-                Text(formatDuration(progress.durationMillis) ?: "--", style = MaterialTheme.typography.labelSmall)
+                Text(formatTimer(sliderPositionMillis.toLong()) ?: "0:00", style = MaterialTheme.typography.labelSmall)
+                Text(formatTimer(progress.durationMillis) ?: "--:--", style = MaterialTheme.typography.labelSmall)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 IconButton(onClick = viewModel::skipBack) {
-                    Icon(Icons.Default.FastRewind, contentDescription = "Back 15 seconds", modifier = Modifier.size(36.dp))
+                    SkipIcon(
+                        seconds = SKIP_SECONDS,
+                        forward = false,
+                        contentDescription = "Back $SKIP_SECONDS seconds",
+                        modifier = Modifier.size(36.dp)
+                    )
                 }
                 FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
                     Icon(
@@ -130,7 +137,15 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                     )
                 }
                 IconButton(onClick = viewModel::skipForward) {
-                    Icon(Icons.Default.Forward30, contentDescription = "Forward 30 seconds", modifier = Modifier.size(36.dp))
+                    SkipIcon(
+                        seconds = SKIP_SECONDS,
+                        forward = true,
+                        contentDescription = "Forward $SKIP_SECONDS seconds",
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+                IconButton(onClick = viewModel::skipToNext) {
+                    Icon(Icons.Default.SkipNext, contentDescription = "Skip to next episode", modifier = Modifier.size(36.dp))
                 }
             }
 
