@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -35,10 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.domain.FeedToEpisodesMapper
-import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeDetailSheet
 import com.solewis.podcaster.ui.common.EpisodeDetailUi
 import com.solewis.podcaster.ui.common.PodcastArtwork
@@ -60,9 +60,7 @@ fun ShowPreviewScreen(
     }
 
     Scaffold { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-        BackButtonRow(onBack)
-        Box(modifier = Modifier.weight(1f)) {
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             when {
                 state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -75,6 +73,7 @@ fun ShowPreviewScreen(
                     LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                         item {
                             PreviewHeader(
+                                onBack = onBack,
                                 title = preview.title,
                                 author = preview.author,
                                 episodeCount = preview.episodes.size,
@@ -97,7 +96,6 @@ fun ShowPreviewScreen(
                 }
             }
         }
-        }
     }
 
     selectedEpisode?.let { episode ->
@@ -118,12 +116,13 @@ fun ShowPreviewScreen(
     }
 }
 
-/** Mirrors [com.solewis.podcaster.ui.show.ShowScreen]'s header shape: name, episode count, and
- * artwork up top, the primary action (Subscribe here; sort/refresh once subscribed) below that,
- * then a divider, description, and another divider before the episode list - the same "podcast
- * detail" page whether or not you've subscribed yet. */
+/** Mirrors [com.solewis.podcaster.ui.show.ShowScreen]'s header shape: back button inline with
+ * the title/artwork row (not its own bar), a Subscribe row below (that screen has sort/refresh
+ * in the equivalent slot instead, once you're already subscribed), then the description and an
+ * "Episodes" label - all sharing the same left inset as the episode rows below. */
 @Composable
 private fun PreviewHeader(
+    onBack: () -> Unit,
     title: String,
     author: String?,
     episodeCount: Int,
@@ -133,44 +132,34 @@ private fun PreviewHeader(
     isSubscribed: Boolean,
     onSubscribe: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 8.dp, end = 24.dp, bottom = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-        author?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 2.dp)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().padding(end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                author?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(
+                    "$episodeCount episodes",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            PodcastArtwork(
+                artworkUrl = artworkUrl,
+                modifier = Modifier.size(64.dp),
+                shape = MaterialTheme.shapes.medium
             )
         }
-        Text(
-            "$episodeCount episodes",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-        PodcastArtwork(
-            artworkUrl = artworkUrl,
-            modifier = Modifier.size(160.dp),
-            shape = MaterialTheme.shapes.extraLarge
-        )
-        Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = onSubscribe,
             enabled = !isSubscribing && !isSubscribed,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             when {
                 isSubscribing -> CircularProgressIndicator(modifier = Modifier.size(18.dp))
@@ -181,23 +170,22 @@ private fun PreviewHeader(
                 else -> Text("Subscribe")
             }
         }
-    }
 
-    HorizontalDivider()
-    description?.takeIf(String::isNotBlank)?.let {
+        description?.takeIf(String::isNotBlank)?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
+            )
+        }
         Text(
-            it,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)
+            "Episodes",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
         HorizontalDivider()
     }
-    Text(
-        "Episodes",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
-    )
 }
 
 @Composable
