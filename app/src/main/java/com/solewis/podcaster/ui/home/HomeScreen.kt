@@ -17,62 +17,50 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.HomeShowSummary
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.formatDuration
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(viewModel: HomeViewModel, onOpenShow: (Long) -> Unit) {
     val state by viewModel.state.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Podcaster",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
+    Scaffold { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            ScreenTitle("Podcaster")
+            if (state.subscriptions.isEmpty()) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text("No shows yet - search to subscribe to one.", style = MaterialTheme.typography.bodyLarge)
                 }
-            )
-        }
-    ) { innerPadding ->
-        if (state.subscriptions.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                Text("No shows yet - search to subscribe to one.", style = MaterialTheme.typography.bodyLarge)
-            }
-        } else {
-            LazyColumn(modifier = Modifier.padding(innerPadding), contentPadding = PaddingValues(bottom = 16.dp)) {
-                item {
-                    SubscriptionsRow(subscriptions = state.subscriptions, onOpenShow = onOpenShow)
-                    HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
-                }
-                items(state.episodes, key = { it.id }) { episode ->
-                    FeedEpisodeRow(
-                        episode = episode,
-                        onPlay = { viewModel.play(episode) },
-                        onEnqueue = { viewModel.enqueue(episode) }
-                    )
-                    HorizontalDivider()
+            } else {
+                LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+                    item {
+                        SubscriptionsRow(subscriptions = state.subscriptions, onOpenShow = onOpenShow)
+                        HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+                    }
+                    items(state.episodes, key = { it.id }) { episode ->
+                        FeedEpisodeRow(
+                            episode = episode,
+                            onPlay = { viewModel.play(episode) },
+                            onEnqueue = { viewModel.enqueue(episode) }
+                        )
+                        HorizontalDivider()
+                    }
                 }
             }
         }

@@ -26,7 +26,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,10 +35,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.repo.PodcastSearchResult
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,20 +47,13 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
     val state by viewModel.state.collectAsState()
     var pendingUnsubscribe by remember { mutableStateOf<PodcastSearchResult?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text("Search", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                }
-            )
-        }
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            ScreenTitle("Search")
             OutlinedTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChange,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
                 placeholder = { Text("Search podcasts") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
