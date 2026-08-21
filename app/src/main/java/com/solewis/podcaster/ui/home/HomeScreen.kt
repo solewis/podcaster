@@ -28,6 +28,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.HomeShowSummary
@@ -102,7 +103,13 @@ private fun FeedEpisodeRow(episode: EpisodeFeedItem, onPlay: () -> Unit, onEnque
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1
             )
-            Text(episode.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 2.dp))
+            Text(
+                episode.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp)
+            )
 
             val dateAndDuration = listOfNotNull(
                 formatEpisodeDate(episode.pubDateMillis),

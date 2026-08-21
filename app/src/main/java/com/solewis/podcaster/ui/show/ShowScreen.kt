@@ -21,8 +21,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
@@ -34,15 +34,20 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,13 +59,16 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.domain.JumpTargetResolver
+import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeDetailSheet
 import com.solewis.podcaster.ui.common.EpisodeDetailUi
-import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 import com.solewis.podcaster.ui.common.formatDuration
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 import kotlinx.coroutines.delay
@@ -74,14 +82,17 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val refreshError by viewModel.refreshError.collectAsState()
+    val didUnsubscribe by viewModel.didUnsubscribe.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    var selectedTab by remember { mutableIntStateOf(0) }
     var highlightedEpisodeId by remember { mutableStateOf<String?>(null) }
     var isJumpTargetVisible by remember { mutableStateOf(false) }
     var selectedEpisode by remember { mutableStateOf<EpisodeListItem?>(null) }
     var selectedEpisodeDescription by remember { mutableStateOf<String?>(null) }
+    var pendingUnsubscribe by remember { mutableStateOf(false) }
 
     LaunchedEffect(selectedEpisode?.id) {
         selectedEpisodeDescription = null
@@ -90,6 +101,10 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
 
     LaunchedEffect(refreshError) {
         refreshError?.let { snackbarHostState.showSnackbar(it) }
+    }
+
+    LaunchedEffect(didUnsubscribe) {
+        if (didUnsubscribe) onBack()
     }
 
     val jump = state.jump
@@ -106,60 +121,109 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            when {
-                state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-                else -> LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(bottom = 88.dp)
-                ) {
-                    items(state.items, key = { it.key }) { listItem ->
-                        when (listItem) {
-                            is ShowListItem.Header -> ShowHeader(
-                                header = listItem,
-                                onBack = onBack,
-                                isRefreshing = isRefreshing,
-                                onRefresh = viewModel::refresh,
-                                onToggleSortOrder = viewModel::toggleSortOrder
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            val podcast = state.podcast
+
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Column {
+                    BackButtonRow(onBack)
+                    podcast?.let {
+                        Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+                            Text(
+                                it.title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            is ShowListItem.Episode -> {
-                                EpisodeRow(
-                                    episode = listItem.item,
-                                    isHighlighted = listItem.item.id == highlightedEpisodeId,
-                                    onClick = { selectedEpisode = listItem.item },
-                                    onPlay = { viewModel.play(listItem.item.id) },
-                                    onEnqueue = { viewModel.enqueue(listItem.item.id) }
+                            it.author?.let { author ->
+                                Text(
+                                    author,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
-                                HorizontalDivider()
                             }
                         }
                     }
                 }
             }
 
-            if (jump != null && !isJumpTargetVisible) {
-                JumpToLastListenedPill(
-                    jump = jump,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                    onClick = {
-                        scope.launch {
-                            val distance = abs(jump.itemIndex - listState.firstVisibleItemIndex)
-                            if (distance > 40) {
-                                listState.scrollToItem(jump.itemIndex)
-                            } else {
-                                listState.animateScrollToItem(jump.itemIndex)
-                            }
-                            // Breathing room so the target row isn't flush against the top bar.
-                            listState.animateScrollBy(-80f)
+            if (podcast != null) {
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    OutlinedButton(onClick = { pendingUnsubscribe = true }) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("Subscribed", modifier = Modifier.padding(start = 4.dp))
+                    }
+                }
 
-                            highlightedEpisodeId = jump.episodeId
-                            delay(1200)
-                            highlightedEpisodeId = null
+                SecondaryTabRow(selectedTabIndex = selectedTab) {
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Episodes") })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("About") })
+                }
+
+                when (selectedTab) {
+                    0 -> Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(onClick = viewModel::toggleSortOrder) {
+                                    Text(if (podcast.sortOrder == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first")
+                                }
+                                Spacer(modifier = Modifier.weight(1f))
+                                if (isRefreshing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp).padding(horizontal = 12.dp))
+                                } else {
+                                    IconButton(onClick = viewModel::refresh) {
+                                        Icon(Icons.Default.Refresh, contentDescription = "Check for new episodes")
+                                    }
+                                }
+                            }
+                            LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 88.dp)) {
+                                items(state.episodes, key = { it.id }) { episode ->
+                                    EpisodeRow(
+                                        episode = episode,
+                                        isHighlighted = episode.id == highlightedEpisodeId,
+                                        onClick = { selectedEpisode = episode },
+                                        onPlay = { viewModel.play(episode.id) },
+                                        onEnqueue = { viewModel.enqueue(episode.id) }
+                                    )
+                                    HorizontalDivider()
+                                }
+                            }
+                        }
+
+                        if (jump != null && !isJumpTargetVisible) {
+                            JumpToLastListenedPill(
+                                jump = jump,
+                                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                                onClick = {
+                                    scope.launch {
+                                        val distance = abs(jump.itemIndex - listState.firstVisibleItemIndex)
+                                        if (distance > 40) {
+                                            listState.scrollToItem(jump.itemIndex)
+                                        } else {
+                                            listState.animateScrollToItem(jump.itemIndex)
+                                        }
+                                        // Breathing room so the target row isn't flush against the top bar.
+                                        listState.animateScrollBy(-80f)
+
+                                        highlightedEpisodeId = jump.episodeId
+                                        delay(1200)
+                                        highlightedEpisodeId = null
+                                    }
+                                }
+                            )
                         }
                     }
-                )
+                    else -> AboutTab(podcast = podcast, episodeCount = state.episodes.size)
+                }
+            } else if (state.isLoading) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
         }
     }
@@ -180,78 +244,34 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
             onDismiss = { selectedEpisode = null }
         )
     }
+
+    if (pendingUnsubscribe) {
+        state.podcast?.let { podcast ->
+            UnsubscribeConfirmDialog(
+                podcastTitle = podcast.title,
+                onConfirm = {
+                    viewModel.unsubscribe()
+                    pendingUnsubscribe = false
+                },
+                onDismiss = { pendingUnsubscribe = false }
+            )
+        }
+    }
 }
 
-/**
- * Back button inline with the title/artwork row - not its own bar - then the description, then
- * an "Episodes" line carrying the sort/refresh controls, all sharing the same left inset as the
- * episode rows below. Mirrors [com.solewis.podcaster.ui.showpreview.ShowPreviewScreen]'s header
- * shape (that one has a Subscribe row in between instead of sort/refresh), since it's the same
- * "podcast detail" page whether or not you're subscribed yet.
- */
 @Composable
-private fun ShowHeader(
-    header: ShowListItem.Header,
-    onBack: () -> Unit,
-    isRefreshing: Boolean,
-    onRefresh: () -> Unit,
-    onToggleSortOrder: () -> Unit
-) {
-    val podcast = header.podcast
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            }
-            Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
-                Text(podcast.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                podcast.author?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text(
-                    "${header.episodeCount} episodes",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            PodcastArtwork(
-                artworkUrl = podcast.artworkUrl,
-                modifier = Modifier.size(64.dp),
-                shape = MaterialTheme.shapes.medium
-            )
-        }
-
-        podcast.description?.takeIf(String::isNotBlank)?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "Episodes",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = onToggleSortOrder) {
-                Text(if (podcast.sortOrder == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first")
-            }
-            if (isRefreshing) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp).padding(horizontal = 12.dp))
-            } else {
-                IconButton(onClick = onRefresh) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Check for new episodes")
-                }
-            }
-        }
-        HorizontalDivider()
+private fun AboutTab(podcast: PodcastEntity, episodeCount: Int) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text(
+            "$episodeCount episodes",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            podcast.description?.takeIf(String::isNotBlank) ?: "No description available.",
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 
@@ -314,7 +334,13 @@ private fun EpisodeRow(
                     Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Text(episode.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 2.dp))
+            Text(
+                episode.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp)
+            )
 
             val progressText = when {
                 episode.isPlayed -> null

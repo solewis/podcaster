@@ -32,7 +32,7 @@ class ShowViewModel(
 
     data class UiState(
         val podcast: PodcastEntity? = null,
-        val items: List<ShowListItem> = emptyList(),
+        val episodes: List<EpisodeListItem> = emptyList(),
         val jump: JumpPillUi? = null,
         val isLoading: Boolean = true
     )
@@ -49,6 +49,11 @@ class ShowViewModel(
     private val _refreshError = MutableStateFlow<String?>(null)
     val refreshError: StateFlow<String?> = _refreshError.asStateFlow()
 
+    /** Flips once the unsubscribe completes, so the screen can navigate back - there is nothing
+     * left here to show once the podcast row (and its episodes) are gone. */
+    private val _didUnsubscribe = MutableStateFlow(false)
+    val didUnsubscribe: StateFlow<Boolean> = _didUnsubscribe.asStateFlow()
+
     fun refresh() {
         if (_isRefreshing.value) return
         viewModelScope.launch {
@@ -57,6 +62,13 @@ class ShowViewModel(
             val result = subscriptionRepository.refresh(podcastId)
             if (result is RefreshResult.Failure) _refreshError.value = result.message
             _isRefreshing.value = false
+        }
+    }
+
+    fun unsubscribe() {
+        viewModelScope.launch {
+            podcastRepository.unsubscribe(podcastId)
+            _didUnsubscribe.value = true
         }
     }
 
@@ -84,15 +96,10 @@ class ShowViewModel(
         if (podcast == null) return UiState(podcast = null, isLoading = episodes.isEmpty())
 
         val sorted = sortEpisodes(episodes, podcast.sortOrder)
-        val items = buildList {
-            add(ShowListItem.Header(podcast, episodes.size))
-            sorted.forEach { add(ShowListItem.Episode(it)) }
-        }
-
         val target = JumpTargetResolver.resolve(episodes)
-        val jump = target?.let { buildJumpPill(it, episodes, items) }
+        val jump = target?.let { buildJumpPill(it, episodes, sorted) }
 
-        return UiState(podcast = podcast, items = items, jump = jump, isLoading = false)
+        return UiState(podcast = podcast, episodes = sorted, jump = jump, isLoading = false)
     }
 
     private fun sortEpisodes(episodes: List<EpisodeListItem>, sortOrder: SortOrder): List<EpisodeListItem> {
@@ -108,10 +115,10 @@ class ShowViewModel(
     private fun buildJumpPill(
         target: JumpTargetResolver.Target,
         episodes: List<EpisodeListItem>,
-        items: List<ShowListItem>
+        sorted: List<EpisodeListItem>
     ): JumpPillUi? {
         val episode = episodes.find { it.id == target.episodeId } ?: return null
-        val itemIndex = items.indexOfFirst { it is ShowListItem.Episode && it.item.id == target.episodeId }
+        val itemIndex = sorted.indexOfFirst { it.id == target.episodeId }
         if (itemIndex == -1) return null
 
         val numberLabel = episode.displayNumber?.let { "Ep $it" } ?: ellipsize(episode.title)
