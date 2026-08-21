@@ -62,30 +62,35 @@ fun PodcasterRoot(container: AppContainer) {
         TopLevelRoute(Route.Queue, "Queue", Icons.AutoMirrored.Filled.PlaylistPlay),
         TopLevelRoute(Route.Search, "Search", Icons.Default.Search)
     )
+    // Hidden on Now Playing itself - showing a mini player and tab bar over the full player
+    // screen is redundant chrome covering the very thing you navigated there to see.
+    val isNowPlaying = currentDestination?.hasRoute(Route.NowPlaying::class) == true
 
     Scaffold(
         bottomBar = {
-            Column {
-                MiniPlayer(
-                    playback = playback,
-                    onTogglePlayPause = { scope.launch { container.playerConnection.togglePlayPause() } },
-                    onExpand = { navController.navigate(Route.NowPlaying) }
-                )
-                NavigationBar {
-                    topLevelRoutes.forEach { topLevel ->
-                        val selected = currentDestination?.hierarchy?.any { it.hasRoute(topLevel.route::class) } == true
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                navController.navigate(topLevel.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(topLevel.icon, contentDescription = topLevel.label) },
-                            label = { Text(topLevel.label) }
-                        )
+            if (!isNowPlaying) {
+                Column {
+                    MiniPlayer(
+                        playback = playback,
+                        onTogglePlayPause = { scope.launch { container.playerConnection.togglePlayPause() } },
+                        onExpand = { navController.navigate(Route.NowPlaying) }
+                    )
+                    NavigationBar {
+                        topLevelRoutes.forEach { topLevel ->
+                            val selected = currentDestination?.hierarchy?.any { it.hasRoute(topLevel.route::class) } == true
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = {
+                                    navController.navigate(topLevel.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                icon = { Icon(topLevel.icon, contentDescription = topLevel.label) },
+                                label = { Text(topLevel.label) }
+                            )
+                        }
                     }
                 }
             }

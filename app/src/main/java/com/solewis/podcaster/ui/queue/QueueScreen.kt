@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -29,11 +28,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.solewis.podcaster.data.db.model.QueueItem
+import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.formatDuration
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,10 +84,9 @@ private fun QueueRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AsyncImage(
-            model = item.artworkUrl ?: item.podcastArtworkUrl,
-            contentDescription = null,
-            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+        PodcastArtwork(
+            artworkUrl = item.artworkUrl ?: item.podcastArtworkUrl,
+            modifier = Modifier.size(56.dp)
         )
         Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
             Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)

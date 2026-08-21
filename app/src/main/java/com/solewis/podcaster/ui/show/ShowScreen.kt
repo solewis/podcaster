@@ -50,19 +50,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
-import coil3.compose.AsyncImage
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.domain.JumpTargetResolver
 import com.solewis.podcaster.ui.common.EpisodeDetailSheet
 import com.solewis.podcaster.ui.common.EpisodeDetailUi
+import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.formatDuration
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 import kotlinx.coroutines.delay
@@ -206,10 +205,10 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
 private fun ShowHeader(header: ShowListItem.Header) {
     val podcast = header.podcast
     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.Top) {
-        AsyncImage(
-            model = podcast.artworkUrl,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp))
+        PodcastArtwork(
+            artworkUrl = podcast.artworkUrl,
+            modifier = Modifier.size(80.dp),
+            shape = MaterialTheme.shapes.large
         )
         Column(modifier = Modifier.padding(start = 12.dp)) {
             Text(podcast.title, style = MaterialTheme.typography.titleLarge)

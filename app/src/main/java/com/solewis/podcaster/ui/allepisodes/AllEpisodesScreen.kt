@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
@@ -28,10 +27,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
+import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.formatDuration
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 
@@ -72,10 +70,9 @@ private fun FeedEpisodeRow(episode: EpisodeFeedItem, onPlay: () -> Unit, onEnque
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top
     ) {
-        AsyncImage(
-            model = episode.artworkUrl ?: episode.podcastArtworkUrl,
-            contentDescription = null,
-            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+        PodcastArtwork(
+            artworkUrl = episode.artworkUrl ?: episode.podcastArtworkUrl,
+            modifier = Modifier.size(56.dp)
         )
 
         Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {

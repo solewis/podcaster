@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -34,10 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.solewis.podcaster.data.repo.PodcastSearchResult
+import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -125,11 +123,7 @@ private fun SearchResultRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AsyncImage(
-            model = result.artworkUrl,
-            contentDescription = null,
-            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
-        )
+        PodcastArtwork(artworkUrl = result.artworkUrl, modifier = Modifier.size(56.dp))
         Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
             Text(result.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
             result.author?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1) }
