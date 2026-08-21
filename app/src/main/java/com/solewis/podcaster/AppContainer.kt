@@ -5,11 +5,13 @@ import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.room.Room
+import com.solewis.podcaster.data.db.MIGRATION_1_2
 import com.solewis.podcaster.data.db.PodcasterDatabase
 import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.data.remote.ItunesSearchApi
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
+import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.data.repo.SearchRepository
 import com.solewis.podcaster.data.repo.ShowPreviewRepository
 import com.solewis.podcaster.data.repo.SubscriptionRepository
@@ -30,15 +32,18 @@ class AppContainer(context: Context) {
         appContext,
         PodcasterDatabase::class.java,
         PodcasterDatabase.NAME
-    ).build()
+    )
+        .addMigrations(MIGRATION_1_2)
+        .build()
 
     private val feedFetcher = FeedFetcher()
 
     val searchRepository = SearchRepository(ItunesSearchApi())
     val subscriptionRepository = SubscriptionRepository(database.podcastDao(), database.episodeDao(), feedFetcher)
-    val episodeRepository = EpisodeRepository(database.episodeDao())
+    val episodeRepository = EpisodeRepository(database.episodeDao(), database.podcastDao())
     val podcastRepository = PodcastRepository(database.podcastDao())
     val showPreviewRepository = ShowPreviewRepository(feedFetcher)
+    val queueRepository = QueueRepository(database.queueDao(), episodeRepository)
 
     /**
      * Must be a process-wide singleton: a second [SimpleCache] instance pointed at the same

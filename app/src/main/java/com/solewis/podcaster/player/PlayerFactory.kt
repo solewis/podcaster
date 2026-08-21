@@ -21,7 +21,7 @@ object PlayerFactory {
 
     private const val USER_AGENT = "Podcaster/1.0 (Android; personal use, not for distribution)"
     private const val SEEK_BACK_MS = 15_000L
-    private const val SEEK_FORWARD_MS = 30_000L
+    private const val SEEK_FORWARD_MS = 15_000L
 
     fun create(context: Context, cache: SimpleCache): ExoPlayer {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory().setUserAgent(USER_AGENT)

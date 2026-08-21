@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -53,7 +54,11 @@ fun AllEpisodesScreen(viewModel: AllEpisodesViewModel) {
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
                 items(episodes, key = { it.id }) { episode ->
-                    FeedEpisodeRow(episode = episode, onPlay = { viewModel.play(episode) })
+                    FeedEpisodeRow(
+                        episode = episode,
+                        onPlay = { viewModel.play(episode) },
+                        onEnqueue = { viewModel.enqueue(episode) }
+                    )
                     HorizontalDivider()
                 }
             }
@@ -62,7 +67,7 @@ fun AllEpisodesScreen(viewModel: AllEpisodesViewModel) {
 }
 
 @Composable
-private fun FeedEpisodeRow(episode: EpisodeFeedItem, onPlay: () -> Unit) {
+private fun FeedEpisodeRow(episode: EpisodeFeedItem, onPlay: () -> Unit, onEnqueue: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top
@@ -107,8 +112,13 @@ private fun FeedEpisodeRow(episode: EpisodeFeedItem, onPlay: () -> Unit) {
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            IconButton(onClick = onPlay) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+            Row {
+                IconButton(onClick = onPlay) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+                }
+                IconButton(onClick = onEnqueue) {
+                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add ${episode.title} to queue")
+                }
             }
             if (episode.isPlayed) {
                 Icon(

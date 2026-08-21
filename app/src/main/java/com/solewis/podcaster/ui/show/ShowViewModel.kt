@@ -7,11 +7,16 @@ import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
+import com.solewis.podcaster.data.repo.QueueRepository
+import com.solewis.podcaster.data.repo.RefreshResult
+import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.domain.JumpTargetResolver
 import com.solewis.podcaster.player.PlayerConnection
 import com.solewis.podcaster.ui.common.formatDuration
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -20,6 +25,8 @@ class ShowViewModel(
     private val podcastId: Long,
     private val podcastRepository: PodcastRepository,
     private val episodeRepository: EpisodeRepository,
+    private val subscriptionRepository: SubscriptionRepository,
+    private val queueRepository: QueueRepository,
     private val playerConnection: PlayerConnection
 ) : ViewModel() {
 
@@ -36,6 +43,26 @@ class ShowViewModel(
     ) { podcast, episodes ->
         buildUiState(podcast, episodes)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+    private val _refreshError = MutableStateFlow<String?>(null)
+    val refreshError: StateFlow<String?> = _refreshError.asStateFlow()
+
+    fun refresh() {
+        if (_isRefreshing.value) return
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            _refreshError.value = null
+            val result = subscriptionRepository.refresh(podcastId)
+            if (result is RefreshResult.Failure) _refreshError.value = result.message
+            _isRefreshing.value = false
+        }
+    }
+
+    fun enqueue(episodeId: String) {
+        viewModelScope.launch { queueRepository.enqueue(episodeId) }
+    }
 
     fun toggleSortOrder() {
         val current = state.value.podcast?.sortOrder ?: return

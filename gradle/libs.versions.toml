@@ -13,6 +13,7 @@ navigationCompose = "2.9.8"
 room = "2.8.4"
 media3 = "1.11.0"
 datastore = "1.2.1"
+work = "2.10.5" # 2.11.x raises minAndroidGradlePluginVersion to 8.6.0 - unneeded, 2.10.5 already covers minCompileSdk 36
 coil = "3.5.0"
 okhttp = "5.3.0" # 5.4.0 requires compileSdk>=36 and 5.5.0 requires >=37 (okhttp-android AAR metadata) - 5.3.0 has no such floor
 kotlinxSerialization = "1.9.0"
@@ -54,6 +55,7 @@ media3-ui-compose = { module = "androidx.media3:media3-ui-compose", version.ref 
 media3-ui-compose-material3 = { module = "androidx.media3:media3-ui-compose-material3", version.ref = "media3" }
 
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }

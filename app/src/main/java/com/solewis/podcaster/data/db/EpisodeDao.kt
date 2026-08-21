@@ -78,6 +78,23 @@ interface EpisodeDao {
     @Query("SELECT id FROM episodes WHERE podcastId = :podcastId")
     suspend fun getAllIdsForPodcast(podcastId: Long): List<String>
 
+    /**
+     * The episode auto-advance (and the manual "skip to next" button) plays when nothing sits
+     * ahead of it in the personal queue - the next unplayed `full` episode of the *same show*,
+     * by [com.solewis.podcaster.data.db.entity.EpisodeEntity.chronoIndex] regardless of the
+     * show's current sort order, matching [com.solewis.podcaster.domain.JumpTargetResolver]'s own
+     * NEXT rule.
+     */
+    @Query(
+        """
+        SELECT * FROM episodes
+        WHERE podcastId = :podcastId AND episodeType = 'full' AND isPlayed = 0 AND chronoIndex > :afterChronoIndex
+        ORDER BY chronoIndex ASC
+        LIMIT 1
+        """
+    )
+    suspend fun findNextUnplayed(podcastId: Long, afterChronoIndex: Int): EpisodeEntity?
+
     @Query(
         """
         SELECT id, podcastId, title, pubDateMillis, durationMillis, displayNumber, chronoIndex,

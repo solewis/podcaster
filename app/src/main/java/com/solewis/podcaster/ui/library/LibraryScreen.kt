@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,24 +40,28 @@ import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 @Composable
 fun LibraryScreen(viewModel: LibraryViewModel, onOpenShow: (Long) -> Unit) {
     val podcasts by viewModel.podcasts.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     var pendingUnsubscribe by remember { mutableStateOf<PodcastEntity?>(null) }
 
     Scaffold(topBar = { TopAppBar(title = { Text("Library") }) }) { innerPadding ->
-        if (podcasts.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                Text("No shows yet - search to subscribe to one.", style = MaterialTheme.typography.bodyLarge)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.padding(innerPadding),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(podcasts, key = { it.id }) { podcast ->
-                    LibraryRow(
-                        podcast = podcast,
-                        onClick = { onOpenShow(podcast.id) },
-                        onUnsubscribe = { pendingUnsubscribe = podcast }
-                    )
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = viewModel::refreshAll,
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            if (podcasts.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No shows yet - search to subscribe to one.", style = MaterialTheme.typography.bodyLarge)
+                }
+            } else {
+                LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
+                    items(podcasts, key = { it.id }) { podcast ->
+                        LibraryRow(
+                            podcast = podcast,
+                            onClick = { onOpenShow(podcast.id) },
+                            onUnsubscribe = { pendingUnsubscribe = podcast }
+                        )
+                    }
                 }
             }
         }

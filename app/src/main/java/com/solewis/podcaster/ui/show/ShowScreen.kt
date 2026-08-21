@@ -24,6 +24,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -32,6 +34,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -70,8 +74,11 @@ import kotlin.math.abs
 @Composable
 fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val refreshError by viewModel.refreshError.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var highlightedEpisodeId by remember { mutableStateOf<String?>(null) }
     var isJumpTargetVisible by remember { mutableStateOf(false) }
@@ -81,6 +88,10 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
     LaunchedEffect(selectedEpisode?.id) {
         selectedEpisodeDescription = null
         selectedEpisode?.let { selectedEpisodeDescription = viewModel.descriptionFor(it.id) }
+    }
+
+    LaunchedEffect(refreshError) {
+        refreshError?.let { snackbarHostState.showSnackbar(it) }
     }
 
     val jump = state.jump
@@ -109,9 +120,17 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                             Text(if (podcast.sortOrder == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first")
                         }
                     }
+                    if (isRefreshing) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp).padding(horizontal = 12.dp))
+                    } else {
+                        IconButton(onClick = viewModel::refresh) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Check for new episodes")
+                        }
+                    }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             when {
@@ -130,7 +149,8 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                                     episode = listItem.item,
                                     isHighlighted = listItem.item.id == highlightedEpisodeId,
                                     onClick = { selectedEpisode = listItem.item },
-                                    onPlay = { viewModel.play(listItem.item.id) }
+                                    onPlay = { viewModel.play(listItem.item.id) },
+                                    onEnqueue = { viewModel.enqueue(listItem.item.id) }
                                 )
                                 HorizontalDivider()
                             }
@@ -220,7 +240,8 @@ private fun EpisodeRow(
     episode: EpisodeListItem,
     isHighlighted: Boolean,
     onClick: () -> Unit,
-    onPlay: () -> Unit
+    onPlay: () -> Unit,
+    onEnqueue: () -> Unit
 ) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isHighlighted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
@@ -275,8 +296,13 @@ private fun EpisodeRow(
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            IconButton(onClick = onPlay) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+            Row {
+                IconButton(onClick = onPlay) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+                }
+                IconButton(onClick = onEnqueue) {
+                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add ${episode.title} to queue")
+                }
             }
             if (episode.isPlayed) {
                 Icon(

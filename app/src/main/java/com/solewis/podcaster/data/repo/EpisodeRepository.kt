@@ -1,12 +1,13 @@
 package com.solewis.podcaster.data.repo
 
 import com.solewis.podcaster.data.db.EpisodeDao
+import com.solewis.podcaster.data.db.PodcastDao
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.domain.HtmlToText
 import kotlinx.coroutines.flow.Flow
 
-class EpisodeRepository(private val episodeDao: EpisodeDao) {
+class EpisodeRepository(private val episodeDao: EpisodeDao, private val podcastDao: PodcastDao) {
     fun observeEpisodes(podcastId: Long): Flow<List<EpisodeListItem>> =
         episodeDao.observeListForPodcast(podcastId)
 
@@ -58,5 +59,34 @@ class EpisodeRepository(private val episodeDao: EpisodeDao) {
             mediaUrl = entity.enclosureUrl,
             startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
         )
+    }
+
+    /**
+     * Same as [getPlayable], but for callers (the personal queue, auto-advance) that only have
+     * an episode id on hand and no podcast context already loaded - resolves the podcast title
+     * and artwork itself via one extra lookup.
+     */
+    suspend fun getPlayableById(episodeId: String): PlayableEpisode? {
+        val entity = episodeDao.getById(episodeId) ?: return null
+        val podcast = podcastDao.getById(entity.podcastId) ?: return null
+        return PlayableEpisode(
+            episodeId = entity.id,
+            title = entity.title,
+            podcastTitle = podcast.title,
+            artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
+            mediaUrl = entity.enclosureUrl,
+            startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
+        )
+    }
+
+    /** The next unplayed episode in [currentEpisodeId]'s own show - what auto-advance and the
+     * manual skip button fall back to once the personal queue is empty. Null for a trailer/bonus
+     * episode (no [com.solewis.podcaster.data.db.entity.EpisodeEntity.chronoIndex]) or when
+     * there's nothing left unplayed after it. */
+    suspend fun getNextInShow(currentEpisodeId: String): PlayableEpisode? {
+        val current = episodeDao.getById(currentEpisodeId) ?: return null
+        val chronoIndex = current.chronoIndex ?: return null
+        val next = episodeDao.findNextUnplayed(current.podcastId, chronoIndex) ?: return null
+        return getPlayableById(next.id)
     }
 }

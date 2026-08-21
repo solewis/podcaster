@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Feed
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -36,6 +37,8 @@ import com.solewis.podcaster.ui.library.LibraryScreen
 import com.solewis.podcaster.ui.library.LibraryViewModel
 import com.solewis.podcaster.ui.nowplaying.NowPlayingScreen
 import com.solewis.podcaster.ui.nowplaying.NowPlayingViewModel
+import com.solewis.podcaster.ui.queue.QueueScreen
+import com.solewis.podcaster.ui.queue.QueueViewModel
 import com.solewis.podcaster.ui.search.SearchScreen
 import com.solewis.podcaster.ui.search.SearchViewModel
 import com.solewis.podcaster.ui.show.ShowScreen
@@ -56,6 +59,7 @@ fun PodcasterRoot(container: AppContainer) {
     val topLevelRoutes = listOf(
         TopLevelRoute(Route.Library, "Library", Icons.Default.LibraryMusic),
         TopLevelRoute(Route.AllEpisodes, "Episodes", Icons.AutoMirrored.Filled.Feed),
+        TopLevelRoute(Route.Queue, "Queue", Icons.AutoMirrored.Filled.PlaylistPlay),
         TopLevelRoute(Route.Search, "Search", Icons.Default.Search)
     )
 
@@ -94,7 +98,9 @@ fun PodcasterRoot(container: AppContainer) {
         ) {
             composable<Route.Library> {
                 val viewModel: LibraryViewModel = viewModel(
-                    factory = viewModelFactory { initializer { LibraryViewModel(container.podcastRepository) } }
+                    factory = viewModelFactory {
+                        initializer { LibraryViewModel(container.podcastRepository, container.subscriptionRepository) }
+                    }
                 )
                 LibraryScreen(viewModel = viewModel, onOpenShow = { podcastId ->
                     navController.navigate(Route.Show(podcastId))
@@ -103,10 +109,24 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.AllEpisodes> {
                 val viewModel: AllEpisodesViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { AllEpisodesViewModel(container.episodeRepository, container.playerConnection) }
+                        initializer {
+                            AllEpisodesViewModel(
+                                container.episodeRepository,
+                                container.queueRepository,
+                                container.playerConnection
+                            )
+                        }
                     }
                 )
                 AllEpisodesScreen(viewModel = viewModel)
+            }
+            composable<Route.Queue> {
+                val viewModel: QueueViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { QueueViewModel(container.queueRepository, container.playerConnection) }
+                    }
+                )
+                QueueScreen(viewModel = viewModel)
             }
             composable<Route.Search> {
                 val viewModel: SearchViewModel = viewModel(
@@ -171,6 +191,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 route.podcastId,
                                 container.podcastRepository,
                                 container.episodeRepository,
+                                container.subscriptionRepository,
+                                container.queueRepository,
                                 container.playerConnection
                             )
                         }
@@ -180,7 +202,9 @@ fun PodcasterRoot(container: AppContainer) {
             }
             composable<Route.NowPlaying> {
                 val viewModel: NowPlayingViewModel = viewModel(
-                    factory = viewModelFactory { initializer { NowPlayingViewModel(container.playerConnection) } }
+                    factory = viewModelFactory {
+                        initializer { NowPlayingViewModel(container.playerConnection, container.queueRepository) }
+                    }
                 )
                 NowPlayingScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
             }
