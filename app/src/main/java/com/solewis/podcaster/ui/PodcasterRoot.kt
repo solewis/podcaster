@@ -1,13 +1,17 @@
 package com.solewis.podcaster.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Feed
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -30,14 +34,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.solewis.podcaster.AppContainer
-import com.solewis.podcaster.ui.allepisodes.AllEpisodesScreen
-import com.solewis.podcaster.ui.allepisodes.AllEpisodesViewModel
+import com.solewis.podcaster.ui.activity.ActivityScreen
 import com.solewis.podcaster.ui.common.MiniPlayer
-import com.solewis.podcaster.ui.library.LibraryScreen
-import com.solewis.podcaster.ui.library.LibraryViewModel
+import com.solewis.podcaster.ui.home.HomeScreen
+import com.solewis.podcaster.ui.home.HomeViewModel
 import com.solewis.podcaster.ui.nowplaying.NowPlayingScreen
 import com.solewis.podcaster.ui.nowplaying.NowPlayingViewModel
-import com.solewis.podcaster.ui.queue.QueueScreen
 import com.solewis.podcaster.ui.queue.QueueViewModel
 import com.solewis.podcaster.ui.search.SearchScreen
 import com.solewis.podcaster.ui.search.SearchViewModel
@@ -45,6 +47,7 @@ import com.solewis.podcaster.ui.show.ShowScreen
 import com.solewis.podcaster.ui.show.ShowViewModel
 import com.solewis.podcaster.ui.showpreview.ShowPreviewScreen
 import com.solewis.podcaster.ui.showpreview.ShowPreviewViewModel
+import com.solewis.podcaster.ui.subscriptions.SubscriptionsViewModel
 import kotlinx.coroutines.launch
 
 @Composable
@@ -57,35 +60,48 @@ fun PodcasterRoot(container: AppContainer) {
     val playback by container.playerConnection.state.collectAsState()
 
     val topLevelRoutes = listOf(
-        TopLevelRoute(Route.Library, "Library", Icons.Default.LibraryMusic),
-        TopLevelRoute(Route.AllEpisodes, "Episodes", Icons.AutoMirrored.Filled.Feed),
-        TopLevelRoute(Route.Queue, "Queue", Icons.AutoMirrored.Filled.PlaylistPlay),
+        TopLevelRoute(Route.Home, "Home", Icons.Default.Home),
+        TopLevelRoute(Route.Activity, "Activity", Icons.AutoMirrored.Filled.PlaylistPlay),
         TopLevelRoute(Route.Search, "Search", Icons.Default.Search)
     )
+    // Hidden on Now Playing itself - showing a mini player and tab bar over the full player
+    // screen is redundant chrome covering the very thing you navigated there to see.
+    val isNowPlaying = currentDestination?.hasRoute(Route.NowPlaying::class) == true
 
     Scaffold(
+        // Leaves the status bar inset for each screen to handle itself (most via ScreenTitle/
+        // BackButtonRow's own windowInsetsPadding) rather than reserving it here too - every
+        // screen nests its own Scaffold below this one, and each of those defaults to reserving
+        // the *same* safe-drawing insets again, so reserving it at both levels was quietly
+        // doubling the status-bar-sized gap at the top of every single screen.
+        contentWindowInsets = WindowInsets.safeDrawing.exclude(WindowInsets.statusBars),
         bottomBar = {
-            Column {
-                MiniPlayer(
-                    playback = playback,
-                    onTogglePlayPause = { scope.launch { container.playerConnection.togglePlayPause() } },
-                    onExpand = { navController.navigate(Route.NowPlaying) }
-                )
-                NavigationBar {
-                    topLevelRoutes.forEach { topLevel ->
-                        val selected = currentDestination?.hierarchy?.any { it.hasRoute(topLevel.route::class) } == true
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                navController.navigate(topLevel.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(topLevel.icon, contentDescription = topLevel.label) },
-                            label = { Text(topLevel.label) }
-                        )
+            if (!isNowPlaying) {
+                Column {
+                    MiniPlayer(
+                        playback = playback,
+                        onTogglePlayPause = { scope.launch { container.playerConnection.togglePlayPause() } },
+                        onExpand = { navController.navigate(Route.NowPlaying) }
+                    )
+                    // Same base color as the screen behind it (background == surface in this
+                    // theme) - tonalElevation still lifts it a touch via M3's surface-tint blend,
+                    // rather than a visibly distinct color block.
+                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                        topLevelRoutes.forEach { topLevel ->
+                            val selected = currentDestination?.hierarchy?.any { it.hasRoute(topLevel.route::class) } == true
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = {
+                                    navController.navigate(topLevel.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                icon = { Icon(topLevel.icon, contentDescription = topLevel.label) },
+                                label = { Text(topLevel.label) }
+                            )
+                        }
                     }
                 }
             }
@@ -93,24 +109,15 @@ fun PodcasterRoot(container: AppContainer) {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Route.Library,
+            startDestination = Route.Home,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable<Route.Library> {
-                val viewModel: LibraryViewModel = viewModel(
-                    factory = viewModelFactory {
-                        initializer { LibraryViewModel(container.podcastRepository, container.subscriptionRepository) }
-                    }
-                )
-                LibraryScreen(viewModel = viewModel, onOpenShow = { podcastId ->
-                    navController.navigate(Route.Show(podcastId))
-                })
-            }
-            composable<Route.AllEpisodes> {
-                val viewModel: AllEpisodesViewModel = viewModel(
+            composable<Route.Home> {
+                val viewModel: HomeViewModel = viewModel(
                     factory = viewModelFactory {
                         initializer {
-                            AllEpisodesViewModel(
+                            HomeViewModel(
+                                container.podcastRepository,
                                 container.episodeRepository,
                                 container.queueRepository,
                                 container.playerConnection
@@ -118,15 +125,26 @@ fun PodcasterRoot(container: AppContainer) {
                         }
                     }
                 )
-                AllEpisodesScreen(viewModel = viewModel)
+                HomeScreen(viewModel = viewModel, onOpenShow = { podcastId ->
+                    navController.navigate(Route.Show(podcastId))
+                })
             }
-            composable<Route.Queue> {
-                val viewModel: QueueViewModel = viewModel(
+            composable<Route.Activity> {
+                val queueViewModel: QueueViewModel = viewModel(
                     factory = viewModelFactory {
                         initializer { QueueViewModel(container.queueRepository, container.playerConnection) }
                     }
                 )
-                QueueScreen(viewModel = viewModel)
+                val subscriptionsViewModel: SubscriptionsViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { SubscriptionsViewModel(container.podcastRepository, container.subscriptionRepository) }
+                    }
+                )
+                ActivityScreen(
+                    queueViewModel = queueViewModel,
+                    subscriptionsViewModel = subscriptionsViewModel,
+                    onOpenShow = { podcastId -> navController.navigate(Route.Show(podcastId)) }
+                )
             }
             composable<Route.Search> {
                 val viewModel: SearchViewModel = viewModel(
@@ -167,6 +185,7 @@ fun PodcasterRoot(container: AppContainer) {
                                 seedArtworkUrl = route.artworkUrl,
                                 showPreviewRepository = container.showPreviewRepository,
                                 subscriptionRepository = container.subscriptionRepository,
+                                podcastRepository = container.podcastRepository,
                                 playerConnection = container.playerConnection
                             )
                         }
@@ -203,7 +222,7 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.NowPlaying> {
                 val viewModel: NowPlayingViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { NowPlayingViewModel(container.playerConnection, container.queueRepository) }
+                        initializer { NowPlayingViewModel(container.playerConnection) }
                     }
                 )
                 NowPlayingScreen(viewModel = viewModel, onBack = { navController.popBackStack() })

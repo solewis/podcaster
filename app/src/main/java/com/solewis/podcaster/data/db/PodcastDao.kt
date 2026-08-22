@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.solewis.podcaster.data.db.entity.PodcastEntity
+import com.solewis.podcaster.data.db.model.HomeShowSummary
 import com.solewis.podcaster.data.db.model.SortOrder
 import kotlinx.coroutines.flow.Flow
 
@@ -19,6 +20,23 @@ interface PodcastDao {
 
     @Query("SELECT * FROM podcasts ORDER BY subscribedAt DESC")
     fun observeAll(): Flow<List<PodcastEntity>>
+
+    /**
+     * Most-recently-listened show first, falling back to most-recently-subscribed for shows
+     * with no listening history yet - what Home's horizontal strip is ordered by. The subquery
+     * is a single indexed lookup per show (backed by the same `(podcastId, lastPlayedAt)` index
+     * [com.solewis.podcaster.data.db.EpisodeDao.getLastListened] uses), not a join fan-out, so
+     * this stays cheap regardless of episode count.
+     */
+    @Query(
+        """
+        SELECT p.id AS id, p.title AS title, p.artworkUrl AS artworkUrl,
+               (SELECT MAX(e.lastPlayedAt) FROM episodes e WHERE e.podcastId = p.id) AS lastListenedAt
+        FROM podcasts p
+        ORDER BY (lastListenedAt IS NULL) ASC, lastListenedAt DESC, p.subscribedAt DESC
+        """
+    )
+    fun observeHomeOrder(): Flow<List<HomeShowSummary>>
 
     @Query("SELECT id FROM podcasts")
     suspend fun getAllIds(): List<Long>

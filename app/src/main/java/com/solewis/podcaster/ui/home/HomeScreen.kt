@@ -1,67 +1,88 @@
-package com.solewis.podcaster.ui.allepisodes
+package com.solewis.podcaster.ui.home
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
+import com.solewis.podcaster.data.db.model.HomeShowSummary
+import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.formatDuration
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 
-/** Every episode across every subscription, newest-published first. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AllEpisodesScreen(viewModel: AllEpisodesViewModel) {
-    val episodes by viewModel.episodes.collectAsState()
+fun HomeScreen(viewModel: HomeViewModel, onOpenShow: (Long) -> Unit) {
+    val state by viewModel.state.collectAsState()
 
-    Scaffold(topBar = { TopAppBar(title = { Text("All Episodes") }) }) { innerPadding ->
-        when {
-            episodes.isEmpty() -> Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No episodes yet - subscribe to a show to see them here.")
-            }
-            else -> LazyColumn(
-                modifier = Modifier.padding(innerPadding),
-                contentPadding = PaddingValues(bottom = 16.dp)
-            ) {
-                items(episodes, key = { it.id }) { episode ->
-                    FeedEpisodeRow(
-                        episode = episode,
-                        onPlay = { viewModel.play(episode) },
-                        onEnqueue = { viewModel.enqueue(episode) }
-                    )
-                    HorizontalDivider()
+    Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding).statusBarsPadding()) {
+            ScreenTitle("Library")
+            if (state.subscriptions.isEmpty()) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text("No shows yet - search to subscribe to one.", style = MaterialTheme.typography.bodyLarge)
+                }
+            } else {
+                LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
+                    item {
+                        SubscriptionsRow(subscriptions = state.subscriptions, onOpenShow = onOpenShow)
+                        HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+                    }
+                    items(state.episodes, key = { it.id }) { episode ->
+                        FeedEpisodeRow(
+                            episode = episode,
+                            onPlay = { viewModel.play(episode) },
+                            onEnqueue = { viewModel.enqueue(episode) }
+                        )
+                        HorizontalDivider()
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionsRow(subscriptions: List<HomeShowSummary>, onOpenShow: (Long) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(subscriptions, key = { it.id }) { show ->
+            PodcastArtwork(
+                artworkUrl = show.artworkUrl,
+                modifier = Modifier
+                    .size(72.dp)
+                    .clickable { onOpenShow(show.id) }
+            )
         }
     }
 }
@@ -72,10 +93,9 @@ private fun FeedEpisodeRow(episode: EpisodeFeedItem, onPlay: () -> Unit, onEnque
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top
     ) {
-        AsyncImage(
-            model = episode.artworkUrl ?: episode.podcastArtworkUrl,
-            contentDescription = null,
-            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+        PodcastArtwork(
+            artworkUrl = episode.artworkUrl ?: episode.podcastArtworkUrl,
+            modifier = Modifier.size(56.dp)
         )
 
         Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
@@ -85,7 +105,13 @@ private fun FeedEpisodeRow(episode: EpisodeFeedItem, onPlay: () -> Unit, onEnque
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1
             )
-            Text(episode.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 2.dp))
+            Text(
+                episode.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp)
+            )
 
             val dateAndDuration = listOfNotNull(
                 formatEpisodeDate(episode.pubDateMillis),

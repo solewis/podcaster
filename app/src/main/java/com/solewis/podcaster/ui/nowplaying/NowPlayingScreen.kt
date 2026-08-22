@@ -5,19 +5,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -27,7 +30,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,16 +39,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import com.solewis.podcaster.ui.common.BackButtonRow
+import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.SkipIcon
 import com.solewis.podcaster.ui.common.formatTimer
 
 private const val SKIP_SECONDS = 15
 
-private val SPEEDS = listOf(0.8f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,30 +62,24 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
     val durationMillis = progress.durationMillis?.coerceAtLeast(1L) ?: 1L
     val sliderPositionMillis = if (isDragging) dragPositionMillis else progress.positionMillis.toFloat()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Now Playing") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
+    Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(innerPadding)
-                .padding(24.dp),
+                .statusBarsPadding()
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            AsyncImage(
-                model = playback.artworkUrl,
-                contentDescription = null,
-                modifier = Modifier.size(280.dp).clip(RoundedCornerShape(16.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                BackButtonRow(onBack)
+            }
+
+            PodcastArtwork(
+                artworkUrl = playback.artworkUrl,
+                modifier = Modifier.size(280.dp),
+                shape = MaterialTheme.shapes.extraLarge
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -144,9 +140,6 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                         modifier = Modifier.size(36.dp)
                     )
                 }
-                IconButton(onClick = viewModel::skipToNext) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "Skip to next episode", modifier = Modifier.size(36.dp))
-                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -158,11 +151,31 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
 
 @Composable
 private fun SpeedControl(currentSpeed: Float, onSpeedChange: (Float) -> Unit) {
-    TextButton(onClick = {
-        val currentIndex = SPEEDS.indexOfFirst { it == currentSpeed }.takeIf { it >= 0 } ?: 1
-        val next = SPEEDS[(currentIndex + 1) % SPEEDS.size]
-        onSpeedChange(next)
-    }) {
-        Text("Speed: ${currentSpeed}x")
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        TextButton(onClick = { expanded = true }) {
+            Text("Speed: ${formatSpeed(currentSpeed)}x")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SPEEDS.forEach { speed ->
+                DropdownMenuItem(
+                    text = { Text("${formatSpeed(speed)}x") },
+                    leadingIcon = if (speed == currentSpeed) {
+                        { Icon(Icons.Default.Check, contentDescription = null) }
+                    } else {
+                        null
+                    },
+                    onClick = {
+                        onSpeedChange(speed)
+                        expanded = false
+                    }
+                )
+            }
+        }
     }
 }
+
+/** "1.0" reads worse than "1" for a whole-number speed; fractional speeds print as-is. */
+private fun formatSpeed(speed: Float): String =
+    if (speed == speed.toInt().toFloat()) speed.toInt().toString() else speed.toString()

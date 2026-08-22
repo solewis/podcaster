@@ -1,21 +1,24 @@
 package com.solewis.podcaster.ui.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -25,7 +28,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,10 +36,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.solewis.podcaster.data.repo.PodcastSearchResult
+import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,12 +49,13 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
     val state by viewModel.state.collectAsState()
     var pendingUnsubscribe by remember { mutableStateOf<PodcastSearchResult?>(null) }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Search") }) }) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+    Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding).statusBarsPadding()) {
+            ScreenTitle("Search")
             OutlinedTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChange,
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
                 placeholder = { Text("Search podcasts") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
@@ -61,7 +65,8 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
                         }
                     }
                 },
-                singleLine = true
+                singleLine = true,
+                shape = MaterialTheme.shapes.extraLarge
             )
 
             when {
@@ -71,11 +76,14 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
                 state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(state.error ?: "", color = MaterialTheme.colorScheme.error)
                 }
-                state.results.isEmpty() && state.query.isNotBlank() -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No shows found")
-                    }
-                }
+                state.query.isBlank() -> SearchPrompt(
+                    icon = Icons.Default.Search,
+                    message = "Find your next favorite podcast"
+                )
+                state.results.isEmpty() -> SearchPrompt(
+                    icon = Icons.Default.SearchOff,
+                    message = "No shows found"
+                )
                 else -> LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                     // No custom key: iTunes Search can return two different catalog entries
                     // (different collectionIds) that point at the identical feedUrl - crashed
@@ -110,6 +118,21 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenShow: (PodcastSearchResult) -
 }
 
 @Composable
+private fun SearchPrompt(icon: ImageVector, message: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(48.dp)
+            )
+            Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
 private fun SearchResultRow(
     result: PodcastSearchResult,
     isSubscribing: Boolean,
@@ -125,11 +148,7 @@ private fun SearchResultRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AsyncImage(
-            model = result.artworkUrl,
-            contentDescription = null,
-            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
-        )
+        PodcastArtwork(artworkUrl = result.artworkUrl, modifier = Modifier.size(56.dp))
         Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
             Text(result.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
             result.author?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1) }

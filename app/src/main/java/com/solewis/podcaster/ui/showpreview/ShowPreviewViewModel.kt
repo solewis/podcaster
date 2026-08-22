@@ -3,6 +3,7 @@ package com.solewis.podcaster.ui.showpreview
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.repo.PlayableEpisode
+import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.ShowPreview
 import com.solewis.podcaster.data.repo.ShowPreviewRepository
 import com.solewis.podcaster.data.repo.SubscribeResult
@@ -28,6 +29,7 @@ class ShowPreviewViewModel(
     private val seedArtworkUrl: String?,
     private val showPreviewRepository: ShowPreviewRepository,
     private val subscriptionRepository: SubscriptionRepository,
+    private val podcastRepository: PodcastRepository,
     private val playerConnection: PlayerConnection
 ) : ViewModel() {
 
@@ -44,6 +46,18 @@ class ShowPreviewViewModel(
 
     init {
         viewModelScope.launch {
+            // Reached here from a Search row that doesn't know the true subscription state
+            // (e.g. subscribed moments ago from a different row for the same show - iTunes can
+            // return the same feedUrl under more than one catalog entry). Redirecting immediately
+            // avoids showing a stale "not subscribed yet" preview - and the Subscribe button
+            // briefly, confusingly appearing to do nothing when tapped, since subscribing again
+            // is a harmless no-op that was never going to flip it to "Subscribed".
+            val existing = podcastRepository.findByFeedUrl(feedUrl)
+            if (existing != null) {
+                _state.value = _state.value.copy(isLoading = false, subscribedPodcastId = existing.id)
+                return@launch
+            }
+
             val preview = showPreviewRepository.load(feedUrl, seedTitle)
             _state.value = if (preview == null) {
                 _state.value.copy(isLoading = false, error = "Couldn't load this show")
