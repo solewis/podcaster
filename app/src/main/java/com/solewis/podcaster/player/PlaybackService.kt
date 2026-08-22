@@ -2,9 +2,11 @@ package com.solewis.podcaster.player
 
 import android.content.Intent
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.Player
 import androidx.media3.datasource.DataSourceBitmapLoader
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CacheBitmapLoader
+import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
@@ -47,6 +49,7 @@ class PlaybackService : MediaLibraryService() {
         )
         mediaSession = MediaLibrarySession.Builder(this, player, callback)
             .setBitmapLoader(CacheBitmapLoader(DataSourceBitmapLoader.Builder(this).build()))
+            .setMediaButtonPreferences(skipButtonPreferences())
             .build()
 
         progressWriter = ProgressWriter(player, container.episodeRepository, lifecycleScope)
@@ -55,6 +58,27 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = mediaSession
+
+    /**
+     * Without this, the system notification and Android Auto fall back to their own default
+     * button set - generic rewind/skip-to-previous glyphs with no indication of how far they
+     * seek, since there's no real "previous track" (every episode plays standalone; see
+     * [AutoAdvancer]). `ICON_SKIP_BACK_15`/`ICON_SKIP_FORWARD_15` are Media3's built-in icons for
+     * exactly this - a podcast-style timed skip - matching [PlayerFactory]'s 15s seek increments
+     * and the in-app Now Playing screen's own skip buttons.
+     */
+    private fun skipButtonPreferences(): List<CommandButton> = listOf(
+        CommandButton.Builder(CommandButton.ICON_SKIP_BACK_15)
+            .setPlayerCommand(Player.COMMAND_SEEK_BACK)
+            .setDisplayName("Back 15 seconds")
+            .setSlots(CommandButton.SLOT_BACK)
+            .build(),
+        CommandButton.Builder(CommandButton.ICON_SKIP_FORWARD_15)
+            .setPlayerCommand(Player.COMMAND_SEEK_FORWARD)
+            .setDisplayName("Forward 15 seconds")
+            .setSlots(CommandButton.SLOT_FORWARD)
+            .build()
+    )
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)

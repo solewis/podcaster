@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,7 +47,11 @@ fun HomeScreen(viewModel: HomeViewModel, onOpenShow: (Long) -> Unit) {
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).statusBarsPadding()) {
             ScreenTitle("Library")
-            if (state.subscriptions.isEmpty()) {
+            if (state.isLoading) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (state.subscriptions.isEmpty()) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text("No shows yet - search to subscribe to one.", style = MaterialTheme.typography.bodyLarge)
                 }

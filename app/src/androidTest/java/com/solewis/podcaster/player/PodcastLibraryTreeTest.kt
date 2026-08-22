@@ -79,19 +79,32 @@ class PodcastLibraryTreeTest {
     )
 
     @Test
-    fun rootChildren_includes_the_queue_node_and_every_subscribed_podcast() = runTest {
+    fun rootChildren_is_just_the_queue_and_a_shows_folder_regardless_of_subscription_count() = runTest {
+        // Android Auto renders root's direct children as a persistent top tab strip - this must
+        // stay exactly two tabs no matter how many shows are subscribed, or it stops scaling.
         db.podcastDao().insert(
             PodcastEntity(feedUrl = "https://example.com/other.xml", title = "Other Show", subscribedAt = 1000L)
         )
 
         val root = tree.children(PodcastLibraryTree.ROOT_ID)
 
-        assertThat(root.map { it.mediaId }).containsExactly(
-            PodcastLibraryTree.QUEUE_ID,
+        assertThat(root.map { it.mediaId }).containsExactly(PodcastLibraryTree.QUEUE_ID, PodcastLibraryTree.SHOWS_ID)
+        assertThat(root.all { it.mediaMetadata.isBrowsable == true }).isTrue()
+    }
+
+    @Test
+    fun shows_children_include_every_subscribed_podcast() = runTest {
+        db.podcastDao().insert(
+            PodcastEntity(feedUrl = "https://example.com/other.xml", title = "Other Show", subscribedAt = 1000L)
+        )
+
+        val shows = tree.children(PodcastLibraryTree.SHOWS_ID)
+
+        assertThat(shows.map { it.mediaId }).containsExactly(
             "${PodcastLibraryTree.PODCAST_PREFIX}$podcastId",
             "${PodcastLibraryTree.PODCAST_PREFIX}2"
         )
-        assertThat(root.all { it.mediaMetadata.isBrowsable == true }).isTrue()
+        assertThat(shows.all { it.mediaMetadata.isBrowsable == true }).isTrue()
     }
 
     @Test

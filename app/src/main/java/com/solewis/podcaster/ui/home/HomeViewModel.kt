@@ -29,13 +29,17 @@ class HomeViewModel(
 
     data class UiState(
         val subscriptions: List<HomeShowSummary> = emptyList(),
-        val episodes: List<EpisodeFeedItem> = emptyList()
+        val episodes: List<EpisodeFeedItem> = emptyList(),
+        /** True only until Room's first emission arrives - distinguishes "still loading" from
+         * "genuinely no subscriptions yet", which otherwise look identical (both empty lists) and
+         * would flash the empty-state message on every launch before the real data loads in. */
+        val isLoading: Boolean = true
     )
 
     val state: StateFlow<UiState> = combine(
         podcastRepository.observeHomeOrder(),
         episodeRepository.observeAllEpisodes()
-    ) { subscriptions, episodes -> UiState(subscriptions, episodes) }
+    ) { subscriptions, episodes -> UiState(subscriptions, episodes, isLoading = false) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
     fun play(episode: EpisodeFeedItem) {
