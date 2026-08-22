@@ -107,6 +107,21 @@ interface EpisodeDao {
     fun observeListForPodcast(podcastId: Long): Flow<List<EpisodeListItem>>
 
     /**
+     * One-shot full-entity snapshot of a show's episodes (unlike [observeListForPodcast], which
+     * is both reactive and a lightweight projection missing `enclosureUrl`) - needed by the
+     * Android Auto browse tree, which has to build real playable [androidx.media3.common.MediaItem]s
+     * with a URI rather than just render text/duration.
+     */
+    @Query(
+        """
+        SELECT * FROM episodes
+        WHERE podcastId = :podcastId
+        ORDER BY (chronoIndex IS NULL) ASC, chronoIndex DESC
+        """
+    )
+    suspend fun getAllForPodcast(podcastId: Long): List<EpisodeEntity>
+
+    /**
      * The episode this show was most recently played, if any. Backed by the
      * `(podcastId, lastPlayedAt)` index, so this is a single index range scan rather than a table
      * sweep even on a show with thousands of episodes.

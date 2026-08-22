@@ -4,6 +4,7 @@ import com.solewis.podcaster.data.db.EpisodeDao
 import com.solewis.podcaster.data.db.PodcastDao
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.EpisodeListItem
+import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.domain.HtmlToText
 import kotlinx.coroutines.flow.Flow
 
@@ -77,6 +78,31 @@ class EpisodeRepository(private val episodeDao: EpisodeDao, private val podcastD
             mediaUrl = entity.enclosureUrl,
             startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
         )
+    }
+
+    /**
+     * One-shot, fully playable snapshot of a show's episodes, sorted the same way [SortOrder]
+     * governs `ShowScreen`'s list (numbered episodes by [com.solewis.podcaster.data.db.entity.EpisodeEntity.chronoIndex],
+     * trailers/bonus episodes always trailing). Used by the Android Auto browse tree, which
+     * queries a browsable node's children once per request rather than observing a `Flow`.
+     */
+    suspend fun getPlayableEpisodesForPodcast(podcastId: Long, sortOrder: SortOrder): List<PlayableEpisode> {
+        val podcast = podcastDao.getById(podcastId) ?: return emptyList()
+        val (numbered, unnumbered) = episodeDao.getAllForPodcast(podcastId).partition { it.chronoIndex != null }
+        val sorted = when (sortOrder) {
+            SortOrder.NEWEST_FIRST -> numbered.sortedByDescending { it.chronoIndex }
+            SortOrder.OLDEST_FIRST -> numbered.sortedBy { it.chronoIndex }
+        } + unnumbered
+        return sorted.map { entity ->
+            PlayableEpisode(
+                episodeId = entity.id,
+                title = entity.title,
+                podcastTitle = podcast.title,
+                artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
+                mediaUrl = entity.enclosureUrl,
+                startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
+            )
+        }
     }
 
     /** The next unplayed episode in [currentEpisodeId]'s own show - what auto-advance and the

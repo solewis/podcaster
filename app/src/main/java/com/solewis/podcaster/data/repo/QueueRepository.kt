@@ -36,6 +36,14 @@ class QueueRepository(
      * jumps the episode straight to the front rather than waiting its turn. */
     suspend fun getPlayable(episodeId: String): PlayableEpisode? = episodeRepository.getPlayableById(episodeId)
 
+    /**
+     * One-shot, fully playable snapshot of the queue in play order - used by the Android Auto
+     * browse tree's "Up Next" node, which needs real [PlayableEpisode]s (with a URI) rather than
+     * the [com.solewis.podcaster.data.db.model.QueueItem] display projection the Queue screen uses.
+     */
+    suspend fun getPlayableQueue(): List<PlayableEpisode> =
+        queueDao.getAllOrdered().mapNotNull { episodeRepository.getPlayableById(it.episodeId) }
+
     private suspend fun move(queueId: Long, delta: Int) {
         val ordered = queueDao.getAllOrdered()
         val index = ordered.indexOfFirst { it.id == queueId }
