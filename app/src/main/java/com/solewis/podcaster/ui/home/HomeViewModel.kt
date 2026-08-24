@@ -8,6 +8,7 @@ import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.player.PlayerConnection
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -33,24 +34,57 @@ class HomeViewModel(
         /** True only until Room's first emission arrives - distinguishes "still loading" from
          * "genuinely no subscriptions yet", which otherwise look identical (both empty lists) and
          * would flash the empty-state message on every launch before the real data loads in. */
-        val isLoading: Boolean = true
+        val isLoading: Boolean = true,
+        /** Set the instant a row's play button is tapped, cleared once that episode is actually
+         * audible - see [play]. Covers the real dead time (controller connection, network
+         * buffering) between tap and sound, which a play button alone gives no feedback for. */
+        val loadingEpisodeId: String? = null,
+        val nowPlayingEpisodeId: String? = null,
+        val nowPlayingPositionMillis: Long = 0,
+        val nowPlayingDurationMillis: Long? = null
     )
+
+    private val loadingEpisodeId = MutableStateFlow<String?>(null)
 
     val state: StateFlow<UiState> = combine(
         podcastRepository.observeHomeOrder(),
-        episodeRepository.observeAllEpisodes()
-    ) { subscriptions, episodes -> UiState(subscriptions, episodes, isLoading = false) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
+        episodeRepository.observeAllEpisodes(),
+        playerConnection.state,
+        playerConnection.progress,
+        loadingEpisodeId
+    ) { subscriptions, episodes, playback, progress, loading ->
+        UiState(
+            subscriptions = subscriptions,
+            episodes = episodes,
+            isLoading = false,
+            // Cleared as soon as this exact episode is confirmed playing - a stale tap on a
+            // different row (or one that never started) must not leave a spinner stuck forever.
+            loadingEpisodeId = loading.takeUnless { it == playback.episodeId && playback.isPlaying },
+            nowPlayingEpisodeId = playback.episodeId.takeIf { playback.isPlaying },
+            nowPlayingPositionMillis = progress.positionMillis,
+            nowPlayingDurationMillis = progress.durationMillis
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
     fun play(episode: EpisodeFeedItem) {
+        loadingEpisodeId.value = episode.id
         viewModelScope.launch {
             val playable = episodeRepository.getPlayable(episode.id, episode.podcastTitle, episode.podcastArtworkUrl)
-                ?: return@launch
+            if (playable == null) {
+                loadingEpisodeId.value = null
+                return@launch
+            }
             playerConnection.play(playable)
         }
+    }
+
+    fun togglePlayPause() {
+        viewModelScope.launch { playerConnection.togglePlayPause() }
     }
 
     fun enqueue(episode: EpisodeFeedItem) {
         viewModelScope.launch { queueRepository.enqueue(episode.id) }
     }
+
+    suspend fun descriptionFor(episodeId: String): String? = episodeRepository.getDescription(episodeId)
 }

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +32,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -45,8 +47,10 @@ import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.SkipIcon
 import com.solewis.podcaster.ui.common.formatTimer
+import kotlin.math.abs
 
 private const val SKIP_SECONDS = 15
+private const val SEEK_SETTLE_TOLERANCE_MILLIS = 1_500L
 
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f)
 
@@ -58,9 +62,24 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
 
     var isDragging by remember { mutableStateOf(false) }
     var dragPositionMillis by remember { mutableFloatStateOf(0f) }
+    // Set on release, cleared once playback actually reports the seeked-to position. Without
+    // this, the slider snaps back to the pre-seek position for the ~500ms until the next
+    // progress tick catches up, then jumps again - looks like the drag didn't take.
+    var pendingSeekMillis by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(progress.positionMillis, pendingSeekMillis) {
+        val pending = pendingSeekMillis
+        if (pending != null && abs(progress.positionMillis - pending) < SEEK_SETTLE_TOLERANCE_MILLIS) {
+            pendingSeekMillis = null
+        }
+    }
 
     val durationMillis = progress.durationMillis?.coerceAtLeast(1L) ?: 1L
-    val sliderPositionMillis = if (isDragging) dragPositionMillis else progress.positionMillis.toFloat()
+    val sliderPositionMillis = when {
+        isDragging -> dragPositionMillis
+        pendingSeekMillis != null -> pendingSeekMillis!!.toFloat()
+        else -> progress.positionMillis.toFloat()
+    }
 
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
         Column(
@@ -105,12 +124,22 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                 },
                 onValueChangeFinished = {
                     isDragging = false
+                    pendingSeekMillis = dragPositionMillis.toLong()
                     viewModel.seekTo(dragPositionMillis.toLong())
                 },
                 modifier = Modifier.fillMaxWidth()
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatTimer(sliderPositionMillis.toLong()) ?: "0:00", style = MaterialTheme.typography.labelSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(formatTimer(sliderPositionMillis.toLong()) ?: "0:00", style = MaterialTheme.typography.labelSmall)
+                    if (pendingSeekMillis != null) {
+                        CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 1.5.dp)
+                    }
+                }
                 Text(formatTimer(progress.durationMillis) ?: "--:--", style = MaterialTheme.typography.labelSmall)
             }
 

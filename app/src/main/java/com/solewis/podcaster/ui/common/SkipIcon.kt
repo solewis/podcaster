@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 
 /**
  * Material's icon set only ships Replay/Forward glyphs baked for 5/10/30 seconds - not the 15
@@ -33,7 +34,7 @@ fun SkipIcon(seconds: Int, forward: Boolean, contentDescription: String, modifie
         )
         Text(
             seconds.toString(),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 9.sp),
             fontWeight = FontWeight.Bold
         )
     }
