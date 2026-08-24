@@ -46,6 +46,24 @@ class HomeViewModel(
 
     private val loadingEpisodeId = MutableStateFlow<String?>(null)
 
+    init {
+        // Genuinely clears the pending tap rather than merely hiding it while `isPlaying` holds.
+        // Masking it in the combine instead looked identical at first - until you paused, which
+        // un-masked the stale id and put the spinner back on an episode that had long since
+        // started. Also clears when some *other* episode takes over, so a tap that never
+        // produced sound can't leave a spinner stuck forever.
+        viewModelScope.launch {
+            playerConnection.state.collect { playback ->
+                val pending = loadingEpisodeId.value ?: return@collect
+                if (playback.episodeId == pending && playback.isPlaying) {
+                    loadingEpisodeId.value = null
+                } else if (playback.episodeId != null && playback.episodeId != pending) {
+                    loadingEpisodeId.value = null
+                }
+            }
+        }
+    }
+
     val state: StateFlow<UiState> = combine(
         podcastRepository.observeHomeOrder(),
         episodeRepository.observeAllEpisodes(),
@@ -57,9 +75,7 @@ class HomeViewModel(
             subscriptions = subscriptions,
             episodes = episodes,
             isLoading = false,
-            // Cleared as soon as this exact episode is confirmed playing - a stale tap on a
-            // different row (or one that never started) must not leave a spinner stuck forever.
-            loadingEpisodeId = loading.takeUnless { it == playback.episodeId && playback.isPlaying },
+            loadingEpisodeId = loading,
             nowPlayingEpisodeId = playback.episodeId.takeIf { playback.isPlaying },
             nowPlayingPositionMillis = progress.positionMillis,
             nowPlayingDurationMillis = progress.durationMillis
@@ -86,5 +102,4 @@ class HomeViewModel(
         viewModelScope.launch { queueRepository.enqueue(episode.id) }
     }
 
-    suspend fun descriptionFor(episodeId: String): String? = episodeRepository.getDescription(episodeId)
 }

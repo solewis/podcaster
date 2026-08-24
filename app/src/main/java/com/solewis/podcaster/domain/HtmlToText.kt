@@ -31,6 +31,14 @@ object HtmlToText {
         return collapsed.takeIf { it.isNotEmpty() }
     }
 
+    /**
+     * A single unescape pass, exposed for callers that hand the result to a real HTML parser
+     * afterwards (see `ui.common.htmlToAnnotatedString`). Feed content is commonly
+     * double-encoded, so stripping one layer here leaves exactly one well-formed layer for the
+     * parser to interpret as markup - matching the two passes [toPlainText] does internally.
+     */
+    fun unescapeOnce(html: String): String = decodeEntities(html)
+
     private fun decodeEntities(input: String): String =
         ENTITY_REGEX.replace(input) { match ->
             val body = match.groupValues[1]

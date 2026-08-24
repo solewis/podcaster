@@ -68,8 +68,6 @@ import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.domain.JumpTargetResolver
 import com.solewis.podcaster.ui.common.BackButtonRow
-import com.solewis.podcaster.ui.common.EpisodeDetailSheet
-import com.solewis.podcaster.ui.common.EpisodeDetailUi
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 import com.solewis.podcaster.ui.common.formatDuration
@@ -81,7 +79,7 @@ import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
+fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (String) -> Unit) {
     val state by viewModel.state.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val refreshError by viewModel.refreshError.collectAsState()
@@ -93,14 +91,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var highlightedEpisodeId by remember { mutableStateOf<String?>(null) }
     var isJumpTargetVisible by remember { mutableStateOf(false) }
-    var selectedEpisode by remember { mutableStateOf<EpisodeListItem?>(null) }
-    var selectedEpisodeDescription by remember { mutableStateOf<String?>(null) }
     var pendingUnsubscribe by remember { mutableStateOf(false) }
-
-    LaunchedEffect(selectedEpisode?.id) {
-        selectedEpisodeDescription = null
-        selectedEpisode?.let { selectedEpisodeDescription = viewModel.descriptionFor(it.id) }
-    }
 
     LaunchedEffect(refreshError) {
         refreshError?.let { snackbarHostState.showSnackbar(it) }
@@ -200,7 +191,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                                     EpisodeRow(
                                         episode = episode,
                                         isHighlighted = episode.id == highlightedEpisodeId,
-                                        onClick = { selectedEpisode = episode },
+                                        onClick = { onOpenEpisode(episode.id) },
                                         onPlay = { viewModel.play(episode.id) },
                                         onEnqueue = { viewModel.enqueue(episode.id) }
                                     )
@@ -240,23 +231,6 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                 }
             }
         }
-    }
-
-    selectedEpisode?.let { episode ->
-        val numberLabel = episode.displayNumber?.let { "Ep $it" }
-            ?: episode.episodeType.takeIf { it != "full" }?.replaceFirstChar(Char::uppercase)
-        EpisodeDetailSheet(
-            episode = EpisodeDetailUi(
-                title = episode.title,
-                numberLabel = numberLabel,
-                dateLabel = formatEpisodeDate(episode.pubDateMillis),
-                durationLabel = formatDuration(episode.durationMillis),
-                description = selectedEpisodeDescription,
-                isPlayed = episode.isPlayed
-            ),
-            onPlay = { viewModel.play(episode.id) },
-            onDismiss = { selectedEpisode = null }
-        )
     }
 
     if (pendingUnsubscribe) {

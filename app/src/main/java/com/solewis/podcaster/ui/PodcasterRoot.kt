@@ -36,6 +36,8 @@ import androidx.navigation.toRoute
 import com.solewis.podcaster.AppContainer
 import com.solewis.podcaster.ui.activity.ActivityScreen
 import com.solewis.podcaster.ui.common.MiniPlayer
+import com.solewis.podcaster.ui.episodedetail.EpisodeDetailScreen
+import com.solewis.podcaster.ui.episodedetail.EpisodeDetailViewModel
 import com.solewis.podcaster.ui.home.HomeScreen
 import com.solewis.podcaster.ui.home.HomeViewModel
 import com.solewis.podcaster.ui.nowplaying.NowPlayingScreen
@@ -125,9 +127,11 @@ fun PodcasterRoot(container: AppContainer) {
                         }
                     }
                 )
-                HomeScreen(viewModel = viewModel, onOpenShow = { podcastId ->
-                    navController.navigate(Route.Show(podcastId))
-                })
+                HomeScreen(
+                    viewModel = viewModel,
+                    onOpenShow = { podcastId -> navController.navigate(Route.Show(podcastId)) },
+                    onOpenEpisode = { episodeId -> navController.navigate(Route.EpisodeDetail(episodeId)) }
+                )
             }
             composable<Route.Activity> {
                 val queueViewModel: QueueViewModel = viewModel(
@@ -217,7 +221,27 @@ fun PodcasterRoot(container: AppContainer) {
                         }
                     }
                 )
-                ShowScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+                ShowScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenEpisode = { episodeId -> navController.navigate(Route.EpisodeDetail(episodeId)) }
+                )
+            }
+            composable<Route.EpisodeDetail> { entry ->
+                val route = entry.toRoute<Route.EpisodeDetail>()
+                val viewModel: EpisodeDetailViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer {
+                            EpisodeDetailViewModel(
+                                episodeId = route.episodeId,
+                                episodeRepository = container.episodeRepository,
+                                queueRepository = container.queueRepository,
+                                playerConnection = container.playerConnection
+                            )
+                        }
+                    }
+                )
+                EpisodeDetailScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
             }
             composable<Route.NowPlaying> {
                 val viewModel: NowPlayingViewModel = viewModel(

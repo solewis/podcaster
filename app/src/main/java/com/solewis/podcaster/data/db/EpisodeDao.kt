@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.solewis.podcaster.data.db.entity.EpisodeEntity
+import com.solewis.podcaster.data.db.model.EpisodeDetailItem
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import kotlinx.coroutines.flow.Flow
@@ -74,6 +75,23 @@ interface EpisodeDao {
 
     @Query("SELECT * FROM episodes WHERE id = :id")
     suspend fun getById(id: String): EpisodeEntity?
+
+    /**
+     * Live single-episode read for the detail screen, joined against its podcast for the show
+     * name and fallback artwork. Reactive rather than one-shot so the screen's progress bar and
+     * "N left" keep pace with the player writing progress underneath it.
+     */
+    @Query(
+        """
+        SELECT e.id, e.podcastId, p.title AS podcastTitle, p.artworkUrl AS podcastArtworkUrl,
+               e.title, e.descriptionHtml, e.pubDateMillis, e.durationMillis, e.displayNumber,
+               e.episodeType, e.artworkUrl, e.positionMillis, e.isPlayed
+        FROM episodes e
+        JOIN podcasts p ON p.id = e.podcastId
+        WHERE e.id = :id
+        """
+    )
+    fun observeDetail(id: String): Flow<EpisodeDetailItem?>
 
     @Query("SELECT id FROM episodes WHERE podcastId = :podcastId")
     suspend fun getAllIdsForPodcast(podcastId: Long): List<String>

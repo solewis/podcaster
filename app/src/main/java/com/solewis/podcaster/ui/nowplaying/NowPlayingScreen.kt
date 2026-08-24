@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.SkipIcon
+import com.solewis.podcaster.ui.common.SkipIconSize
 import com.solewis.podcaster.ui.common.formatTimer
 import kotlin.math.abs
 
@@ -151,14 +152,14 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                         seconds = SKIP_SECONDS,
                         forward = false,
                         contentDescription = "Back $SKIP_SECONDS seconds",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(SkipIconSize)
                     )
                 }
                 FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
                     Icon(
                         if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (playback.isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(SkipIconSize)
                     )
                 }
                 IconButton(onClick = viewModel::skipForward) {
@@ -166,7 +167,7 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                         seconds = SKIP_SECONDS,
                         forward = true,
                         contentDescription = "Forward $SKIP_SECONDS seconds",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(SkipIconSize)
                     )
                 }
             }

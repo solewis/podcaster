@@ -2,6 +2,7 @@ package com.solewis.podcaster.data.repo
 
 import com.solewis.podcaster.data.db.EpisodeDao
 import com.solewis.podcaster.data.db.PodcastDao
+import com.solewis.podcaster.data.db.model.EpisodeDetailItem
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
@@ -15,6 +16,9 @@ class EpisodeRepository(private val episodeDao: EpisodeDao, private val podcastD
 
     fun observeAllEpisodes(): Flow<List<EpisodeFeedItem>> = episodeDao.observeAllEpisodes()
 
+    /** Live single episode for the detail screen - see [EpisodeDao.observeDetail]. */
+    fun observeEpisodeDetail(episodeId: String): Flow<EpisodeDetailItem?> = episodeDao.observeDetail(episodeId)
+
     /** Records playback activity for an episode - written by the player's progress writer. */
     suspend fun setProgress(episodeId: String, positionMillis: Long, isPlayed: Boolean) {
         episodeDao.setProgress(episodeId, positionMillis, isPlayed, System.currentTimeMillis())
@@ -23,15 +27,6 @@ class EpisodeRepository(private val episodeDao: EpisodeDao, private val podcastD
     suspend fun backfillDuration(episodeId: String, durationMillis: Long) {
         episodeDao.backfillDuration(episodeId, durationMillis)
     }
-
-    /**
-     * The full show notes, converted to plain text - loaded on demand, by id, only when an
-     * episode's detail sheet is opened. [EpisodeListItem]/[EpisodeFeedItem] deliberately omit
-     * this: it can be several KB of HTML per row, which a list of hundreds of episodes has no
-     * business holding in memory just to render titles and durations.
-     */
-    suspend fun getDescription(episodeId: String): String? =
-        HtmlToText.toPlainText(episodeDao.getById(episodeId)?.descriptionHtml)
 
     /**
      * [EpisodeListItem]/[EpisodeFeedItem] (what the list screens hold) deliberately omit
