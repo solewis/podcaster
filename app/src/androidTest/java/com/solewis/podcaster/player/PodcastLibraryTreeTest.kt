@@ -62,7 +62,8 @@ class PodcastLibraryTreeTest {
         title: String = "Episode $chronoIndex",
         positionMillis: Long = 0,
         isPlayed: Boolean = false,
-        podcastIdOverride: Long = podcastId
+        podcastIdOverride: Long = podcastId,
+        pubDateMillis: Long? = null
     ) = EpisodeEntity(
         id = id,
         podcastId = podcastIdOverride,
@@ -75,36 +76,66 @@ class PodcastLibraryTreeTest {
         displayNumber = chronoIndex,
         positionMillis = positionMillis,
         isPlayed = isPlayed,
+        pubDateMillis = pubDateMillis,
         firstSeenAt = 1000L
     )
 
     @Test
-    fun rootChildren_is_just_the_queue_and_a_shows_folder_regardless_of_subscription_count() = runTest {
+    fun rootChildren_is_a_fixed_three_tabs_regardless_of_subscription_count() = runTest {
         // Android Auto renders root's direct children as a persistent top tab strip - this must
-        // stay exactly two tabs no matter how many shows are subscribed, or it stops scaling.
+        // stay exactly three tabs no matter how many shows are subscribed, or it stops scaling.
         db.podcastDao().insert(
             PodcastEntity(feedUrl = "https://example.com/other.xml", title = "Other Show", subscribedAt = 1000L)
         )
 
         val root = tree.children(PodcastLibraryTree.ROOT_ID)
 
-        assertThat(root.map { it.mediaId }).containsExactly(PodcastLibraryTree.QUEUE_ID, PodcastLibraryTree.SHOWS_ID)
+        assertThat(root.map { it.mediaId }).containsExactly(
+            PodcastLibraryTree.QUEUE_ID,
+            PodcastLibraryTree.EPISODES_ID,
+            PodcastLibraryTree.SUBSCRIPTIONS_ID
+        )
         assertThat(root.all { it.mediaMetadata.isBrowsable == true }).isTrue()
     }
 
     @Test
-    fun shows_children_include_every_subscribed_podcast() = runTest {
+    fun subscriptions_children_include_every_subscribed_podcast() = runTest {
         db.podcastDao().insert(
             PodcastEntity(feedUrl = "https://example.com/other.xml", title = "Other Show", subscribedAt = 1000L)
         )
 
-        val shows = tree.children(PodcastLibraryTree.SHOWS_ID)
+        val subscriptions = tree.children(PodcastLibraryTree.SUBSCRIPTIONS_ID)
 
-        assertThat(shows.map { it.mediaId }).containsExactly(
+        assertThat(subscriptions.map { it.mediaId }).containsExactly(
             "${PodcastLibraryTree.PODCAST_PREFIX}$podcastId",
             "${PodcastLibraryTree.PODCAST_PREFIX}2"
         )
-        assertThat(shows.all { it.mediaMetadata.isBrowsable == true }).isTrue()
+        assertThat(subscriptions.all { it.mediaMetadata.isBrowsable == true }).isTrue()
+    }
+
+    @Test
+    fun episodes_children_span_every_show_newest_published_first() = runTest {
+        val otherPodcastId = db.podcastDao().insert(
+            PodcastEntity(feedUrl = "https://example.com/other.xml", title = "Other Show", subscribedAt = 1000L)
+        )
+        db.episodeDao().insertNew(
+            listOf(
+                episode(id = "ep1", chronoIndex = 1, pubDateMillis = 1000L),
+                episode(id = "ep2", chronoIndex = 2, pubDateMillis = 3000L),
+                episode(
+                    id = "other-ep1",
+                    chronoIndex = 1,
+                    pubDateMillis = 2000L,
+                    podcastIdOverride = otherPodcastId
+                )
+            )
+        )
+
+        val episodes = tree.children(PodcastLibraryTree.EPISODES_ID)
+
+        assertThat(episodes.map { it.mediaId }).containsExactly("ep2", "other-ep1", "ep1").inOrder()
+        assertThat(episodes.all { it.mediaMetadata.isPlayable == true }).isTrue()
+        assertThat(episodes.all { it.localConfiguration?.uri != null }).isTrue()
     }
 
     @Test

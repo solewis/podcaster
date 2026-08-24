@@ -7,6 +7,7 @@ import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.domain.HtmlToText
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 class EpisodeRepository(private val episodeDao: EpisodeDao, private val podcastDao: PodcastDao) {
     fun observeEpisodes(podcastId: Long): Flow<List<EpisodeListItem>> =
@@ -94,6 +95,26 @@ class EpisodeRepository(private val episodeDao: EpisodeDao, private val podcastD
             SortOrder.OLDEST_FIRST -> numbered.sortedBy { it.chronoIndex }
         } + unnumbered
         return sorted.map { entity ->
+            PlayableEpisode(
+                episodeId = entity.id,
+                title = entity.title,
+                podcastTitle = podcast.title,
+                artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
+                mediaUrl = entity.enclosureUrl,
+                startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
+            )
+        }
+    }
+
+    /**
+     * One-shot, fully playable snapshot across every subscription, newest-published first - the
+     * same ordering as [observeAllEpisodes] (the Home feed). Used by the Android Auto browse
+     * tree's "Episodes" tab.
+     */
+    suspend fun getPlayableEpisodesAcrossAllShows(): List<PlayableEpisode> {
+        val podcastsById = podcastDao.observeAll().first().associateBy { it.id }
+        return episodeDao.getAllAcrossPodcasts().mapNotNull { entity ->
+            val podcast = podcastsById[entity.podcastId] ?: return@mapNotNull null
             PlayableEpisode(
                 episodeId = entity.id,
                 title = entity.title,

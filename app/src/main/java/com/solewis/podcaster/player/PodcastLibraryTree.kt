@@ -15,12 +15,14 @@ import kotlinx.coroutines.flow.first
  * `EpisodeDaoTest` does, rather than needing a full `MediaBrowser`/`MediaSession` binder
  * round-trip just to prove the tree shape and resume-position logic are correct.
  *
- * Root deliberately has only two children (`Up Next`, `Shows`) rather than one per subscription:
- * Android Auto renders a browsable node's *direct* children as a persistent top tab strip, so
- * putting every subscribed show at the root - as an earlier version of this tree did - turned
- * into one tab per show, which doesn't scale past a handful of subscriptions. Grouping shows
- * under one "Shows" folder keeps the tab strip to two tabs; the shows themselves render as a
- * grid one level in (see the content-style hints in [PodcastLibrarySessionCallback.onGetLibraryRoot]).
+ * Root deliberately has only three, fixed children (`Up Next`, `Episodes`, `Subscriptions`)
+ * rather than one per subscription: Android Auto renders a browsable node's *direct* children as
+ * a persistent top tab strip, so putting every subscribed show at the root - as an earlier
+ * version of this tree did - turned into one tab per show, which doesn't scale past a handful of
+ * subscriptions. Grouping shows under one "Subscriptions" folder keeps the tab strip to a fixed
+ * three tabs; the shows themselves render as a grid one level in (see the content-style hints in
+ * [PodcastLibrarySessionCallback.onGetLibraryRoot]), mirroring the phone UI's Home screen
+ * (cross-show episode feed) plus Activity/Subscriptions split.
  */
 class PodcastLibraryTree(
     private val podcastRepository: PodcastRepository,
@@ -29,18 +31,20 @@ class PodcastLibraryTree(
 ) {
     suspend fun rootChildren(): List<MediaItem> = listOf(
         MediaItemMapper.toBrowsableMediaItem(QUEUE_ID, "Up Next"),
-        MediaItemMapper.toBrowsableMediaItem(SHOWS_ID, "Shows")
+        MediaItemMapper.toBrowsableMediaItem(EPISODES_ID, "Episodes"),
+        MediaItemMapper.toBrowsableMediaItem(SUBSCRIPTIONS_ID, "Subscriptions")
     )
 
     suspend fun children(parentId: String): List<MediaItem> = when {
         parentId == ROOT_ID -> rootChildren()
         parentId == QUEUE_ID -> queueRepository.getPlayableQueue().map(MediaItemMapper::toMediaItem)
-        parentId == SHOWS_ID -> showsChildren()
+        parentId == EPISODES_ID -> episodeRepository.getPlayableEpisodesAcrossAllShows().map(MediaItemMapper::toMediaItem)
+        parentId == SUBSCRIPTIONS_ID -> subscriptionsChildren()
         parentId.startsWith(PODCAST_PREFIX) -> podcastChildren(parentId.removePrefix(PODCAST_PREFIX).toLongOrNull())
         else -> emptyList()
     }
 
-    private suspend fun showsChildren(): List<MediaItem> =
+    private suspend fun subscriptionsChildren(): List<MediaItem> =
         podcastRepository.observeAll().first().map {
             MediaItemMapper.toBrowsableMediaItem("$PODCAST_PREFIX${it.id}", it.title, it.artworkUrl)
         }
@@ -77,7 +81,8 @@ class PodcastLibraryTree(
     companion object {
         const val ROOT_ID = "root"
         const val QUEUE_ID = "queue"
-        const val SHOWS_ID = "shows"
+        const val EPISODES_ID = "episodes"
+        const val SUBSCRIPTIONS_ID = "subscriptions"
         const val PODCAST_PREFIX = "podcast:"
     }
 }

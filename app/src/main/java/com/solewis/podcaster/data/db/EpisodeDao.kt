@@ -122,6 +122,15 @@ interface EpisodeDao {
     suspend fun getAllForPodcast(podcastId: Long): List<EpisodeEntity>
 
     /**
+     * One-shot full-entity snapshot across every subscription, newest-published first - the
+     * same ordering as [observeAllEpisodes] (the Home feed), but with `enclosureUrl` included
+     * so the Android Auto browse tree's "Episodes" tab can build real playable
+     * [androidx.media3.common.MediaItem]s rather than just render text/duration.
+     */
+    @Query("SELECT * FROM episodes ORDER BY (pubDateMillis IS NULL) ASC, pubDateMillis DESC")
+    suspend fun getAllAcrossPodcasts(): List<EpisodeEntity>
+
+    /**
      * The episode this show was most recently played, if any. Backed by the
      * `(podcastId, lastPlayedAt)` index, so this is a single index range scan rather than a table
      * sweep even on a show with thousands of episodes.
