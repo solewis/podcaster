@@ -12,6 +12,7 @@ import com.solewis.podcaster.testing.awaitTrue
 import com.solewis.podcaster.testing.awaitValue
 import com.solewis.podcaster.testing.keepHot
 import com.solewis.podcaster.testing.settle
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -25,6 +26,7 @@ import org.junit.runner.RunWith
  * tracking it locally, so both of those are what's pinned here. The debounce runs on virtual time;
  * everything downstream of it (real HTTP, real Room) is awaited in real time.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class SearchViewModelTest {
 
@@ -49,10 +51,12 @@ class SearchViewModelTest {
         graph.close()
     }
 
-    private fun viewModel() = SearchViewModel(
-        SearchRepository(ItunesSearchApi(httpClient = searchHost.hostRedirectingClient())),
-        graph.subscriptionRepository,
-        graph.podcastRepository
+    private fun viewModel() = graph.hosting(
+        SearchViewModel(
+            SearchRepository(ItunesSearchApi(httpClient = searchHost.hostRedirectingClient())),
+            graph.subscriptionRepository,
+            graph.podcastRepository
+        )
     )
 
     private fun oneResult(title: String, feedUrl: String) =

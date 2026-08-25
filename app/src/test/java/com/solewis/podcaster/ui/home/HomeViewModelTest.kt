@@ -40,11 +40,13 @@ class HomeViewModelTest {
     @After
     fun tearDown() = graph.close()
 
-    private fun viewModel() = HomeViewModel(
-        graph.podcastRepository,
-        graph.episodeRepository,
-        graph.queueRepository,
-        graph.playback
+    private fun viewModel() = graph.hosting(
+        HomeViewModel(
+            graph.podcastRepository,
+            graph.episodeRepository,
+            graph.queueRepository,
+            graph.playback
+        )
     )
 
     /** Builds the ViewModel, keeps its state hot, and waits for Room's first emission. */

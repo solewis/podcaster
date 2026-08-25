@@ -42,7 +42,8 @@ class ShowPreviewViewModelTest {
         graph.close()
     }
 
-    private fun viewModel(feedUrl: String, seedTitle: String? = null) = ShowPreviewViewModel(
+    private fun viewModel(feedUrl: String, seedTitle: String? = null) = graph.hosting(
+        ShowPreviewViewModel(
         feedUrl = feedUrl,
         itunesCollectionId = 7,
         seedTitle = seedTitle,
@@ -51,6 +52,7 @@ class ShowPreviewViewModelTest {
         subscriptionRepository = graph.subscriptionRepository,
         podcastRepository = graph.podcastRepository,
         playback = graph.playback
+        )
     )
 
     @Test
