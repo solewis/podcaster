@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.db.model.EpisodeDetailItem
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.QueueRepository
-import com.solewis.podcaster.player.PlayerConnection
+import com.solewis.podcaster.player.Playback
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -16,7 +16,7 @@ class EpisodeDetailViewModel(
     private val episodeId: String,
     private val episodeRepository: EpisodeRepository,
     private val queueRepository: QueueRepository,
-    private val playerConnection: PlayerConnection
+    private val playback: Playback
 ) : ViewModel() {
 
     data class UiState(
@@ -35,8 +35,8 @@ class EpisodeDetailViewModel(
 
     val state: StateFlow<UiState> = combine(
         episodeRepository.observeEpisodeDetail(episodeId),
-        playerConnection.state,
-        playerConnection.progress
+        playback.state,
+        playback.progress
     ) { episode, playback, progress ->
         val isThis = playback.episodeId == episodeId
         UiState(
@@ -52,11 +52,11 @@ class EpisodeDetailViewModel(
     fun togglePlay() {
         viewModelScope.launch {
             if (state.value.isPlayingThis) {
-                playerConnection.togglePlayPause()
+                playback.togglePlayPause()
                 return@launch
             }
             val playable = episodeRepository.getPlayableById(episodeId) ?: return@launch
-            playerConnection.play(playable)
+            playback.play(playable)
         }
     }
 

@@ -10,7 +10,12 @@ import com.solewis.podcaster.domain.HtmlToText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
-class EpisodeRepository(private val episodeDao: EpisodeDao, private val podcastDao: PodcastDao) {
+class EpisodeRepository(
+    private val episodeDao: EpisodeDao,
+    private val podcastDao: PodcastDao,
+    /** Injectable so tests can assert on the jump anchor, matching [SubscriptionRepository]. */
+    private val now: () -> Long = System::currentTimeMillis
+) {
     fun observeEpisodes(podcastId: Long): Flow<List<EpisodeListItem>> =
         episodeDao.observeListForPodcast(podcastId)
 
@@ -21,7 +26,7 @@ class EpisodeRepository(private val episodeDao: EpisodeDao, private val podcastD
 
     /** Records playback activity for an episode - written by the player's progress writer. */
     suspend fun setProgress(episodeId: String, positionMillis: Long, isPlayed: Boolean) {
-        episodeDao.setProgress(episodeId, positionMillis, isPlayed, System.currentTimeMillis())
+        episodeDao.setProgress(episodeId, positionMillis, isPlayed, now())
     }
 
     suspend fun backfillDuration(episodeId: String, durationMillis: Long) {

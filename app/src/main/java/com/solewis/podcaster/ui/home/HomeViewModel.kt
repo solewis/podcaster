@@ -7,7 +7,7 @@ import com.solewis.podcaster.data.db.model.HomeShowSummary
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.QueueRepository
-import com.solewis.podcaster.player.PlayerConnection
+import com.solewis.podcaster.player.Playback
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +25,7 @@ class HomeViewModel(
     private val podcastRepository: PodcastRepository,
     private val episodeRepository: EpisodeRepository,
     private val queueRepository: QueueRepository,
-    private val playerConnection: PlayerConnection
+    private val playback: Playback
 ) : ViewModel() {
 
     data class UiState(
@@ -53,7 +53,7 @@ class HomeViewModel(
         // started. Also clears when some *other* episode takes over, so a tap that never
         // produced sound can't leave a spinner stuck forever.
         viewModelScope.launch {
-            playerConnection.state.collect { playback ->
+            playback.state.collect { playback ->
                 val pending = loadingEpisodeId.value ?: return@collect
                 if (playback.episodeId == pending && playback.isPlaying) {
                     loadingEpisodeId.value = null
@@ -67,8 +67,8 @@ class HomeViewModel(
     val state: StateFlow<UiState> = combine(
         podcastRepository.observeHomeOrder(),
         episodeRepository.observeAllEpisodes(),
-        playerConnection.state,
-        playerConnection.progress,
+        playback.state,
+        playback.progress,
         loadingEpisodeId
     ) { subscriptions, episodes, playback, progress, loading ->
         UiState(
@@ -90,12 +90,12 @@ class HomeViewModel(
                 loadingEpisodeId.value = null
                 return@launch
             }
-            playerConnection.play(playable)
+            playback.play(playable)
         }
     }
 
     fun togglePlayPause() {
-        viewModelScope.launch { playerConnection.togglePlayPause() }
+        viewModelScope.launch { playback.togglePlayPause() }
     }
 
     fun enqueue(episode: EpisodeFeedItem) {

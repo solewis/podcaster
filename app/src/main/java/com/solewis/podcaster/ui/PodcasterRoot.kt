@@ -212,7 +212,7 @@ fun PodcasterRoot(container: AppContainer) {
                                 showPreviewRepository = container.showPreviewRepository,
                                 subscriptionRepository = container.subscriptionRepository,
                                 podcastRepository = container.podcastRepository,
-                                playerConnection = container.playerConnection
+                                playback = container.playerConnection
                             )
                         }
                     }
@@ -258,7 +258,7 @@ fun PodcasterRoot(container: AppContainer) {
                                 episodeId = route.episodeId,
                                 episodeRepository = container.episodeRepository,
                                 queueRepository = container.queueRepository,
-                                playerConnection = container.playerConnection
+                                playback = container.playerConnection
                             )
                         }
                     }

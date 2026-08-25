@@ -15,13 +15,14 @@ import kotlinx.coroutines.flow.Flow
  */
 class QueueRepository(
     private val queueDao: QueueDao,
-    private val episodeRepository: EpisodeRepository
+    private val episodeRepository: EpisodeRepository,
+    private val now: () -> Long = System::currentTimeMillis
 ) {
     fun observeQueue(): Flow<List<QueueItem>> = queueDao.observeQueue()
 
     suspend fun enqueue(episodeId: String) {
         val position = queueDao.nextPosition()
-        queueDao.insert(QueueEntity(episodeId = episodeId, position = position, addedAt = System.currentTimeMillis()))
+        queueDao.insert(QueueEntity(episodeId = episodeId, position = position, addedAt = now()))
     }
 
     suspend fun remove(queueId: Long) {

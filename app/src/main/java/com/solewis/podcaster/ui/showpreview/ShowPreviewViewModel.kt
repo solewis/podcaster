@@ -10,7 +10,7 @@ import com.solewis.podcaster.data.repo.SubscribeResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.domain.FeedToEpisodesMapper
 import com.solewis.podcaster.domain.HtmlToText
-import com.solewis.podcaster.player.PlayerConnection
+import com.solewis.podcaster.player.Playback
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,7 +30,7 @@ class ShowPreviewViewModel(
     private val showPreviewRepository: ShowPreviewRepository,
     private val subscriptionRepository: SubscriptionRepository,
     private val podcastRepository: PodcastRepository,
-    private val playerConnection: PlayerConnection
+    private val playback: Playback
 ) : ViewModel() {
 
     data class UiState(
@@ -70,7 +70,7 @@ class ShowPreviewViewModel(
     fun play(episode: FeedToEpisodesMapper.MappedEpisode) {
         val preview = _state.value.preview ?: return
         viewModelScope.launch {
-            playerConnection.play(
+            playback.play(
                 PlayableEpisode(
                     episodeId = episode.stableKey,
                     title = episode.title,

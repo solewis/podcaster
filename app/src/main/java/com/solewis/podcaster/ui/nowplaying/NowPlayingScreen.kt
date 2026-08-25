@@ -66,7 +66,7 @@ private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
-    val playback by viewModel.playback.collectAsState()
+    val playback by viewModel.playbackState.collectAsState()
     val progress by viewModel.progress.collectAsState()
 
     var isDragging by remember { mutableStateOf(false) }

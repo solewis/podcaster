@@ -11,7 +11,7 @@ import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.data.repo.RefreshResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.domain.JumpTargetResolver
-import com.solewis.podcaster.player.PlayerConnection
+import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.ui.common.formatDuration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,7 +27,7 @@ class ShowViewModel(
     private val episodeRepository: EpisodeRepository,
     private val subscriptionRepository: SubscriptionRepository,
     private val queueRepository: QueueRepository,
-    private val playerConnection: PlayerConnection
+    private val playback: Playback
 ) : ViewModel() {
 
     data class UiState(
@@ -86,7 +86,7 @@ class ShowViewModel(
         val podcast = state.value.podcast ?: return
         viewModelScope.launch {
             val playable = episodeRepository.getPlayable(episodeId, podcast.title, podcast.artworkUrl) ?: return@launch
-            playerConnection.play(playable)
+            playback.play(playable)
         }
     }
 

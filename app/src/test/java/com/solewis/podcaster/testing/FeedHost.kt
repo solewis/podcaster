@@ -6,6 +6,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import java.io.Closeable
+import java.util.concurrent.TimeUnit
 
 /**
  * A local stand-in for a podcast host, so the ingest path can be tested over real HTTP without
@@ -33,9 +34,16 @@ class FeedHost : Closeable {
         server.enqueue(response)
     }
 
-    /** What a real host returns for an unchanged feed: a bare 304 with no body at all. */
-    fun enqueueNotModified() {
-        server.enqueue(MockResponse().setResponseCode(304))
+    /**
+     * What a real host returns for an unchanged feed: a bare 304 with no body at all.
+     *
+     * [delayMillis] holds the response open, which is how a test can be certain a request is still
+     * in flight - needed to exercise anything guarding against a concurrent second request.
+     */
+    fun enqueueNotModified(delayMillis: Long = 0) {
+        val response = MockResponse().setResponseCode(304)
+        if (delayMillis > 0) response.setHeadersDelay(delayMillis, TimeUnit.MILLISECONDS)
+        server.enqueue(response)
     }
 
     fun enqueueStatus(code: Int) {
