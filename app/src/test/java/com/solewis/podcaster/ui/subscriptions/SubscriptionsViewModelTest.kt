@@ -39,7 +39,8 @@ class SubscriptionsViewModelTest {
         graph.close()
     }
 
-    private fun viewModel() = SubscriptionsViewModel(graph.podcastRepository, graph.subscriptionRepository)
+    private fun viewModel() =
+        graph.hosting(SubscriptionsViewModel(graph.podcastRepository, graph.subscriptionRepository))
 
     @Test
     fun every_subscription_is_listed() = runTest(mainDispatcher.dispatcher) {
@@ -72,7 +73,7 @@ class SubscriptionsViewModelTest {
         host.enqueueFeed("rotating_token_v1.xml")
         repository.subscribe(host.feedUrl())
         host.enqueueNotModified()
-        val vm = SubscriptionsViewModel(graph.podcastRepository, repository)
+        val vm = graph.hosting(SubscriptionsViewModel(graph.podcastRepository, repository))
 
         vm.refreshAll()
 
@@ -88,7 +89,7 @@ class SubscriptionsViewModelTest {
         ) { 1_000L }
         host.enqueueFeed("rotating_token_v1.xml")
         repository.subscribe(host.feedUrl())
-        val vm = SubscriptionsViewModel(graph.podcastRepository, repository)
+        val vm = graph.hosting(SubscriptionsViewModel(graph.podcastRepository, repository))
         // Held open so the second call below is unambiguously concurrent with the first, rather
         // than racing a refresh that may already have finished.
         host.enqueueNotModified(delayMillis = 300)

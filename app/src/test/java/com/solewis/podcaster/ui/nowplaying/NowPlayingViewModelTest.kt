@@ -3,8 +3,10 @@ package com.solewis.podcaster.ui.nowplaying
 import com.google.common.truth.Truth.assertThat
 import com.solewis.podcaster.testing.FakePlayback
 import com.solewis.podcaster.testing.MainDispatcherRule
+import com.solewis.podcaster.testing.ViewModelHost
 import com.solewis.podcaster.testing.awaitTrue
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 
@@ -19,7 +21,11 @@ class NowPlayingViewModelTest {
     val mainDispatcher = MainDispatcherRule()
 
     private val playback = FakePlayback()
-    private val viewModel = NowPlayingViewModel(playback)
+    private val host = ViewModelHost()
+    private val viewModel = host.hosting(NowPlayingViewModel(playback))
+
+    @After
+    fun tearDown() = host.close()
 
     @Test
     fun playback_and_progress_are_surfaced_straight_from_the_player() = runTest(mainDispatcher.dispatcher) {

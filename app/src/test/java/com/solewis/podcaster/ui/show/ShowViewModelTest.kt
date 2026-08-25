@@ -51,13 +51,15 @@ class ShowViewModelTest {
     }
 
     private fun viewModel(subscriptions: SubscriptionRepository = graph.subscriptionRepository) =
-        ShowViewModel(
-            podcastId,
-            graph.podcastRepository,
-            graph.episodeRepository,
-            subscriptions,
-            graph.queueRepository,
-            graph.playback
+        graph.hosting(
+            ShowViewModel(
+                podcastId,
+                graph.podcastRepository,
+                graph.episodeRepository,
+                subscriptions,
+                graph.queueRepository,
+                graph.playback
+            )
         )
 
     private suspend fun TestScope.loadedViewModel(episodeCount: Int = 3): ShowViewModel {

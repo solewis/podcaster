@@ -1,5 +1,6 @@
 package com.solewis.podcaster.testing
 
+import androidx.lifecycle.ViewModel
 import com.solewis.podcaster.data.db.PodcasterDatabase
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
@@ -50,5 +51,18 @@ class TestGraph : Closeable {
         playbackFactory = { playback }
     )
 
-    override fun close() = db.close()
+    private val viewModels = ViewModelHost()
+
+    /**
+     * Registers a ViewModel so its `viewModelScope` is cancelled when this graph closes. See
+     * [ViewModelHost] for why leaving it uncancelled makes unrelated tests fail intermittently.
+     */
+    fun <T : ViewModel> hosting(viewModel: T): T = viewModels.hosting(viewModel)
+
+    override fun close() {
+        // Order matters: cancel the ViewModels first so their sharing coroutines stop observing
+        // before the database they are reading from disappears underneath them.
+        viewModels.close()
+        db.close()
+    }
 }

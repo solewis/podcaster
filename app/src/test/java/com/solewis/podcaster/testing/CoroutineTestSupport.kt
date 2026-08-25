@@ -2,6 +2,7 @@ package com.solewis.podcaster.testing
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelStore
+import java.io.Closeable
 
 /**
  * Points `Dispatchers.Main` at a test dispatcher, since `viewModelScope` uses
@@ -25,6 +29,7 @@ import org.junit.runner.Description
  * otherwise virtual time the test advances never reaches work the ViewModel launched, and the
  * search debounce in particular silently never fires.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule(
     val dispatcher: TestDispatcher = UnconfinedTestDispatcher()
 ) : TestWatcher() {
@@ -46,6 +51,7 @@ class MainDispatcherRule(
  * collector has to sit on a real thread: Room delivers its emissions from its own threads, so a
  * collector parked on the test dispatcher would only see them when the test happened to advance.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 fun TestScope.keepHot(vararg flows: Flow<*>) {
     flows.forEach { flow -> backgroundScope.launch(Dispatchers.Default) { flow.collect {} } }
 }
@@ -86,3 +92,29 @@ suspend fun CoroutineScope.settle() {
 private const val TIMEOUT_MILLIS = 5_000L
 private const val POLL_MILLIS = 5L
 private const val SETTLE_MILLIS = 150L
+
+/**
+ * Owns the ViewModels a test builds, so their `viewModelScope` is cancelled when the test ends.
+ *
+ * Without this they leak. A ViewModel's scope is never cancelled unless something clears it, so its
+ * `stateIn(WhileSubscribed(5s))` sharing coroutine outlives the test still holding a pending
+ * timeout - and when the next `Dispatchers.setMain`/`resetMain` runs, kotlinx-coroutines' guard
+ * throws "Dispatchers.Main is used concurrently with setting it". That surfaces as an unrelated
+ * test failing intermittently, which is the worst kind: it looks like the code under test.
+ *
+ * `clear()` is the only public route to cancelling the scope - `ViewModel.clear()` itself is
+ * internal to the library.
+ */
+class ViewModelHost : Closeable {
+
+    private val store = ViewModelStore()
+    private var next = 0
+
+    fun <T : ViewModel> hosting(viewModel: T): T {
+        store.put("viewModel${next++}", viewModel)
+        return viewModel
+    }
+
+    override fun close() = store.clear()
+}
+

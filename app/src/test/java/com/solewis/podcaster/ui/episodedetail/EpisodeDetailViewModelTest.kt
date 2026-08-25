@@ -48,7 +48,9 @@ class EpisodeDetailViewModelTest {
             episodeRow(podcastId, "1", positionMillis = positionMillis, isPlayed = isPlayed, durationMillis = 600_000),
             episodeRow(podcastId, "2")
         )
-        val vm = EpisodeDetailViewModel(episodeId, graph.episodeRepository, graph.queueRepository, graph.playback)
+        val vm = graph.hosting(
+            EpisodeDetailViewModel(episodeId, graph.episodeRepository, graph.queueRepository, graph.playback)
+        )
         keepHot(vm.state)
         vm.state.awaitValue { it.episode != null }
         return vm
