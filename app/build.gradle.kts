@@ -121,6 +121,14 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.truth)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Robolectric lets the repository and (later) ViewModel tests run a real Room database on the
+    // JVM, so they land in the `test` source set and run in CI - which only executes `test`.
+    // Instrumented tests stay for what genuinely needs a device: ExoPlayer, MediaSession, and
+    // Android's own XML parser (see RssParserOnDeviceTest).
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.okhttp.mockwebserver)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.test.ext.junit)
