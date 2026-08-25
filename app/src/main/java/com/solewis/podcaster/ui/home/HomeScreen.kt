@@ -18,7 +18,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,19 +36,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.HomeShowSummary
+import com.solewis.podcaster.ui.common.EpisodeProgressBar
+import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.ScreenTitle
-import com.solewis.podcaster.ui.common.formatDuration
-import com.solewis.podcaster.ui.common.formatEpisodeDate
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel, onOpenShow: (Long) -> Unit) {
+fun HomeScreen(viewModel: HomeViewModel, onOpenShow: (Long) -> Unit, onOpenEpisode: (String) -> Unit) {
     val state by viewModel.state.collectAsState()
 
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).statusBarsPadding()) {
             ScreenTitle("Library")
-            if (state.subscriptions.isEmpty()) {
+            if (state.isLoading) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (state.subscriptions.isEmpty()) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text("No shows yet - search to subscribe to one.", style = MaterialTheme.typography.bodyLarge)
                 }
@@ -57,9 +64,15 @@ fun HomeScreen(viewModel: HomeViewModel, onOpenShow: (Long) -> Unit) {
                         HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
                     }
                     items(state.episodes, key = { it.id }) { episode ->
+                        val isNowPlaying = state.nowPlayingEpisodeId == episode.id
                         FeedEpisodeRow(
                             episode = episode,
-                            onPlay = { viewModel.play(episode) },
+                            isLoading = state.loadingEpisodeId == episode.id,
+                            isNowPlaying = isNowPlaying,
+                            nowPlayingPositionMillis = state.nowPlayingPositionMillis,
+                            nowPlayingDurationMillis = state.nowPlayingDurationMillis,
+                            onClick = { onOpenEpisode(episode.id) },
+                            onPlayOrToggle = { if (isNowPlaying) viewModel.togglePlayPause() else viewModel.play(episode) },
                             onEnqueue = { viewModel.enqueue(episode) }
                         )
                         HorizontalDivider()
@@ -88,14 +101,25 @@ private fun SubscriptionsRow(subscriptions: List<HomeShowSummary>, onOpenShow: (
 }
 
 @Composable
-private fun FeedEpisodeRow(episode: EpisodeFeedItem, onPlay: () -> Unit, onEnqueue: () -> Unit) {
+private fun FeedEpisodeRow(
+    episode: EpisodeFeedItem,
+    isLoading: Boolean,
+    isNowPlaying: Boolean,
+    nowPlayingPositionMillis: Long,
+    nowPlayingDurationMillis: Long?,
+    onClick: () -> Unit,
+    onPlayOrToggle: () -> Unit,
+    onEnqueue: () -> Unit
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        // Tappable to open episode details; the play/enqueue icons keep their own click targets,
+        // matching the nested-clickable pattern used elsewhere (e.g. MiniPlayer).
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top
     ) {
         PodcastArtwork(
             artworkUrl = episode.artworkUrl ?: episode.podcastArtworkUrl,
-            modifier = Modifier.size(56.dp)
+            modifier = Modifier.size(EpisodeArtworkSize)
         )
 
         Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
@@ -113,34 +137,39 @@ private fun FeedEpisodeRow(episode: EpisodeFeedItem, onPlay: () -> Unit, onEnque
                 modifier = Modifier.padding(top = 2.dp)
             )
 
-            val dateAndDuration = listOfNotNull(
-                formatEpisodeDate(episode.pubDateMillis),
-                formatDuration(episode.durationMillis)
-            ).joinToString(" · ")
-            if (dateAndDuration.isNotEmpty()) {
+            val progress = episodeProgressUi(
+                pubDateMillis = episode.pubDateMillis,
+                durationMillis = episode.durationMillis,
+                positionMillis = episode.positionMillis,
+                isPlayed = episode.isPlayed,
+                livePositionMillis = nowPlayingPositionMillis.takeIf { isNowPlaying },
+                liveDurationMillis = nowPlayingDurationMillis.takeIf { isNowPlaying }
+            )
+            if (progress.label.isNotEmpty()) {
                 Text(
-                    dateAndDuration,
+                    progress.label,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
-
-            val progressText = when {
-                episode.isPlayed -> null
-                episode.positionMillis > 0 && episode.durationMillis != null ->
-                    "${formatDuration(episode.positionMillis)} / ${formatDuration(episode.durationMillis)}"
-                else -> null
-            }
-            progressText?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+            if (progress.showBar) {
+                EpisodeProgressBar(
+                    positionMillis = progress.positionMillis!!,
+                    durationMillis = progress.durationMillis!!,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
             }
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Row {
-                IconButton(onClick = onPlay) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+                IconButton(onClick = onPlayOrToggle, enabled = !isLoading) {
+                    when {
+                        isLoading -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        isNowPlaying -> Icon(Icons.Default.Pause, contentDescription = "Pause ${episode.title}")
+                        else -> Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+                    }
                 }
                 IconButton(onClick = onEnqueue) {
                     Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add ${episode.title} to queue")

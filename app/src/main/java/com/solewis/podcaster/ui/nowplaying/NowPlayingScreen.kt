@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,9 +31,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -44,23 +49,46 @@ import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.SkipIcon
+import com.solewis.podcaster.ui.common.SkipIconSize
 import com.solewis.podcaster.ui.common.formatTimer
+import kotlin.math.abs
 
 private const val SKIP_SECONDS = 15
+private const val SEEK_SETTLE_TOLERANCE_MILLIS = 1_500L
+private val SCRUBBER_TRACK_HEIGHT = 4.dp
+private val SCRUBBER_THUMB_SIZE = 14.dp
+
+/** Gap between the play/pause button and the skip buttons flanking it. */
+private val TRANSPORT_BUTTON_SPACING = 36.dp
 
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
-    val playback by viewModel.playback.collectAsState()
+    val playback by viewModel.playbackState.collectAsState()
     val progress by viewModel.progress.collectAsState()
 
     var isDragging by remember { mutableStateOf(false) }
     var dragPositionMillis by remember { mutableFloatStateOf(0f) }
+    // Set on release, cleared once playback actually reports the seeked-to position. Without
+    // this, the slider snaps back to the pre-seek position for the ~500ms until the next
+    // progress tick catches up, then jumps again - looks like the drag didn't take.
+    var pendingSeekMillis by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(progress.positionMillis, pendingSeekMillis) {
+        val pending = pendingSeekMillis
+        if (pending != null && abs(progress.positionMillis - pending) < SEEK_SETTLE_TOLERANCE_MILLIS) {
+            pendingSeekMillis = null
+        }
+    }
 
     val durationMillis = progress.durationMillis?.coerceAtLeast(1L) ?: 1L
-    val sliderPositionMillis = if (isDragging) dragPositionMillis else progress.positionMillis.toFloat()
+    val sliderPositionMillis = when {
+        isDragging -> dragPositionMillis
+        pendingSeekMillis != null -> pendingSeekMillis!!.toFloat()
+        else -> progress.positionMillis.toFloat()
+    }
 
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
         Column(
@@ -105,31 +133,63 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                 },
                 onValueChangeFinished = {
                     isDragging = false
+                    pendingSeekMillis = dragPositionMillis.toLong()
                     viewModel.seekTo(dragPositionMillis.toLong())
+                },
+                // Material 3's current default is a thick track with a tall pill thumb and a stop
+                // indicator at the end - a lot of furniture for a scrubber. A slim track with a
+                // round thumb is the shape people expect on a player, so both slots are supplied.
+                thumb = {
+                    Box(
+                        modifier = Modifier
+                            .size(SCRUBBER_THUMB_SIZE)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    )
+                },
+                track = { sliderState ->
+                    SliderDefaults.Track(
+                        sliderState = sliderState,
+                        modifier = Modifier.height(SCRUBBER_TRACK_HEIGHT),
+                        thumbTrackGapSize = 0.dp,
+                        drawStopIndicator = null,
+                        trackInsideCornerSize = 0.dp
+                    )
                 },
                 modifier = Modifier.fillMaxWidth()
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatTimer(sliderPositionMillis.toLong()) ?: "0:00", style = MaterialTheme.typography.labelSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(formatTimer(sliderPositionMillis.toLong()) ?: "0:00", style = MaterialTheme.typography.labelSmall)
+                    if (pendingSeekMillis != null) {
+                        CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 1.5.dp)
+                    }
+                }
                 Text(formatTimer(progress.durationMillis) ?: "--:--", style = MaterialTheme.typography.labelSmall)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(TRANSPORT_BUTTON_SPACING)
+            ) {
                 IconButton(onClick = viewModel::skipBack) {
                     SkipIcon(
                         seconds = SKIP_SECONDS,
                         forward = false,
                         contentDescription = "Back $SKIP_SECONDS seconds",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(SkipIconSize)
                     )
                 }
                 FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
                     Icon(
                         if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (playback.isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(SkipIconSize)
                     )
                 }
                 IconButton(onClick = viewModel::skipForward) {
@@ -137,7 +197,7 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                         seconds = SKIP_SECONDS,
                         forward = true,
                         contentDescription = "Forward $SKIP_SECONDS seconds",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(SkipIconSize)
                     )
                 }
             }

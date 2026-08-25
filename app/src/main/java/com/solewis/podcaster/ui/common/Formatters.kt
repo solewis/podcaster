@@ -20,6 +20,12 @@ fun formatDuration(millis: Long?): String? {
     return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }
 
+/** e.g. position=171,000ms, duration=11,940,000ms -> "3h 15m left". Null when duration is unknown. */
+fun formatRemaining(positionMillis: Long, durationMillis: Long?): String? {
+    if (durationMillis == null) return null
+    return formatDuration((durationMillis - positionMillis).coerceAtLeast(0))?.let { "$it left" }
+}
+
 /**
  * Clock-style formatting for a live playback position/duration, e.g. 78,000ms -> "1:18",
  * 8,300,000ms -> "2:18:20". Distinct from [formatDuration]: that reads better for browsing a list

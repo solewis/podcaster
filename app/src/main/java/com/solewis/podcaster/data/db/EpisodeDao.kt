@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.solewis.podcaster.data.db.entity.EpisodeEntity
+import com.solewis.podcaster.data.db.model.EpisodeDetailItem
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import kotlinx.coroutines.flow.Flow
@@ -75,6 +76,23 @@ interface EpisodeDao {
     @Query("SELECT * FROM episodes WHERE id = :id")
     suspend fun getById(id: String): EpisodeEntity?
 
+    /**
+     * Live single-episode read for the detail screen, joined against its podcast for the show
+     * name and fallback artwork. Reactive rather than one-shot so the screen's progress bar and
+     * "N left" keep pace with the player writing progress underneath it.
+     */
+    @Query(
+        """
+        SELECT e.id, e.podcastId, p.title AS podcastTitle, p.artworkUrl AS podcastArtworkUrl,
+               e.title, e.descriptionHtml, e.pubDateMillis, e.durationMillis, e.displayNumber,
+               e.episodeType, e.artworkUrl, e.positionMillis, e.isPlayed
+        FROM episodes e
+        JOIN podcasts p ON p.id = e.podcastId
+        WHERE e.id = :id
+        """
+    )
+    fun observeDetail(id: String): Flow<EpisodeDetailItem?>
+
     @Query("SELECT id FROM episodes WHERE podcastId = :podcastId")
     suspend fun getAllIdsForPodcast(podcastId: Long): List<String>
 
@@ -105,6 +123,30 @@ interface EpisodeDao {
         """
     )
     fun observeListForPodcast(podcastId: Long): Flow<List<EpisodeListItem>>
+
+    /**
+     * One-shot full-entity snapshot of a show's episodes (unlike [observeListForPodcast], which
+     * is both reactive and a lightweight projection missing `enclosureUrl`) - needed by the
+     * Android Auto browse tree, which has to build real playable [androidx.media3.common.MediaItem]s
+     * with a URI rather than just render text/duration.
+     */
+    @Query(
+        """
+        SELECT * FROM episodes
+        WHERE podcastId = :podcastId
+        ORDER BY (chronoIndex IS NULL) ASC, chronoIndex DESC
+        """
+    )
+    suspend fun getAllForPodcast(podcastId: Long): List<EpisodeEntity>
+
+    /**
+     * One-shot full-entity snapshot across every subscription, newest-published first - the
+     * same ordering as [observeAllEpisodes] (the Home feed), but with `enclosureUrl` included
+     * so the Android Auto browse tree's "Episodes" tab can build real playable
+     * [androidx.media3.common.MediaItem]s rather than just render text/duration.
+     */
+    @Query("SELECT * FROM episodes ORDER BY (pubDateMillis IS NULL) ASC, pubDateMillis DESC")
+    suspend fun getAllAcrossPodcasts(): List<EpisodeEntity>
 
     /**
      * The episode this show was most recently played, if any. Backed by the

@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.solewis.podcaster.ui.common.ScreenTitle
@@ -21,6 +22,8 @@ import com.solewis.podcaster.ui.queue.QueueList
 import com.solewis.podcaster.ui.queue.QueueViewModel
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsList
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsViewModel
+import androidx.compose.ui.platform.testTag
+import com.solewis.podcaster.ui.common.TestTags
 
 private val SEGMENTS = listOf("Queue", "Subscriptions")
 
@@ -37,7 +40,10 @@ fun ActivityScreen(
     subscriptionsViewModel: SubscriptionsViewModel,
     onOpenShow: (Long) -> Unit
 ) {
-    var selectedSegment by remember { mutableIntStateOf(0) }
+    // Saveable, not plain remember: navigating into a show and back recreates this
+    // composable, and a plain remember would silently drop you back on Queue even though
+    // you left from Subscriptions.
+    var selectedSegment by rememberSaveable { mutableIntStateOf(0) }
 
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).statusBarsPadding()) {
@@ -47,7 +53,8 @@ fun ActivityScreen(
                     Tab(
                         selected = selectedSegment == index,
                         onClick = { selectedSegment = index },
-                        text = { Text(label) }
+                        text = { Text(label) },
+                        modifier = Modifier.testTag(TestTags.segment(label))
                     )
                 }
             }

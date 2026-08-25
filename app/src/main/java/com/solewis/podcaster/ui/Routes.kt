@@ -25,5 +25,8 @@ sealed interface Route {
     ) : Route
 
     @Serializable
+    data class EpisodeDetail(val episodeId: String) : Route
+
+    @Serializable
     data object NowPlaying : Route
 }

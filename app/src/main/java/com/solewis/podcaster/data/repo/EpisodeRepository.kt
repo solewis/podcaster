@@ -2,34 +2,36 @@ package com.solewis.podcaster.data.repo
 
 import com.solewis.podcaster.data.db.EpisodeDao
 import com.solewis.podcaster.data.db.PodcastDao
+import com.solewis.podcaster.data.db.model.EpisodeDetailItem
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.EpisodeListItem
+import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.domain.HtmlToText
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
-class EpisodeRepository(private val episodeDao: EpisodeDao, private val podcastDao: PodcastDao) {
+class EpisodeRepository(
+    private val episodeDao: EpisodeDao,
+    private val podcastDao: PodcastDao,
+    /** Injectable so tests can assert on the jump anchor, matching [SubscriptionRepository]. */
+    private val now: () -> Long = System::currentTimeMillis
+) {
     fun observeEpisodes(podcastId: Long): Flow<List<EpisodeListItem>> =
         episodeDao.observeListForPodcast(podcastId)
 
     fun observeAllEpisodes(): Flow<List<EpisodeFeedItem>> = episodeDao.observeAllEpisodes()
 
+    /** Live single episode for the detail screen - see [EpisodeDao.observeDetail]. */
+    fun observeEpisodeDetail(episodeId: String): Flow<EpisodeDetailItem?> = episodeDao.observeDetail(episodeId)
+
     /** Records playback activity for an episode - written by the player's progress writer. */
     suspend fun setProgress(episodeId: String, positionMillis: Long, isPlayed: Boolean) {
-        episodeDao.setProgress(episodeId, positionMillis, isPlayed, System.currentTimeMillis())
+        episodeDao.setProgress(episodeId, positionMillis, isPlayed, now())
     }
 
     suspend fun backfillDuration(episodeId: String, durationMillis: Long) {
         episodeDao.backfillDuration(episodeId, durationMillis)
     }
-
-    /**
-     * The full show notes, converted to plain text - loaded on demand, by id, only when an
-     * episode's detail sheet is opened. [EpisodeListItem]/[EpisodeFeedItem] deliberately omit
-     * this: it can be several KB of HTML per row, which a list of hundreds of episodes has no
-     * business holding in memory just to render titles and durations.
-     */
-    suspend fun getDescription(episodeId: String): String? =
-        HtmlToText.toPlainText(episodeDao.getById(episodeId)?.descriptionHtml)
 
     /**
      * [EpisodeListItem]/[EpisodeFeedItem] (what the list screens hold) deliberately omit
@@ -77,6 +79,51 @@ class EpisodeRepository(private val episodeDao: EpisodeDao, private val podcastD
             mediaUrl = entity.enclosureUrl,
             startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
         )
+    }
+
+    /**
+     * One-shot, fully playable snapshot of a show's episodes, sorted the same way [SortOrder]
+     * governs `ShowScreen`'s list (numbered episodes by [com.solewis.podcaster.data.db.entity.EpisodeEntity.chronoIndex],
+     * trailers/bonus episodes always trailing). Used by the Android Auto browse tree, which
+     * queries a browsable node's children once per request rather than observing a `Flow`.
+     */
+    suspend fun getPlayableEpisodesForPodcast(podcastId: Long, sortOrder: SortOrder): List<PlayableEpisode> {
+        val podcast = podcastDao.getById(podcastId) ?: return emptyList()
+        val (numbered, unnumbered) = episodeDao.getAllForPodcast(podcastId).partition { it.chronoIndex != null }
+        val sorted = when (sortOrder) {
+            SortOrder.NEWEST_FIRST -> numbered.sortedByDescending { it.chronoIndex }
+            SortOrder.OLDEST_FIRST -> numbered.sortedBy { it.chronoIndex }
+        } + unnumbered
+        return sorted.map { entity ->
+            PlayableEpisode(
+                episodeId = entity.id,
+                title = entity.title,
+                podcastTitle = podcast.title,
+                artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
+                mediaUrl = entity.enclosureUrl,
+                startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
+            )
+        }
+    }
+
+    /**
+     * One-shot, fully playable snapshot across every subscription, newest-published first - the
+     * same ordering as [observeAllEpisodes] (the Home feed). Used by the Android Auto browse
+     * tree's "Episodes" tab.
+     */
+    suspend fun getPlayableEpisodesAcrossAllShows(): List<PlayableEpisode> {
+        val podcastsById = podcastDao.observeAll().first().associateBy { it.id }
+        return episodeDao.getAllAcrossPodcasts().mapNotNull { entity ->
+            val podcast = podcastsById[entity.podcastId] ?: return@mapNotNull null
+            PlayableEpisode(
+                episodeId = entity.id,
+                title = entity.title,
+                podcastTitle = podcast.title,
+                artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
+                mediaUrl = entity.enclosureUrl,
+                startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
+            )
+        }
     }
 
     /** The next unplayed episode in [currentEpisodeId]'s own show - what auto-advance and the

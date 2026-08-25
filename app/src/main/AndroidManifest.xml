@@ -20,6 +20,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Podcaster">
 
+        <!-- Phone-projected Android Auto (not native Automotive OS, which uses the different
+             com.android.automotive key). Points at the same "media" capability descriptor. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -38,7 +44,10 @@
             android:foregroundServiceType="mediaPlayback"
             android:exported="true">
             <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <!-- Legacy discovery action - Android Auto and older browser clients still look
+                     for this alongside the Media3 action. -->
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
     </application>

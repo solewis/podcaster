@@ -4,10 +4,22 @@ on:
   push:
     branches: [main]
   pull_request:
+  # So this can be run against a branch on demand, without waiting for a pull request.
+  workflow_dispatch:
+
+# A newer push supersedes whatever is still running for the same branch. The emulator job is the
+# slow one, and there is no value in finishing it for a commit that has already been replaced.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  # Fast feedback: lint, the release build, and the 265 JVM tests - repositories, ViewModels,
+  # screens and navigation, all of which run on Robolectric rather than a device.
+  unit:
+    name: Unit tests and lint
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -20,5 +32,72 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build and run unit tests
+      - name: Build, lint and run unit tests
         run: ./gradlew build test --stacktrace
+
+      - name: Upload unit test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-*.html
+          retention-days: 7
+
+  # The tier that cannot run on the JVM: real ExoPlayer with real decoders, a real MediaSession,
+  # Room migrations against real SQLite, and Android's own XML parser - which behaves differently
+  # from the host JDK's, as RssParserOnDeviceTest exists to prove.
+  #
+  # These 40 tests were previously only ever run by hand, which meant a genuine failure could sit
+  # green in CI. That is the gap this job closes.
+  #
+  # Running them locally is not the same command. `connectedDebugAndroidTest` fans out to *every*
+  # attached device, so with a phone plugged in it will install and run there too. Locally, pin it:
+  #     ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest
+  # Here there is only ever the one emulator this job creates.
+  instrumented:
+    name: Instrumented tests (API 35)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # The hosted runner exposes /dev/kvm but not to the runner's own user, so without this the
+      # emulator falls back to software emulation and takes long enough to hit the job timeout.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          # Matches the emulator these tests were developed and verified against. google_apis
+          # rather than one of the stripped-down test images: the playback tests need real audio
+          # decoders, which the ATD images do not ship.
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+
+      - name: Upload instrumented test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-report
+          path: app/build/reports/androidTests/
+          retention-days: 7

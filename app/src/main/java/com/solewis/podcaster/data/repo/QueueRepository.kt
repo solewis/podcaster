@@ -15,13 +15,14 @@ import kotlinx.coroutines.flow.Flow
  */
 class QueueRepository(
     private val queueDao: QueueDao,
-    private val episodeRepository: EpisodeRepository
+    private val episodeRepository: EpisodeRepository,
+    private val now: () -> Long = System::currentTimeMillis
 ) {
     fun observeQueue(): Flow<List<QueueItem>> = queueDao.observeQueue()
 
     suspend fun enqueue(episodeId: String) {
         val position = queueDao.nextPosition()
-        queueDao.insert(QueueEntity(episodeId = episodeId, position = position, addedAt = System.currentTimeMillis()))
+        queueDao.insert(QueueEntity(episodeId = episodeId, position = position, addedAt = now()))
     }
 
     suspend fun remove(queueId: Long) {
@@ -35,6 +36,14 @@ class QueueRepository(
     /** Resolves a queue row's episode to something playable, e.g. for a "play now" tap that
      * jumps the episode straight to the front rather than waiting its turn. */
     suspend fun getPlayable(episodeId: String): PlayableEpisode? = episodeRepository.getPlayableById(episodeId)
+
+    /**
+     * One-shot, fully playable snapshot of the queue in play order - used by the Android Auto
+     * browse tree's "Up Next" node, which needs real [PlayableEpisode]s (with a URI) rather than
+     * the [com.solewis.podcaster.data.db.model.QueueItem] display projection the Queue screen uses.
+     */
+    suspend fun getPlayableQueue(): List<PlayableEpisode> =
+        queueDao.getAllOrdered().mapNotNull { episodeRepository.getPlayableById(it.episodeId) }
 
     private suspend fun move(queueId: Long, delta: Int) {
         val ordered = queueDao.getAllOrdered()

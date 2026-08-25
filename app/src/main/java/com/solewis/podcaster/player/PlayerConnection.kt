@@ -19,22 +19,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 
-data class PlaybackUiState(
-    val episodeId: String? = null,
-    val title: String? = null,
-    val podcastTitle: String? = null,
-    val artworkUrl: String? = null,
-    val isPlaying: Boolean = false,
-    val speed: Float = 1f
-)
-
-/** Deliberately separate from [PlaybackUiState]: position ticks every 500ms while playing, and
- * nothing should recompose off that except an actual scrubber/progress indicator. */
-data class ProgressUiState(
-    val positionMillis: Long = 0,
-    val durationMillis: Long? = null
-)
-
 /**
  * App-scoped [MediaController] wrapper - the only way the UI touches playback. Held as a single
  * lazily-built instance for the app's lifetime rather than connected/disconnected per screen:
@@ -42,16 +26,16 @@ data class ProgressUiState(
  * before the controller finishes connecting are silently dropped by Media3, which is why every
  * public method here goes through the suspending [controller] rather than a nullable field.
  */
-class PlayerConnection(private val context: Context) {
+class PlayerConnection(private val context: Context) : Playback {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var controller: MediaController? = null
 
     private val _state = MutableStateFlow(PlaybackUiState())
-    val state: StateFlow<PlaybackUiState> = _state.asStateFlow()
+    override val state: StateFlow<PlaybackUiState> = _state.asStateFlow()
 
     private val _progress = MutableStateFlow(ProgressUiState())
-    val progress: StateFlow<ProgressUiState> = _progress.asStateFlow()
+    override val progress: StateFlow<ProgressUiState> = _progress.asStateFlow()
 
     init {
         scope.launch {
@@ -59,13 +43,24 @@ class PlayerConnection(private val context: Context) {
                 delay(PROGRESS_TICK_MILLIS)
                 val mediaController = controller
                 if (mediaController != null && _state.value.isPlaying) {
-                    _progress.value = ProgressUiState(
-                        positionMillis = mediaController.currentPosition,
-                        durationMillis = mediaController.duration.takeIf { it != C.TIME_UNSET }
-                    )
+                    publishProgress(mediaController.currentPosition)
                 }
             }
         }
+    }
+
+    /**
+     * The ticker above only runs while playing, so a seek made *while paused* would otherwise
+     * leave the scrubber and progress bars frozen at the pre-seek position until playback
+     * resumed. [Player.Listener.onPositionDiscontinuity] covers that, and does it for every
+     * source of a seek - the in-app buttons, the notification, Android Auto, a Bluetooth remote -
+     * rather than only the few methods on this class.
+     */
+    private fun publishProgress(positionMillis: Long) {
+        _progress.value = ProgressUiState(
+            positionMillis = positionMillis,
+            durationMillis = controller?.duration?.takeIf { it != C.TIME_UNSET }
+        )
     }
 
     private suspend fun controller(): MediaController {
@@ -100,6 +95,17 @@ class PlayerConnection(private val context: Context) {
                 _progress.value = ProgressUiState()
             }
 
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                // newPosition, not the controller's currentPosition: on an item transition the
+                // latter already refers to the incoming item, which is the same trap documented
+                // on ProgressWriter for recording progress against the wrong episode.
+                publishProgress(newPosition.positionMs)
+            }
+
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
                 _state.value = _state.value.copy(speed = playbackParameters.speed)
             }
@@ -108,31 +114,31 @@ class PlayerConnection(private val context: Context) {
         return newController
     }
 
-    suspend fun play(episode: PlayableEpisode) {
+    override suspend fun play(episode: PlayableEpisode) {
         val mediaController = controller()
         mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
         mediaController.prepare()
         mediaController.play()
     }
 
-    suspend fun togglePlayPause() {
+    override suspend fun togglePlayPause() {
         val mediaController = controller()
         if (mediaController.isPlaying) mediaController.pause() else mediaController.play()
     }
 
-    suspend fun seekTo(positionMillis: Long) {
+    override suspend fun seekTo(positionMillis: Long) {
         controller().seekTo(positionMillis)
     }
 
-    suspend fun skipForward() {
+    override suspend fun skipForward() {
         controller().seekForward()
     }
 
-    suspend fun skipBack() {
+    override suspend fun skipBack() {
         controller().seekBack()
     }
 
-    suspend fun setSpeed(speed: Float) {
+    override suspend fun setSpeed(speed: Float) {
         controller().setPlaybackSpeed(speed)
     }
 

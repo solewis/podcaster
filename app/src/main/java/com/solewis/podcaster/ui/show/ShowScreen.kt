@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
@@ -36,7 +35,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SnackbarHost
@@ -48,13 +46,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -66,22 +64,23 @@ import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
-import com.solewis.podcaster.domain.JumpTargetResolver
 import com.solewis.podcaster.ui.common.BackButtonRow
-import com.solewis.podcaster.ui.common.EpisodeDetailSheet
-import com.solewis.podcaster.ui.common.EpisodeDetailUi
+import com.solewis.podcaster.ui.common.EpisodeProgressBar
+import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.SubscribeButton
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
-import com.solewis.podcaster.ui.common.formatDuration
+import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import androidx.compose.ui.platform.testTag
+import com.solewis.podcaster.ui.common.TestTags
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
+fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (String) -> Unit) {
     val state by viewModel.state.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val refreshError by viewModel.refreshError.collectAsState()
@@ -92,15 +91,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var highlightedEpisodeId by remember { mutableStateOf<String?>(null) }
-    var isJumpTargetVisible by remember { mutableStateOf(false) }
-    var selectedEpisode by remember { mutableStateOf<EpisodeListItem?>(null) }
-    var selectedEpisodeDescription by remember { mutableStateOf<String?>(null) }
     var pendingUnsubscribe by remember { mutableStateOf(false) }
-
-    LaunchedEffect(selectedEpisode?.id) {
-        selectedEpisodeDescription = null
-        selectedEpisode?.let { selectedEpisodeDescription = viewModel.descriptionFor(it.id) }
-    }
 
     LaunchedEffect(refreshError) {
         refreshError?.let { snackbarHostState.showSnackbar(it) }
@@ -111,17 +102,18 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
     }
 
     val jump = state.jump
-    LaunchedEffect(listState, jump?.episodeId) {
-        if (jump == null) {
-            isJumpTargetVisible = false
-        } else {
-            snapshotFlow { listState.layoutInfo.visibleItemsInfo.any { it.key == jump.episodeId } }
-                .distinctUntilChanged()
-                .collect { visible -> isJumpTargetVisible = visible }
+    // derivedStateOf (not a LaunchedEffect+snapshotFlow collector) so this reflects the list's
+    // actual current layout on every recomposition - the effect-based version only updated once
+    // the collector had a chance to run, which is why the pill stayed hidden until the user
+    // scrolled even when the jump target was never on screen to begin with.
+    val isJumpTargetVisible by remember(jump?.episodeId) {
+        derivedStateOf {
+            jump != null && listState.layoutInfo.visibleItemsInfo.any { it.key == jump.episodeId }
         }
     }
 
     Scaffold(
+        modifier = Modifier.testTag(TestTags.SHOW_SCREEN),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
@@ -158,13 +150,14 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                                 }
                             }
                             Spacer(modifier = Modifier.width(12.dp))
-                            PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(56.dp))
+                            PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(72.dp))
                         }
                         Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
-                            OutlinedButton(onClick = { pendingUnsubscribe = true }) {
-                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Subscribed", modifier = Modifier.padding(start = 4.dp))
-                            }
+                            SubscribeButton(
+                                isSubscribed = true,
+                                isBusy = false,
+                                onClick = { pendingUnsubscribe = true }
+                            )
                         }
                     }
                 }
@@ -199,8 +192,9 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
                                 items(state.episodes, key = { it.id }) { episode ->
                                     EpisodeRow(
                                         episode = episode,
+                                        podcastArtworkUrl = podcast.artworkUrl,
                                         isHighlighted = episode.id == highlightedEpisodeId,
-                                        onClick = { selectedEpisode = episode },
+                                        onClick = { onOpenEpisode(episode.id) },
                                         onPlay = { viewModel.play(episode.id) },
                                         onEnqueue = { viewModel.enqueue(episode.id) }
                                     )
@@ -242,23 +236,6 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit) {
         }
     }
 
-    selectedEpisode?.let { episode ->
-        val numberLabel = episode.displayNumber?.let { "Ep $it" }
-            ?: episode.episodeType.takeIf { it != "full" }?.replaceFirstChar(Char::uppercase)
-        EpisodeDetailSheet(
-            episode = EpisodeDetailUi(
-                title = episode.title,
-                numberLabel = numberLabel,
-                dateLabel = formatEpisodeDate(episode.pubDateMillis),
-                durationLabel = formatDuration(episode.durationMillis),
-                description = selectedEpisodeDescription,
-                isPlayed = episode.isPlayed
-            ),
-            onPlay = { viewModel.play(episode.id) },
-            onDismiss = { selectedEpisode = null }
-        )
-    }
-
     if (pendingUnsubscribe) {
         state.podcast?.let { podcast ->
             UnsubscribeConfirmDialog(
@@ -291,7 +268,7 @@ private fun AboutTab(podcast: PodcastEntity, episodeCount: Int) {
 
 @Composable
 private fun JumpToLastListenedPill(jump: JumpPillUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    ExtendedFloatingActionButton(onClick = onClick, modifier = modifier) {
+    ExtendedFloatingActionButton(onClick = onClick, modifier = modifier.testTag(TestTags.RESUME_PILL)) {
         Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
         Spacer(modifier = Modifier.width(8.dp))
         Column {
@@ -304,6 +281,7 @@ private fun JumpToLastListenedPill(jump: JumpPillUi, onClick: () -> Unit, modifi
 @Composable
 private fun EpisodeRow(
     episode: EpisodeListItem,
+    podcastArtworkUrl: String?,
     isHighlighted: Boolean,
     onClick: () -> Unit,
     onPlay: () -> Unit,
@@ -336,7 +314,15 @@ private fun EpisodeRow(
             Spacer(modifier = Modifier.width(8.dp))
         }
 
-        Column(modifier = Modifier.weight(1f)) {
+        // Falls back to the show's own art, since most feeds only set per-episode artwork
+        // occasionally - same expression the Home feed uses, so a given episode looks the same
+        // in both lists rather than showing art in one place and a bare row in the other.
+        PodcastArtwork(
+            artworkUrl = episode.artworkUrl ?: podcastArtworkUrl,
+            modifier = Modifier.size(EpisodeArtworkSize)
+        )
+
+        Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
             val numberLabel = episode.displayNumber?.let { "Ep $it" }
                 ?: episode.episodeType.takeIf { it != "full" }?.replaceFirstChar(Char::uppercase)
             Row {
@@ -356,14 +342,25 @@ private fun EpisodeRow(
                 modifier = Modifier.padding(top = 2.dp)
             )
 
-            val progressText = when {
-                episode.isPlayed -> null
-                episode.positionMillis > 0 && episode.durationMillis != null ->
-                    "${formatDuration(episode.positionMillis)} / ${formatDuration(episode.durationMillis)}"
-                else -> formatDuration(episode.durationMillis)
+            // Null date on purpose: this row already prints it in the header above, and passing
+            // it again would repeat it. Everything else - "20m left" vs "51m" vs "Played", and
+            // whether a bar is drawn at all - is the same rule the Home feed and the detail
+            // screen use, so an episode reads identically wherever you meet it.
+            val progress = episodeProgressUi(
+                pubDateMillis = null,
+                durationMillis = episode.durationMillis,
+                positionMillis = episode.positionMillis,
+                isPlayed = episode.isPlayed
+            )
+            if (progress.label.isNotEmpty()) {
+                Text(progress.label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
             }
-            progressText?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+            if (progress.showBar) {
+                EpisodeProgressBar(
+                    positionMillis = progress.positionMillis!!,
+                    durationMillis = progress.durationMillis!!,
+                    modifier = Modifier.padding(top = 6.dp, end = 8.dp)
+                )
             }
         }
 
