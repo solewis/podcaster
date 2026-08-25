@@ -62,8 +62,12 @@ android {
         // Custom ExoPlayer caching and MediaSession artwork loading both require touching
         // Media3's @UnstableApi surface - there is no stable alternative for this functionality,
         // and every real Media3 app makes this same deliberate tradeoff (including Media3's own
-        // sample apps, which disable this same check). The module-wide Kotlin compiler opt-in
-        // above covers compilation; this covers AGP's separate lint pass for the same annotation.
+        // sample apps, which disable this same check).
+        //
+        // This lint check is the *only* thing that enforces @UnstableApi here. There is no Kotlin
+        // compiler opt-in to pair it with: UnstableApi carries androidx.annotation.RequiresOptIn,
+        // which lint understands but kotlinc does not, so a `-opt-in=` argument for it is silently
+        // inert and only earns a "not an opt-in requirement marker" warning on every compilation.
         disable += "UnsafeOptInUsageError"
         // Fires because the app publishes a MediaBrowserService, which lint takes as a promise to
         // support "play <something> from search" by voice. It isn't one: there is no voice search
@@ -99,10 +103,6 @@ room {
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        // Almost all of Media3's cache/datasource surface (SimpleCache, CacheDataSource,
-        // DataSourceBitmapLoader, ...) is marked @UnstableApi. Opting in module-wide is the
-        // standard approach for Media3 apps rather than annotating every call site individually.
-        freeCompilerArgs.add("-opt-in=androidx.media3.common.util.UnstableApi")
     }
 }
 
