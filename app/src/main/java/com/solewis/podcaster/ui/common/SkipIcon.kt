@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -16,8 +17,6 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import kotlin.math.cos
-import kotlin.math.sin
 
 /**
  * The 15-second skip control, drawn rather than composed from Material's icon set.
@@ -58,25 +57,25 @@ fun SkipIcon(seconds: Int, forward: Boolean, contentDescription: String, modifie
                 style = Stroke(width = strokeWidth)
             )
 
-            // Arrowhead capping the arc's counter-clockwise end, built from the tangent and
-            // radial vectors at that exact angle so it sits *on* the curve rather than floating
-            // above it - the giveaway that an earlier version was positioning it by eye.
-            val endRadians = Math.toRadians((ARC_START_DEGREES + ARC_SWEEP_DEGREES).toDouble())
-            val radial = Offset(cos(endRadians).toFloat(), sin(endRadians).toFloat())
-            val tangent = Offset(sin(endRadians).toFloat(), -cos(endRadians).toFloat())
-            val onArc = middle + radial * radius
-            val tip = onArc + tangent * (strokeWidth * ARROW_LENGTH_FACTOR)
-            val halfWidth = radial * (strokeWidth * ARROW_HALF_WIDTH_FACTOR)
-
-            drawPath(
-                path = Path().apply {
-                    moveTo(tip.x, tip.y)
-                    lineTo((onArc + halfWidth).x, (onArc + halfWidth).y)
-                    lineTo((onArc - halfWidth).x, (onArc - halfWidth).y)
-                    close()
-                },
-                color = color
-            )
+            // Arrowhead capping the arc's counter-clockwise end. Drawn in a frame rotated so that
+            // end sits at twelve o'clock, which makes the triangle plain vertical/horizontal
+            // arithmetic - deriving it from tangent vectors in the unrotated frame was easy to
+            // get subtly wrong and hard to eyeball afterwards.
+            val arcEndDegrees = ARC_START_DEGREES + ARC_SWEEP_DEGREES
+            rotate(degrees = arcEndDegrees - 270f, pivot = middle) {
+                val topY = middle.y - radius
+                val halfBase = radius * ARROW_HALF_BASE_FRACTION
+                val back = middle.x + radius * ARROW_BACK_FRACTION
+                drawPath(
+                    path = Path().apply {
+                        moveTo(middle.x - radius * ARROW_LENGTH_FRACTION, topY)
+                        lineTo(back, topY - halfBase)
+                        lineTo(back, topY + halfBase)
+                        close()
+                    },
+                    color = color
+                )
+            }
         }
 
         val measured = textMeasurer.measure(
@@ -103,7 +102,8 @@ val SkipIconSize = 46.dp
 private const val RADIUS_FRACTION = 0.40f
 private const val STROKE_FRACTION = 0.075f
 private const val TEXT_FRACTION = 0.38f
-private const val ARC_START_DEGREES = -52f
-private const val ARC_SWEEP_DEGREES = 308f
-private const val ARROW_LENGTH_FACTOR = 2.4f
-private const val ARROW_HALF_WIDTH_FACTOR = 1.35f
+private const val ARC_START_DEGREES = -60f
+private const val ARC_SWEEP_DEGREES = 310f
+private const val ARROW_LENGTH_FRACTION = 0.62f
+private const val ARROW_HALF_BASE_FRACTION = 0.26f
+private const val ARROW_BACK_FRACTION = 0.16f

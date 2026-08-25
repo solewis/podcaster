@@ -3,23 +3,27 @@ package com.solewis.podcaster.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Calm doesn't mean washed out: a confident, more saturated teal carries every primary action
- * and accent (still a "focus" hue, not an urgent one), warm stone for secondary accents, and a
- * soft clay for the rare tertiary highlight - against warm-neutral surfaces rather than stark
- * white/black. One vivid accent against a quiet neutral base, rather than everything muted at
- * once, which is what read as bland rather than minimalist.
+ * Calm doesn't mean washed out: a deep, near-black petrol carries every primary action and accent
+ * (a "focus" hue, not an urgent one), warm stone for secondary accents, and a soft clay for the
+ * rare tertiary highlight - against warm-neutral surfaces rather than stark white/black. One
+ * decisive accent against a quiet neutral base, rather than everything muted at once, which is
+ * what read as bland rather than minimalist.
+ *
+ * The dark-theme primary is deliberately *not* the same value: #002B36 is far too dark to sit on
+ * a dark surface, so the dark palette lifts the same hue to a legible tint instead. Reusing the
+ * light value there would leave primary-coloured text and icons all but invisible.
  */
 
-// Primary - a confident teal.
-val TealLight = Color(0xFF0F766E)
+// Primary - deep petrol.
+val TealLight = Color(0xFF002B36)
 val OnTealLight = Color(0xFFFFFFFF)
-val TealContainerLight = Color(0xFFB8ECE1)
-val OnTealContainerLight = Color(0xFF00201C)
+val TealContainerLight = Color(0xFFC4E5EF)
+val OnTealContainerLight = Color(0xFF001016)
 
-val TealDark = Color(0xFF5EEAD4)
-val OnTealDark = Color(0xFF00382F)
-val TealContainerDark = Color(0xFF0B544C)
-val OnTealContainerDark = Color(0xFFBBF5E9)
+val TealDark = Color(0xFF88CFE3)
+val OnTealDark = Color(0xFF00323F)
+val TealContainerDark = Color(0xFF00485A)
+val OnTealContainerDark = Color(0xFFB8E7F6)
 
 // Secondary - warm stone.
 val StoneLight = Color(0xFF6B5F52)

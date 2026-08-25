@@ -60,6 +60,7 @@ fun PodcasterRoot(container: AppContainer) {
     val scope = rememberCoroutineScope()
 
     val playback by container.playerConnection.state.collectAsState()
+    val playbackProgress by container.playerConnection.progress.collectAsState()
 
     val topLevelRoutes = listOf(
         TopLevelRoute(Route.Home, "Home", Icons.Default.Home),
@@ -82,6 +83,7 @@ fun PodcasterRoot(container: AppContainer) {
                 Column {
                     MiniPlayer(
                         playback = playback,
+                        progress = playbackProgress,
                         onTogglePlayPause = { scope.launch { container.playerConnection.togglePlayPause() } },
                         onExpand = { navController.navigate(Route.NowPlaying) }
                     )

@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
@@ -29,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,6 +55,8 @@ import kotlin.math.abs
 
 private const val SKIP_SECONDS = 15
 private const val SEEK_SETTLE_TOLERANCE_MILLIS = 1_500L
+private val SCRUBBER_TRACK_HEIGHT = 4.dp
+private val SCRUBBER_THUMB_SIZE = 14.dp
 
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f)
 
@@ -127,6 +132,25 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                     isDragging = false
                     pendingSeekMillis = dragPositionMillis.toLong()
                     viewModel.seekTo(dragPositionMillis.toLong())
+                },
+                // Material 3's current default is a thick track with a tall pill thumb and a stop
+                // indicator at the end - a lot of furniture for a scrubber. A slim track with a
+                // round thumb is the shape people expect on a player, so both slots are supplied.
+                thumb = {
+                    Box(
+                        modifier = Modifier
+                            .size(SCRUBBER_THUMB_SIZE)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    )
+                },
+                track = { sliderState ->
+                    SliderDefaults.Track(
+                        sliderState = sliderState,
+                        modifier = Modifier.height(SCRUBBER_TRACK_HEIGHT),
+                        thumbTrackGapSize = 0.dp,
+                        drawStopIndicator = null,
+                        trackInsideCornerSize = 0.dp
+                    )
                 },
                 modifier = Modifier.fillMaxWidth()
             )

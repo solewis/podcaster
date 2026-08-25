@@ -68,9 +68,11 @@ import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.domain.JumpTargetResolver
 import com.solewis.podcaster.ui.common.BackButtonRow
+import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 import com.solewis.podcaster.ui.common.formatDuration
+import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -330,14 +332,25 @@ private fun EpisodeRow(
                 modifier = Modifier.padding(top = 2.dp)
             )
 
-            val progressText = when {
-                episode.isPlayed -> null
-                episode.positionMillis > 0 && episode.durationMillis != null ->
-                    "${formatDuration(episode.positionMillis)} / ${formatDuration(episode.durationMillis)}"
-                else -> formatDuration(episode.durationMillis)
+            // Null date on purpose: this row already prints it in the header above, and passing
+            // it again would repeat it. Everything else - "20m left" vs "51m" vs "Played", and
+            // whether a bar is drawn at all - is the same rule the Home feed and the detail
+            // screen use, so an episode reads identically wherever you meet it.
+            val progress = episodeProgressUi(
+                pubDateMillis = null,
+                durationMillis = episode.durationMillis,
+                positionMillis = episode.positionMillis,
+                isPlayed = episode.isPlayed
+            )
+            if (progress.label.isNotEmpty()) {
+                Text(progress.label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
             }
-            progressText?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+            if (progress.showBar) {
+                EpisodeProgressBar(
+                    positionMillis = progress.positionMillis!!,
+                    durationMillis = progress.durationMillis!!,
+                    modifier = Modifier.padding(top = 6.dp, end = 8.dp)
+                )
             }
         }
 

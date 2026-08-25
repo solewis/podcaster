@@ -18,9 +18,14 @@ import androidx.compose.ui.unit.dp
 fun EpisodeProgressBar(positionMillis: Long, durationMillis: Long, modifier: Modifier = Modifier) {
     LinearProgressIndicator(
         progress = { (positionMillis.toFloat() / durationMillis).coerceIn(0f, 1f) },
+        // Material 3 draws a "stop indicator" dot at the track end and a gap before it by
+        // default. That reads as a marker you could act on, which this isn't - it's a plain
+        // how-far-through bar - so both are switched off for one continuous fill.
+        drawStopIndicator = {},
+        gapSize = 0.dp,
         modifier = modifier
             .fillMaxWidth()
-            .height(4.dp)
+            .height(3.dp)
             .clip(RoundedCornerShape(2.dp))
     )
 }

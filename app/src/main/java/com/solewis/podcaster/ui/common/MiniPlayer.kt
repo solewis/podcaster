@@ -19,33 +19,47 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.player.PlaybackUiState
+import com.solewis.podcaster.player.ProgressUiState
 
 /**
  * Persistent playback bar. Lives in `PodcasterRoot`'s `Scaffold.bottomBar`, outside the `NavHost`,
  * so it survives navigation and never re-subscribes to [PlaybackUiState] on a screen change.
  */
 @Composable
-fun MiniPlayer(playback: PlaybackUiState, onTogglePlayPause: () -> Unit, onExpand: () -> Unit) {
+fun MiniPlayer(
+    playback: PlaybackUiState,
+    progress: ProgressUiState,
+    onTogglePlayPause: () -> Unit,
+    onExpand: () -> Unit
+) {
     if (playback.episodeId == null) return
 
     Surface(tonalElevation = 3.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onExpand).padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                playback.title?.let {
-                    Text(it, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onExpand)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    playback.title?.let {
+                        Text(it, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    playback.podcastTitle?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
-                playback.podcastTitle?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                IconButton(onClick = onTogglePlayPause) {
+                    Icon(
+                        if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (playback.isPlaying) "Pause" else "Play"
+                    )
                 }
             }
-            IconButton(onClick = onTogglePlayPause) {
-                Icon(
-                    if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (playback.isPlaying) "Pause" else "Play"
-                )
+
+            // Flush along the bottom edge, so the bar reads as belonging to the whole panel
+            // rather than being one more element inside it.
+            progress.durationMillis?.let { duration ->
+                EpisodeProgressBar(positionMillis = progress.positionMillis, durationMillis = duration)
             }
         }
     }
