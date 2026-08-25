@@ -58,6 +58,9 @@ private const val SEEK_SETTLE_TOLERANCE_MILLIS = 1_500L
 private val SCRUBBER_TRACK_HEIGHT = 4.dp
 private val SCRUBBER_THUMB_SIZE = 14.dp
 
+/** Gap between the play/pause button and the skip buttons flanking it. */
+private val TRANSPORT_BUTTON_SPACING = 36.dp
+
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -170,7 +173,10 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(TRANSPORT_BUTTON_SPACING)
+            ) {
                 IconButton(onClick = viewModel::skipBack) {
                     SkipIcon(
                         seconds = SKIP_SECONDS,
