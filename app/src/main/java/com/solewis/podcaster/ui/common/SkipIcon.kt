@@ -8,7 +8,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -57,25 +56,21 @@ fun SkipIcon(seconds: Int, forward: Boolean, contentDescription: String, modifie
                 style = Stroke(width = strokeWidth)
             )
 
-            // Arrowhead capping the arc's counter-clockwise end. Drawn in a frame rotated so that
-            // end sits at twelve o'clock, which makes the triangle plain vertical/horizontal
-            // arithmetic - deriving it from tangent vectors in the unrotated frame was easy to
-            // get subtly wrong and hard to eyeball afterwards.
-            val arcEndDegrees = ARC_START_DEGREES + ARC_SWEEP_DEGREES
-            rotate(degrees = arcEndDegrees - 270f, pivot = middle) {
-                val topY = middle.y - radius
-                val halfBase = radius * ARROW_HALF_BASE_FRACTION
-                val back = middle.x + radius * ARROW_BACK_FRACTION
-                drawPath(
-                    path = Path().apply {
-                        moveTo(middle.x - radius * ARROW_LENGTH_FRACTION, topY)
-                        lineTo(back, topY - halfBase)
-                        lineTo(back, topY + halfBase)
-                        close()
-                    },
-                    color = color
-                )
-            }
+            // Arrowhead sits flat at twelve o'clock, pointing left - the leading edge of the
+            // counter-clockwise sweep. Nothing to rotate or derive: the arc ends where the arrow
+            // begins, so this is a plain horizontal triangle straddling the ring's top point.
+            val topY = middle.y - radius
+            val halfHeight = radius * ARROW_HALF_HEIGHT_FRACTION
+            val tail = middle.x + radius * ARROW_TAIL_FRACTION
+            drawPath(
+                path = Path().apply {
+                    moveTo(middle.x - radius * ARROW_LENGTH_FRACTION, topY)
+                    lineTo(tail, topY - halfHeight)
+                    lineTo(tail, topY + halfHeight)
+                    close()
+                },
+                color = color
+            )
         }
 
         val measured = textMeasurer.measure(
@@ -102,8 +97,10 @@ val SkipIconSize = 46.dp
 private const val RADIUS_FRACTION = 0.40f
 private const val STROKE_FRACTION = 0.075f
 private const val TEXT_FRACTION = 0.38f
-private const val ARC_START_DEGREES = -60f
-private const val ARC_SWEEP_DEGREES = 310f
-private const val ARROW_LENGTH_FRACTION = 0.62f
-private const val ARROW_HALF_BASE_FRACTION = 0.26f
-private const val ARROW_BACK_FRACTION = 0.16f
+/** Twelve o'clock. The arc runs clockwise from here, so the gap it leaves is the top quadrant. */
+private const val ARC_START_DEGREES = -90f
+/** Three quarters of the circle: twelve o'clock round to nine o'clock. */
+private const val ARC_SWEEP_DEGREES = 270f
+private const val ARROW_LENGTH_FRACTION = 0.48f
+private const val ARROW_TAIL_FRACTION = 0.10f
+private const val ARROW_HALF_HEIGHT_FRACTION = 0.25f
