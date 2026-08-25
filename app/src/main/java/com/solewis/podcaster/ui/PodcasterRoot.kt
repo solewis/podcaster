@@ -96,10 +96,20 @@ fun PodcasterRoot(container: AppContainer) {
                             NavigationBarItem(
                                 selected = selected,
                                 onClick = {
+                                    // A tab tap always lands on that tab's root, discarding
+                                    // anything pushed on top of it.
+                                    //
+                                    // The usual saveState/restoreState pair is deliberately not
+                                    // used: popping with saveState and then navigating with
+                                    // restoreState round-trips the very entries just popped, so
+                                    // tapping Home from an episode's detail screen saved and then
+                                    // restored that screen and appeared to do nothing at all.
                                     navController.navigate(topLevel.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = false
+                                        }
                                         launchSingleTop = true
-                                        restoreState = true
+                                        restoreState = false
                                     }
                                 },
                                 icon = { Icon(topLevel.icon, contentDescription = topLevel.label) },

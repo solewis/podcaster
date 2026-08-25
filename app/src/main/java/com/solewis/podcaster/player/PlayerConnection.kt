@@ -59,13 +59,24 @@ class PlayerConnection(private val context: Context) {
                 delay(PROGRESS_TICK_MILLIS)
                 val mediaController = controller
                 if (mediaController != null && _state.value.isPlaying) {
-                    _progress.value = ProgressUiState(
-                        positionMillis = mediaController.currentPosition,
-                        durationMillis = mediaController.duration.takeIf { it != C.TIME_UNSET }
-                    )
+                    publishProgress(mediaController.currentPosition)
                 }
             }
         }
+    }
+
+    /**
+     * The ticker above only runs while playing, so a seek made *while paused* would otherwise
+     * leave the scrubber and progress bars frozen at the pre-seek position until playback
+     * resumed. [Player.Listener.onPositionDiscontinuity] covers that, and does it for every
+     * source of a seek - the in-app buttons, the notification, Android Auto, a Bluetooth remote -
+     * rather than only the few methods on this class.
+     */
+    private fun publishProgress(positionMillis: Long) {
+        _progress.value = ProgressUiState(
+            positionMillis = positionMillis,
+            durationMillis = controller?.duration?.takeIf { it != C.TIME_UNSET }
+        )
     }
 
     private suspend fun controller(): MediaController {
@@ -98,6 +109,17 @@ class PlayerConnection(private val context: Context) {
                     artworkUrl = mediaItem?.mediaMetadata?.artworkUri?.toString()
                 )
                 _progress.value = ProgressUiState()
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                // newPosition, not the controller's currentPosition: on an item transition the
+                // latter already refers to the incoming item, which is the same trap documented
+                // on ProgressWriter for recording progress against the wrong episode.
+                publishProgress(newPosition.positionMs)
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
