@@ -33,6 +33,7 @@ import com.solewis.podcaster.PodcasterApp
 class PlaybackService : MediaLibraryService() {
 
     private lateinit var player: ExoPlayer
+    private lateinit var sessionPlayer: TimedSkipPlayer
     private lateinit var mediaSession: MediaLibrarySession
     private lateinit var progressWriter: ProgressWriter
 
@@ -40,6 +41,10 @@ class PlaybackService : MediaLibraryService() {
         super.onCreate()
         val container = (application as PodcasterApp).container
         player = PlayerFactory.create(this, container.mediaCache)
+        // Only the session sees the wrapper - it exists purely to expose the 15s seeks as
+        // next/previous for external controllers. ProgressWriter and AutoAdvancer below stay on
+        // the real ExoPlayer, since they care about actual playlist and position semantics.
+        sessionPlayer = TimedSkipPlayer(player)
 
         val callback = PodcastLibrarySessionCallback(
             podcastRepository = container.podcastRepository,
@@ -47,7 +52,7 @@ class PlaybackService : MediaLibraryService() {
             queueRepository = container.queueRepository,
             scope = lifecycleScope
         )
-        mediaSession = MediaLibrarySession.Builder(this, player, callback)
+        mediaSession = MediaLibrarySession.Builder(this, sessionPlayer, callback)
             .setBitmapLoader(CacheBitmapLoader(DataSourceBitmapLoader.Builder(this).build()))
             .setMediaButtonPreferences(skipButtonPreferences())
             .build()
@@ -90,7 +95,8 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         progressWriter.flushBlocking()
         mediaSession.release()
-        player.release()
+        // Releases the wrapped ExoPlayer too, and detaches the listener the wrapper holds on it.
+        sessionPlayer.release()
         super.onDestroy()
     }
 }
