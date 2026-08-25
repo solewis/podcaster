@@ -96,20 +96,30 @@ fun PodcasterRoot(container: AppContainer) {
                             NavigationBarItem(
                                 selected = selected,
                                 onClick = {
-                                    // A tab tap always lands on that tab's root, discarding
-                                    // anything pushed on top of it.
+                                    // Drop any detail screens stacked on the tab being left,
+                                    // *before* the navigate below saves that tab's state.
                                     //
-                                    // The usual saveState/restoreState pair is deliberately not
-                                    // used: popping with saveState and then navigating with
-                                    // restoreState round-trips the very entries just popped, so
-                                    // tapping Home from an episode's detail screen saved and then
-                                    // restored that screen and appeared to do nothing at all.
+                                    // saveState preserves the whole popped run as one unit, so
+                                    // leaving a show open under Activity would save
+                                    // [Activity, Show] together and restoreState would later drop
+                                    // you straight back into the show. Popping to the tab screen
+                                    // first means what gets saved is the tab itself - you come
+                                    // back to the subscriptions list you were browsing, with its
+                                    // scroll intact, rather than the show you wandered into.
+                                    val currentTab = navController.currentBackStack.value
+                                        .lastOrNull { entry ->
+                                            topLevelRoutes.any { entry.destination.hasRoute(it.route::class) }
+                                        }
+                                    currentTab?.let {
+                                        navController.popBackStack(it.destination.id, inclusive = false)
+                                    }
+
                                     navController.navigate(topLevel.route) {
                                         popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = false
+                                            saveState = true
                                         }
                                         launchSingleTop = true
-                                        restoreState = false
+                                        restoreState = true
                                     }
                                 },
                                 icon = { Icon(topLevel.icon, contentDescription = topLevel.label) },
