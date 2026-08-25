@@ -79,6 +79,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import androidx.compose.ui.platform.testTag
+import com.solewis.podcaster.ui.common.TestTags
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +118,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     }
 
     Scaffold(
+        modifier = Modifier.testTag(TestTags.SHOW_SCREEN),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
@@ -269,7 +272,7 @@ private fun AboutTab(podcast: PodcastEntity, episodeCount: Int) {
 
 @Composable
 private fun JumpToLastListenedPill(jump: JumpPillUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    ExtendedFloatingActionButton(onClick = onClick, modifier = modifier) {
+    ExtendedFloatingActionButton(onClick = onClick, modifier = modifier.testTag(TestTags.RESUME_PILL)) {
         Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
         Spacer(modifier = Modifier.width(8.dp))
         Column {

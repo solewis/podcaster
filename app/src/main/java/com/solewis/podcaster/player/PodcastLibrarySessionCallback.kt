@@ -3,6 +3,7 @@ package com.solewis.podcaster.player
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.LibraryResult
+import androidx.media3.session.SessionError
 import androidx.media3.session.MediaConstants
 import androidx.media3.session.MediaLibraryService.LibraryParams
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
@@ -73,7 +74,7 @@ class PodcastLibrarySessionCallback(
         mediaId: String
     ): ListenableFuture<LibraryResult<MediaItem>> = scope.future {
         tree.item(mediaId)?.let { LibraryResult.ofItem(it, null) }
-            ?: LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE)
+            ?: LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
     }
 
     override fun onSetMediaItems(

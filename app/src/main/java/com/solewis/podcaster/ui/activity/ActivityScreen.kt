@@ -22,6 +22,8 @@ import com.solewis.podcaster.ui.queue.QueueList
 import com.solewis.podcaster.ui.queue.QueueViewModel
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsList
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsViewModel
+import androidx.compose.ui.platform.testTag
+import com.solewis.podcaster.ui.common.TestTags
 
 private val SEGMENTS = listOf("Queue", "Subscriptions")
 
@@ -51,7 +53,8 @@ fun ActivityScreen(
                     Tab(
                         selected = selectedSegment == index,
                         onClick = { selectedSegment = index },
-                        text = { Text(label) }
+                        text = { Text(label) },
+                        modifier = Modifier.testTag(TestTags.segment(label))
                     )
                 }
             }

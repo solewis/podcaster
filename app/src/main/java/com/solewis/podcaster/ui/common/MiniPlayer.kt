@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.player.PlaybackUiState
 import com.solewis.podcaster.player.ProgressUiState
+import androidx.compose.ui.platform.testTag
 
 /**
  * Persistent playback bar. Lives in `PodcasterRoot`'s `Scaffold.bottomBar`, outside the `NavHost`,
@@ -35,7 +36,12 @@ fun MiniPlayer(
     if (playback.episodeId == null) return
 
     Surface(tonalElevation = 3.dp) {
-        Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onExpand)) {
+        Column(
+            modifier = Modifier
+                .testTag(TestTags.MINI_PLAYER)
+                .fillMaxWidth()
+                .clickable(onClick = onExpand)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically

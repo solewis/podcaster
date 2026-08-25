@@ -25,6 +25,8 @@ import kotlinx.coroutines.runBlocking
 class ProgressWriter(
     private val player: ExoPlayer,
     private val episodeRepository: EpisodeRepository,
+    /** Must be dispatched on the player's application thread - the ticker reads player state
+     * directly, and ExoPlayer throws when touched from anywhere else. */
     private val scope: CoroutineScope
 ) : Player.Listener {
 

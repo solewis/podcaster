@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 
 /**
  * A tab root's title, deliberately not a `TopAppBar`: that reserves a fixed 64dp-tall bar and
@@ -21,6 +22,8 @@ fun ScreenTitle(text: String) {
         text,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+        modifier = Modifier
+            .testTag(TestTags.screenTitle(text))
+            .padding(horizontal = 24.dp, vertical = 16.dp)
     )
 }

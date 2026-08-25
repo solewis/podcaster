@@ -43,6 +43,8 @@ import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.htmlToAnnotatedString
+import androidx.compose.ui.platform.testTag
+import com.solewis.podcaster.ui.common.TestTags
 
 private const val COLLAPSED_DESCRIPTION_LINES = 8
 
@@ -50,7 +52,10 @@ private const val COLLAPSED_DESCRIPTION_LINES = 8
 fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
 
-    Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
+    Scaffold(
+        modifier = Modifier.testTag(TestTags.EPISODE_DETAIL_SCREEN),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

@@ -17,11 +17,16 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -36,6 +41,7 @@ import androidx.navigation.toRoute
 import com.solewis.podcaster.AppContainer
 import com.solewis.podcaster.ui.activity.ActivityScreen
 import com.solewis.podcaster.ui.common.MiniPlayer
+import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.episodedetail.EpisodeDetailScreen
 import com.solewis.podcaster.ui.episodedetail.EpisodeDetailViewModel
 import com.solewis.podcaster.ui.home.HomeScreen
@@ -59,14 +65,25 @@ fun PodcasterRoot(container: AppContainer) {
     val currentDestination = backStackEntry?.destination
     val scope = rememberCoroutineScope()
 
-    val playback by container.playerConnection.state.collectAsState()
-    val playbackProgress by container.playerConnection.progress.collectAsState()
+    val playback by container.playback.state.collectAsState()
+    val playbackProgress by container.playback.progress.collectAsState()
 
     val topLevelRoutes = listOf(
         TopLevelRoute(Route.Home, "Home", Icons.Default.Home),
         TopLevelRoute(Route.Activity, "Activity", Icons.AutoMirrored.Filled.PlaylistPlay),
         TopLevelRoute(Route.Search, "Search", Icons.Default.Search)
     )
+    // The tab whose detail screens need dropping when a tab is tapped. Tracked rather than derived
+    // because the graph is flat: Show and EpisodeDetail are siblings of the tab destinations, not
+    // nested under them, so a detail screen's own hierarchy never names the tab it was opened from.
+    // (Reading navController.currentBackStack would answer this directly, but that property is
+    // restricted to the navigation library's own group.)
+    var lastTabRoute: Route by remember { mutableStateOf(Route.Home) }
+    LaunchedEffect(currentDestination) {
+        topLevelRoutes.firstOrNull { currentDestination?.hasRoute(it.route::class) == true }
+            ?.let { lastTabRoute = it.route }
+    }
+
     // Hidden on Now Playing itself - showing a mini player and tab bar over the full player
     // screen is redundant chrome covering the very thing you navigated there to see.
     val isNowPlaying = currentDestination?.hasRoute(Route.NowPlaying::class) == true
@@ -84,7 +101,7 @@ fun PodcasterRoot(container: AppContainer) {
                     MiniPlayer(
                         playback = playback,
                         progress = playbackProgress,
-                        onTogglePlayPause = { scope.launch { container.playerConnection.togglePlayPause() } },
+                        onTogglePlayPause = { scope.launch { container.playback.togglePlayPause() } },
                         onExpand = { navController.navigate(Route.NowPlaying) }
                     )
                     // Same base color as the screen behind it (background == surface in this
@@ -106,13 +123,7 @@ fun PodcasterRoot(container: AppContainer) {
                                     // first means what gets saved is the tab itself - you come
                                     // back to the subscriptions list you were browsing, with its
                                     // scroll intact, rather than the show you wandered into.
-                                    val currentTab = navController.currentBackStack.value
-                                        .lastOrNull { entry ->
-                                            topLevelRoutes.any { entry.destination.hasRoute(it.route::class) }
-                                        }
-                                    currentTab?.let {
-                                        navController.popBackStack(it.destination.id, inclusive = false)
-                                    }
+                                    navController.popBackStack(lastTabRoute, inclusive = false)
 
                                     navController.navigate(topLevel.route) {
                                         popUpTo(navController.graph.findStartDestination().id) {
@@ -123,7 +134,8 @@ fun PodcasterRoot(container: AppContainer) {
                                     }
                                 },
                                 icon = { Icon(topLevel.icon, contentDescription = topLevel.label) },
-                                label = { Text(topLevel.label) }
+                                label = { Text(topLevel.label) },
+                                modifier = Modifier.testTag(TestTags.navTab(topLevel.label))
                             )
                         }
                     }
@@ -144,7 +156,7 @@ fun PodcasterRoot(container: AppContainer) {
                                 container.podcastRepository,
                                 container.episodeRepository,
                                 container.queueRepository,
-                                container.playerConnection
+                                container.playback
                             )
                         }
                     }
@@ -158,7 +170,7 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.Activity> {
                 val queueViewModel: QueueViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { QueueViewModel(container.queueRepository, container.playerConnection) }
+                        initializer { QueueViewModel(container.queueRepository, container.playback) }
                     }
                 )
                 val subscriptionsViewModel: SubscriptionsViewModel = viewModel(
@@ -212,7 +224,7 @@ fun PodcasterRoot(container: AppContainer) {
                                 showPreviewRepository = container.showPreviewRepository,
                                 subscriptionRepository = container.subscriptionRepository,
                                 podcastRepository = container.podcastRepository,
-                                playback = container.playerConnection
+                                playback = container.playback
                             )
                         }
                     }
@@ -238,7 +250,7 @@ fun PodcasterRoot(container: AppContainer) {
                                 container.episodeRepository,
                                 container.subscriptionRepository,
                                 container.queueRepository,
-                                container.playerConnection
+                                container.playback
                             )
                         }
                     }
@@ -258,7 +270,7 @@ fun PodcasterRoot(container: AppContainer) {
                                 episodeId = route.episodeId,
                                 episodeRepository = container.episodeRepository,
                                 queueRepository = container.queueRepository,
-                                playback = container.playerConnection
+                                playback = container.playback
                             )
                         }
                     }
@@ -268,7 +280,7 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.NowPlaying> {
                 val viewModel: NowPlayingViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { NowPlayingViewModel(container.playerConnection) }
+                        initializer { NowPlayingViewModel(container.playback) }
                     }
                 )
                 NowPlayingScreen(viewModel = viewModel, onBack = { navController.popBackStack() })

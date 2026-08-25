@@ -18,7 +18,7 @@ android {
         versionCode = 1
         versionName = "0.1"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.solewis.podcaster.testing.PodcasterTestRunner"
     }
 
     sourceSets {
@@ -65,6 +65,26 @@ android {
         // sample apps, which disable this same check). The module-wide Kotlin compiler opt-in
         // above covers compilation; this covers AGP's separate lint pass for the same annotation.
         disable += "UnsafeOptInUsageError"
+        // Fires because the app publishes a MediaBrowserService, which lint takes as a promise to
+        // support "play <something> from search" by voice. It isn't one: there is no voice search
+        // here, and adding an intent-filter for an action nothing handles would be worse than the
+        // warning. Revisit if voice search is ever built.
+        disable += "MissingIntentFilterForMediaSearch"
+    }
+}
+
+/**
+ * Unit tests run on the debug variant only.
+ *
+ * Release would otherwise run the exact same code a second time - minification is off and there are
+ * no variant-specific sources - so it doubled the suite's runtime for no coverage. It also could not
+ * work: the Compose test harness hosts its content in a ComponentActivity contributed to the
+ * manifest by `ui-test-manifest`, which is a debug-only dependency, so every screen and navigation
+ * test failed on release with "Unable to resolve activity".
+ */
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variant ->
+        variant.enableUnitTest = false
     }
 }
 
@@ -129,6 +149,10 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.test.ext.junit)
     testImplementation(libs.okhttp.mockwebserver)
+    // Compose UI tests under Robolectric, so screen and navigation behavior is covered by the
+    // same `test` task CI already runs. ui-test-manifest supplies the activity the harness hosts.
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.compose.ui.test.manifest)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.test.ext.junit)

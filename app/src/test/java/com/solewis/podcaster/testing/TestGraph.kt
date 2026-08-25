@@ -6,6 +6,9 @@ import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.data.remote.FeedFetcher
+import com.solewis.podcaster.AppContainer
+import androidx.test.core.app.ApplicationProvider
+import okhttp3.OkHttpClient
 import java.io.Closeable
 
 /**
@@ -35,6 +38,17 @@ class TestGraph : Closeable {
     suspend fun insertEpisodes(vararg episodes: com.solewis.podcaster.data.db.entity.EpisodeEntity) {
         db.episodeDao().insertNew(episodes.toList())
     }
+
+    /**
+     * The whole app graph over this test's database, for tests that drive real screens through
+     * `PodcasterRoot`. Playback is the fake, so nothing binds to the playback service.
+     */
+    fun appContainer(httpClient: OkHttpClient = OkHttpClient()): AppContainer = AppContainer(
+        context = ApplicationProvider.getApplicationContext(),
+        database = db,
+        httpClient = httpClient,
+        playbackFactory = { playback }
+    )
 
     override fun close() = db.close()
 }
