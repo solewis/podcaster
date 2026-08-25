@@ -16,6 +16,7 @@ import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.data.repo.SearchRepository
 import com.solewis.podcaster.data.repo.ShowPreviewRepository
 import com.solewis.podcaster.data.repo.SubscriptionRepository
+import com.solewis.podcaster.data.settings.PlaybackSettings
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayerConnection
 import okhttp3.OkHttpClient
@@ -50,6 +51,9 @@ class AppContainer(
     val podcastRepository = PodcastRepository(database.podcastDao())
     val showPreviewRepository = ShowPreviewRepository(feedFetcher)
     val queueRepository = QueueRepository(database.queueDao(), episodeRepository)
+
+    /** Not per-show state, so it has nowhere to live in [database] - see [PlaybackSettings]. */
+    val playbackSettings = PlaybackSettings(appContext)
 
     /**
      * Must be a process-wide singleton: a second [SimpleCache] instance pointed at the same

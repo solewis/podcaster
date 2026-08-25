@@ -63,7 +63,8 @@ class PodcastLibraryTreeTest {
         positionMillis: Long = 0,
         isPlayed: Boolean = false,
         podcastIdOverride: Long = podcastId,
-        pubDateMillis: Long? = null
+        pubDateMillis: Long? = null,
+        lastPlayedAt: Long? = null
     ) = EpisodeEntity(
         id = id,
         podcastId = podcastIdOverride,
@@ -76,9 +77,37 @@ class PodcastLibraryTreeTest {
         displayNumber = chronoIndex,
         positionMillis = positionMillis,
         isPlayed = isPlayed,
+        lastPlayedAt = lastPlayedAt,
         pubDateMillis = pubDateMillis,
         firstSeenAt = 1000L
     )
+
+    @Test
+    fun playback_resumption_offers_the_last_played_episode_at_its_saved_position() = runTest {
+        db.episodeDao().insertNew(
+            listOf(
+                episode("ep-1", 1, positionMillis = 30_000, lastPlayedAt = 5_000),
+                episode("ep-2", 2, positionMillis = 450_000, lastPlayedAt = 9_000)
+            )
+        )
+
+        // What a steering-wheel play button gets with the app not running. Getting the position
+        // wrong here is the silent kind of failure: it just quietly starts the episode over.
+        val resumption = tree.lastPlayed()
+
+        assertThat(resumption?.mediaItems?.map { it.mediaId }).containsExactly("ep-2")
+        assertThat(resumption?.startIndex).isEqualTo(0)
+        assertThat(resumption?.startPositionMs).isEqualTo(450_000)
+    }
+
+    @Test
+    fun playback_resumption_has_nothing_to_offer_before_anything_is_played() = runTest {
+        db.episodeDao().insertNew(listOf(episode("ep-1", 1), episode("ep-2", 2)))
+
+        // Null is what the callback turns into a failed future - Media3's signal for "nothing to
+        // resume". An empty playlist instead would leave the car's play button dead.
+        assertThat(tree.lastPlayed()).isNull()
+    }
 
     @Test
     fun rootChildren_is_a_fixed_three_tabs_regardless_of_subscription_count() = runTest {

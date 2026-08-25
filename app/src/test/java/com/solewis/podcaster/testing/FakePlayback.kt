@@ -26,6 +26,7 @@ class FakePlayback : Playback {
     override val progress: StateFlow<ProgressUiState> = _progress.asStateFlow()
 
     val played = mutableListOf<PlayableEpisode>()
+    val restored = mutableListOf<PlayableEpisode>()
     var togglePlayPauseCount = 0
         private set
     val seekedTo = mutableListOf<Long>()
@@ -37,6 +38,22 @@ class FakePlayback : Playback {
 
     override suspend fun play(episode: PlayableEpisode) {
         played += episode
+    }
+
+    /**
+     * Mirrors the real thing: the episode becomes what the UI shows - paused, at its saved
+     * position - without any player having loaded it.
+     */
+    override suspend fun restore(episode: PlayableEpisode) {
+        restored += episode
+        _state.value = _state.value.copy(
+            episodeId = episode.episodeId,
+            title = episode.title,
+            podcastTitle = episode.podcastTitle,
+            artworkUrl = episode.artworkUrl,
+            isPlaying = false
+        )
+        _progress.value = ProgressUiState(episode.startPositionMillis, episode.durationMillis)
     }
 
     override suspend fun togglePlayPause() {

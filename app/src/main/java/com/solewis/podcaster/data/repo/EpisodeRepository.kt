@@ -59,7 +59,8 @@ class EpisodeRepository(
             podcastTitle = podcastTitle,
             artworkUrl = entity.artworkUrl ?: podcastArtworkUrl,
             mediaUrl = entity.enclosureUrl,
-            startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
+            startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis,
+            durationMillis = entity.durationMillis
         )
     }
 
@@ -77,7 +78,8 @@ class EpisodeRepository(
             podcastTitle = podcast.title,
             artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
             mediaUrl = entity.enclosureUrl,
-            startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
+            startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis,
+            durationMillis = entity.durationMillis
         )
     }
 
@@ -101,7 +103,8 @@ class EpisodeRepository(
                 podcastTitle = podcast.title,
                 artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
                 mediaUrl = entity.enclosureUrl,
-                startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
+                startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis,
+                durationMillis = entity.durationMillis
             )
         }
     }
@@ -121,10 +124,19 @@ class EpisodeRepository(
                 podcastTitle = podcast.title,
                 artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
                 mediaUrl = entity.enclosureUrl,
-                startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis
+                startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis,
+                durationMillis = entity.durationMillis
             )
         }
     }
+
+    /**
+     * The episode to put back in front of the user at startup - the one played most recently
+     * across every show, at its saved position. Null on a fresh install, and null once the show it
+     * belonged to is unsubscribed, since its episode rows go with it.
+     */
+    suspend fun getLastPlayed(): PlayableEpisode? =
+        episodeDao.getMostRecentlyPlayed()?.let { getPlayableById(it.id) }
 
     /** The next unplayed episode in [currentEpisodeId]'s own show - what auto-advance and the
      * manual skip button fall back to once the personal queue is empty. Null for a trailer/bonus

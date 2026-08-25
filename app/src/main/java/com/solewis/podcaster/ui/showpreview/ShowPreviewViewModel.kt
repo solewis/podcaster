@@ -77,7 +77,8 @@ class ShowPreviewViewModel(
                     podcastTitle = preview.title,
                     artworkUrl = episode.artworkUrl ?: preview.artworkUrl,
                     mediaUrl = episode.enclosureUrl,
-                    startPositionMillis = 0L
+                    startPositionMillis = 0L,
+                    durationMillis = episode.durationMillis
                 )
             )
         }

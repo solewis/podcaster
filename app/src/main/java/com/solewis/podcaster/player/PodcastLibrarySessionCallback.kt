@@ -77,6 +77,26 @@ class PodcastLibrarySessionCallback(
             ?: LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
     }
 
+    /**
+     * What a Bluetooth remote, a steering-wheel play button, or System UI's post-reboot
+     * resumption notification gets when it asks to resume with the app not running. Without it
+     * the session comes up with an empty playlist and pressing play in the car does nothing -
+     * the same "the player is just gone" symptom the phone UI had, one layer out.
+     *
+     * The three-argument overload, not the two-argument one Media3 deprecated in favour of it.
+     * [isForPlayback] `false` means the caller only wants metadata to render a resumption
+     * notification rather than to start playing, which the same single item answers either way.
+     */
+    override fun onPlaybackResumption(
+        session: MediaSession,
+        controller: ControllerInfo,
+        isForPlayback: Boolean
+    ): ListenableFuture<MediaItemsWithStartPosition> = scope.future {
+        // A failed future is how Media3 is told there is nothing to resume. Returning an empty
+        // playlist instead leaves the session prepared with no items and the play button dead.
+        tree.lastPlayed() ?: throw UnsupportedOperationException("No listening history to resume")
+    }
+
     override fun onSetMediaItems(
         session: MediaSession,
         controller: ControllerInfo,

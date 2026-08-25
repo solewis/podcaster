@@ -7,5 +7,11 @@ data class PlayableEpisode(
     val podcastTitle: String,
     val artworkUrl: String?,
     val mediaUrl: String,
-    val startPositionMillis: Long
+    val startPositionMillis: Long,
+    /**
+     * The duration already known from the feed (or backfilled by a previous playback), so a
+     * restored mini player can draw a real progress bar before any player has loaded the media and
+     * reported its own. Null when the feed never gave one and the episode has never been played.
+     */
+    val durationMillis: Long? = null
 )

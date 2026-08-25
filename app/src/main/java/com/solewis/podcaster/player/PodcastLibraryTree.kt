@@ -53,6 +53,20 @@ class PodcastLibraryTree(
         episodeRepository.getPlayableById(mediaId)?.let(MediaItemMapper::toMediaItem)
 
     /**
+     * What playback resumption should offer: the most recently played episode across every show,
+     * at its saved position. Null when there is no listening history at all - which the callback
+     * turns into a failed future, since that is Media3's signal for "nothing to resume".
+     */
+    suspend fun lastPlayed(): MediaItemsWithStartPosition? =
+        episodeRepository.getLastPlayed()?.let {
+            MediaItemsWithStartPosition(
+                listOf(MediaItemMapper.toMediaItem(it)),
+                /* startIndex = */ 0,
+                it.startPositionMillis
+            )
+        }
+
+    /**
      * See [PodcastLibrarySessionCallback.onSetMediaItems] - this is what makes an episode tapped
      * from Auto's browse tree resume instead of restarting from 0.
      */
