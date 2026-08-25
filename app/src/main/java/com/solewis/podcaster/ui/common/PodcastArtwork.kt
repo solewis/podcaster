@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 
 /**
@@ -48,3 +49,10 @@ fun PodcastArtwork(
         )
     }
 }
+
+/**
+ * Thumbnail size for an episode inside a list. Shared so the Home feed and a show's own episode
+ * list stay identical - the same episode should not be a different size depending on which list you
+ * happened to reach it from.
+ */
+val EpisodeArtworkSize = 56.dp

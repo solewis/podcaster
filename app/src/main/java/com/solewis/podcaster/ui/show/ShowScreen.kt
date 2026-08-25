@@ -69,6 +69,7 @@ import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.domain.JumpTargetResolver
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
+import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 import com.solewis.podcaster.ui.common.formatDuration
@@ -192,6 +193,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                 items(state.episodes, key = { it.id }) { episode ->
                                     EpisodeRow(
                                         episode = episode,
+                                        podcastArtworkUrl = podcast.artworkUrl,
                                         isHighlighted = episode.id == highlightedEpisodeId,
                                         onClick = { onOpenEpisode(episode.id) },
                                         onPlay = { viewModel.play(episode.id) },
@@ -280,6 +282,7 @@ private fun JumpToLastListenedPill(jump: JumpPillUi, onClick: () -> Unit, modifi
 @Composable
 private fun EpisodeRow(
     episode: EpisodeListItem,
+    podcastArtworkUrl: String?,
     isHighlighted: Boolean,
     onClick: () -> Unit,
     onPlay: () -> Unit,
@@ -312,7 +315,15 @@ private fun EpisodeRow(
             Spacer(modifier = Modifier.width(8.dp))
         }
 
-        Column(modifier = Modifier.weight(1f)) {
+        // Falls back to the show's own art, since most feeds only set per-episode artwork
+        // occasionally - same expression the Home feed uses, so a given episode looks the same
+        // in both lists rather than showing art in one place and a bare row in the other.
+        PodcastArtwork(
+            artworkUrl = episode.artworkUrl ?: podcastArtworkUrl,
+            modifier = Modifier.size(EpisodeArtworkSize)
+        )
+
+        Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
             val numberLabel = episode.displayNumber?.let { "Ep $it" }
                 ?: episode.episodeType.takeIf { it != "full" }?.replaceFirstChar(Char::uppercase)
             Row {

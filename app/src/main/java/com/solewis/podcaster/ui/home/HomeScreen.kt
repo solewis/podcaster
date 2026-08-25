@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.HomeShowSummary
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
+import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.ScreenTitle
@@ -118,7 +119,7 @@ private fun FeedEpisodeRow(
     ) {
         PodcastArtwork(
             artworkUrl = episode.artworkUrl ?: episode.podcastArtworkUrl,
-            modifier = Modifier.size(56.dp)
+            modifier = Modifier.size(EpisodeArtworkSize)
         )
 
         Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
