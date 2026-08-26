@@ -7,8 +7,20 @@ fun podcastRow(
     title: String = "Test Show",
     feedUrl: String = "https://example.com/${title.lowercase().replace(' ', '-')}.xml",
     artworkUrl: String? = null,
-    subscribedAt: Long = 1_000L
-) = PodcastEntity(feedUrl = feedUrl, title = title, artworkUrl = artworkUrl, subscribedAt = subscribedAt)
+    subscribedAt: Long = 1_000L,
+    /**
+     * The wall clock, not [subscribedAt]: on-device tests run the real repositories with the real
+     * clock, so an epoch-1970 timestamp would read as long overdue and send the app's automatic
+     * refresh off to fetch example.com for real.
+     */
+    lastRefreshedAt: Long? = System.currentTimeMillis()
+) = PodcastEntity(
+    feedUrl = feedUrl,
+    title = title,
+    artworkUrl = artworkUrl,
+    subscribedAt = subscribedAt,
+    lastRefreshedAt = lastRefreshedAt
+)
 
 fun episodeRow(
     podcastId: Long,

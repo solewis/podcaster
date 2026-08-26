@@ -7,6 +7,7 @@ import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.testing.FeedHost
 import com.solewis.podcaster.testing.inMemoryDatabase
+import com.solewis.podcaster.testing.podcastRow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -46,6 +47,75 @@ class SubscriptionRepositoryTest {
     fun tearDown() {
         host.close()
         db.close()
+    }
+
+    private suspend fun subscribeToHost(): Long {
+        host.enqueueFeed("rotating_token_v1.xml")
+        return (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+    }
+
+    @Test
+    fun a_show_checked_moments_ago_is_left_alone_by_the_automatic_refresh() = runTest {
+        subscribeToHost()
+
+        repository.refreshStale()
+
+        // Foregrounding happens on every task switch and rotation. Without the gate this is a feed
+        // request each time, which is both rude to the host and pointless.
+        assertThat(host.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun a_show_not_checked_in_a_while_is_refreshed_automatically() = runTest {
+        subscribeToHost()
+        clock += SubscriptionRepository.STALE_AFTER_MILLIS + 1
+        host.enqueueNotModified()
+
+        repository.refreshStale()
+
+        assertThat(host.requestCount).isEqualTo(2)
+    }
+
+    @Test
+    fun a_show_never_checked_at_all_counts_as_stale() = runTest {
+        // The state a row can be left in by a migration, or by a subscribe that predates the
+        // column: null must not read as "checked at time zero, so recently enough".
+        db.podcastDao().insert(podcastRow(feedUrl = host.feedUrl(), lastRefreshedAt = null))
+        host.enqueueNotModified()
+
+        repository.refreshStale()
+
+        assertThat(host.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun refreshing_one_stale_show_reports_what_happened() = runTest {
+        val id = subscribeToHost()
+        clock += SubscriptionRepository.STALE_AFTER_MILLIS + 1
+        host.enqueueNotModified()
+
+        assertThat(repository.refreshIfStale(id)).isEqualTo(RefreshResult.NotModified)
+    }
+
+    @Test
+    fun refreshing_one_fresh_show_reports_that_it_skipped() = runTest {
+        val id = subscribeToHost()
+
+        // Null rather than a result, so a caller showing a spinner knows to leave it down.
+        assertThat(repository.refreshIfStale(id)).isNull()
+        assertThat(host.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun an_explicit_refresh_always_asks_however_recently_it_was_checked() = runTest {
+        subscribeToHost()
+        host.enqueueNotModified()
+
+        // Pull-to-refresh, the button on a show, and the periodic worker all mean "ask now" - the
+        // staleness gate belongs only to the automatic paths.
+        repository.refreshAll()
+
+        assertThat(host.requestCount).isEqualTo(2)
     }
 
     // ---- subscribe ----

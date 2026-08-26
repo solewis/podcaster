@@ -14,6 +14,7 @@ import com.solewis.podcaster.testing.awaitTrue
 import com.solewis.podcaster.testing.awaitValue
 import com.solewis.podcaster.testing.episodeRow
 import com.solewis.podcaster.testing.keepHot
+import com.solewis.podcaster.testing.settle
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -244,6 +245,56 @@ class ShowViewModelTest {
 
         assertThat(host.requestCount).isEqualTo(2)
     }
+
+    /** A host-backed subscription, so requests to it can be counted. */
+    private suspend fun subscribedToHost(): SubscriptionRepository {
+        val repository =
+            SubscriptionRepository(graph.db.podcastDao(), graph.db.episodeDao(), FeedFetcher()) { graph.clock }
+        host.enqueueFeed("rotating_token_v1.xml")
+        podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        return repository
+    }
+
+    @Test
+    fun opening_a_show_checks_for_new_episodes_without_being_asked() =
+        runTest(mainDispatcher.dispatcher) {
+            val repository = subscribedToHost()
+            graph.clock += SubscriptionRepository.STALE_AFTER_MILLIS + 1
+            host.enqueueNotModified()
+
+            viewModel(repository)
+
+            // The whole point of opening a show is to see what is in it now. Before this, the
+            // answer was whatever had last been fetched until you found the refresh button.
+            awaitTrue("the show was checked on open") { host.requestCount == 2 }
+        }
+
+    @Test
+    fun reopening_a_show_just_checked_makes_no_request() = runTest(mainDispatcher.dispatcher) {
+        val repository = subscribedToHost()
+
+        viewModel(repository)
+
+        settle()
+        assertThat(host.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun the_automatic_check_stays_invisible_even_when_the_feed_is_down() =
+        runTest(mainDispatcher.dispatcher) {
+            val repository = subscribedToHost()
+            graph.clock += SubscriptionRepository.STALE_AFTER_MILLIS + 1
+            host.enqueueStatus(503)
+
+            val vm = viewModel(repository)
+
+            awaitTrue("the check happened") { host.requestCount == 2 }
+            settle()
+            // Nobody asked for this one, so a snackbar over a screen that opened fine would be
+            // noise - and sharing the spinner flag would let it swallow a real tap on refresh.
+            assertThat(vm.refreshError.value).isNull()
+            assertThat(vm.isRefreshing.value).isFalse()
+        }
 
     @Test
     fun unsubscribing_signals_the_screen_to_leave() = runTest(mainDispatcher.dispatcher) {

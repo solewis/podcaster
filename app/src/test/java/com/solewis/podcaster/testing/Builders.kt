@@ -12,12 +12,20 @@ fun podcastRow(
     title: String = "Test Show",
     feedUrl: String = "https://example.com/${title.lowercase().replace(' ', '-')}.xml",
     artworkUrl: String? = "https://example.com/show.png",
-    subscribedAt: Long = 1_000L
+    subscribedAt: Long = 1_000L,
+    /**
+     * Defaults to [subscribedAt] - matching [TestGraph.clock], so an inserted show counts as just
+     * fetched and the automatic refreshes skip it. Without that, every test holding a subscription
+     * would trip `refreshStale`/`refreshIfStale` into a live request against example.com. Pass an
+     * older value (or advance the clock) in a test that wants the automatic refresh to fire.
+     */
+    lastRefreshedAt: Long? = subscribedAt
 ) = PodcastEntity(
     feedUrl = feedUrl,
     title = title,
     artworkUrl = artworkUrl,
-    subscribedAt = subscribedAt
+    subscribedAt = subscribedAt,
+    lastRefreshedAt = lastRefreshedAt
 )
 
 fun episodeRow(

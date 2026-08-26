@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -67,6 +69,16 @@ fun PodcasterRoot(container: AppContainer) {
 
     val playback by container.playback.state.collectAsState()
     val playbackProgress by container.playback.progress.collectAsState()
+
+    // Keeps the library current without anyone having to ask for it. The periodic worker runs only
+    // every six hours - and later than that whenever Doze defers it - so before this, opening the
+    // app often meant looking at a feed from hours ago until you found the refresh control.
+    //
+    // Safe to fire on every ON_START (task switches and rotations included) because
+    // refreshStale skips anything checked recently; see its own doc for the reasoning.
+    LifecycleEventEffect(Lifecycle.Event.ON_START) {
+        scope.launch { container.subscriptionRepository.refreshStale() }
+    }
 
     val topLevelRoutes = listOf(
         TopLevelRoute(Route.Home, "Home", Icons.Default.Home),

@@ -54,6 +54,19 @@ class ShowViewModel(
     private val _didUnsubscribe = MutableStateFlow(false)
     val didUnsubscribe: StateFlow<Boolean> = _didUnsubscribe.asStateFlow()
 
+    init {
+        // Opening a show asks one question above all others - is there a new episode - so check,
+        // rather than showing whatever was last fetched and waiting for the refresh button to be
+        // found. Skipped when this show was checked recently, and a 304 when nothing changed.
+        //
+        // Deliberately invisible: it raises neither [isRefreshing] nor [refreshError]. Nobody asked
+        // for it, so a feed that is down has no business throwing a snackbar over a screen that
+        // opened fine, and sharing the spinner flag with refresh() would let this swallow a real
+        // tap on the refresh button. The list is already on screen from Room and updates itself
+        // when new rows land. Failures are still recorded on the podcast row.
+        viewModelScope.launch { subscriptionRepository.refreshIfStale(podcastId) }
+    }
+
     fun refresh() {
         if (_isRefreshing.value) return
         viewModelScope.launch {

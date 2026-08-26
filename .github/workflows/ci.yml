@@ -52,8 +52,12 @@ jobs:
   # These 40 tests were previously only ever run by hand, which meant a genuine failure could sit
   # green in CI. That is the gap this job closes.
   #
-  # Running them locally is not the same command. `connectedDebugAndroidTest` fans out to *every*
-  # attached device, so with a phone plugged in it will install and run there too. Locally, pin it:
+  # Running them locally is not the same command, and getting it wrong is destructive.
+  # `connectedDebugAndroidTest` fans out to *every* attached device, and AGP **uninstalls the app
+  # afterwards** - which wipes that device's database, subscriptions and listening positions along
+  # with it. Confirmed on the emulator: after a run, `dumpsys package com.solewis.podcaster` showed
+  # firstInstallTime == lastUpdateTime, i.e. a fresh install rather than an update, and the library
+  # was empty. With a phone plugged in, that phone loses its real data. So locally, always pin it:
   #     ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest
   # Here there is only ever the one emulator this job creates.
   instrumented:
