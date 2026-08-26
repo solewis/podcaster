@@ -69,21 +69,32 @@ written — see its doc for why read-only matters.
 
 ### 2. Settings
 
-There is no Settings screen at all today.
+Reached from the gear on the Library header rather than a fourth tab — somewhere you go once and
+then forget, which is the opposite of a tab. `SettingsStore` is the single writer; everything else
+observes it, so a change lands without restarting anything.
 
-- [ ] Skip amounts: **5s / 15s / 30s**, forward and back set independently. Three preset values
-      rather than a free number so each can have a drawn icon — the Auto buttons currently use
-      Media3's built-in `ICON_SKIP_BACK_15`/`ICON_SKIP_FORWARD_15`, which would silently lie once
-      the amount is configurable, so this needs six icons of our own (three per direction).
-      15s is hardcoded in `PlayerFactory` today.
+- [x] Skip amounts: **5s / 15s / 30s**, forward and back set independently
+- [x] Theme: system / light / dark
+- [x] Auto-advance toggle
 - [ ] Per-show speed override — `PodcastEntity.playbackSpeedOverride` already exists, unused
 - [ ] Auto-download: off / new episodes / per-show
-- [ ] Auto-advance toggle (`AutoAdvancer` runs unconditionally today)
 - [ ] "Mark played at" threshold (`CompletionRule` decides this silently)
 - [ ] Skip intro/outro seconds, per show
-- [ ] Theme: system / light / dark
 - [ ] New-episode notifications — needs `POST_NOTIFICATIONS`, unlike the media notification, which
       is exempt
+
+Two notes on the skip amounts, since both were assumptions that turned out to be wrong:
+
+- **No custom icons were needed.** `SkipIcon` already takes the seconds and draws the numeral, and
+  Media3 ships `ICON_SKIP_BACK_5`/`_15`/`_30` for the notification and the car. Those baked icons
+  are the reason the setting offers three fixed values instead of a slider: every settable amount
+  has a glyph that states it truthfully.
+- **The amount cannot live on the `ExoPlayer`.** Its seek increments are fixed when it is built, so
+  a configurable amount would mean rebuilding the player mid-listen. `TimedSkipPlayer` owns them
+  instead and reads them per press. The trap there is worth knowing:
+  `ForwardingSimpleBasePlayer.handleSeek` implements `COMMAND_SEEK_BACK` as `seekBack()` on the
+  *wrapped* player, ignoring the increment the wrapper reports — so overriding only what is reported
+  gives a button that says 30 and moves 15. `TimedSkipPlayerTest` pins both halves.
 
 ### 3. Missing table stakes
 

@@ -91,6 +91,55 @@ class TimedSkipPlayerTest {
     }
 
 
+    @Test
+    fun a_configured_amount_is_what_actually_gets_seeked_not_just_what_is_reported() {
+        // The trap this guards: ForwardingSimpleBasePlayer implements COMMAND_SEEK_BACK as
+        // seekBack() on the *wrapped* player, whose increment is fixed when it is built. Report a
+        // different number from getState() and you get a button that says 30 and moves 15 - which
+        // is invisible until someone counts. Note the wrapped player below is still built at 15s.
+        val configured = onMain {
+            TimedSkipPlayer(exoPlayer, skipBackMillis = { 30_000L }, skipForwardMillis = { 5_000L })
+        }
+
+        onMain {
+            assertThat(configured.seekBackIncrement).isEqualTo(30_000L)
+            assertThat(configured.seekForwardIncrement).isEqualTo(5_000L)
+        }
+
+        seekTo(START_MILLIS)
+        onMain { configured.seekBack() }
+        assertThat(positionMillis()).isWithin(TOLERANCE_MILLIS).of(START_MILLIS - 30_000L)
+
+        seekTo(START_MILLIS)
+        onMain { configured.seekForward() }
+        assertThat(positionMillis()).isWithin(TOLERANCE_MILLIS).of(START_MILLIS + 5_000L)
+    }
+
+    @Test
+    fun the_steering_wheel_buttons_use_the_configured_amounts_too() {
+        // Same values have to reach next/previous, since that is the only route a head unit has.
+        val configured = onMain {
+            TimedSkipPlayer(exoPlayer, skipBackMillis = { 30_000L }, skipForwardMillis = { 5_000L })
+        }
+
+        seekTo(START_MILLIS)
+        onMain { configured.seekToPrevious() }
+        assertThat(positionMillis()).isWithin(TOLERANCE_MILLIS).of(START_MILLIS - 30_000L)
+
+        seekTo(START_MILLIS)
+        onMain { configured.seekToNext() }
+        assertThat(positionMillis()).isWithin(TOLERANCE_MILLIS).of(START_MILLIS + 5_000L)
+    }
+
+    @Test
+    fun skipping_back_at_the_start_stops_at_zero_rather_than_going_negative() {
+        seekTo(2_000)
+
+        onMain { sessionPlayer.seekBack() }
+
+        assertThat(positionMillis()).isWithin(TOLERANCE_MILLIS).of(0)
+    }
+
     private fun positionMillis(): Long = onMain { sessionPlayer.currentPosition }
 
     private fun seekTo(positionMillis: Long) {

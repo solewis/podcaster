@@ -53,7 +53,6 @@ import com.solewis.podcaster.ui.common.SkipIconSize
 import com.solewis.podcaster.ui.common.formatTimer
 import kotlin.math.abs
 
-private const val SKIP_SECONDS = 15
 private const val SEEK_SETTLE_TOLERANCE_MILLIS = 1_500L
 private val SCRUBBER_TRACK_HEIGHT = 4.dp
 private val SCRUBBER_THUMB_SIZE = 14.dp
@@ -68,6 +67,7 @@ private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f)
 fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
     val playback by viewModel.playbackState.collectAsState()
     val progress by viewModel.progress.collectAsState()
+    val settings by viewModel.settings.collectAsState()
 
     var isDragging by remember { mutableStateOf(false) }
     var dragPositionMillis by remember { mutableFloatStateOf(0f) }
@@ -179,9 +179,9 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
             ) {
                 IconButton(onClick = viewModel::skipBack) {
                     SkipIcon(
-                        seconds = SKIP_SECONDS,
+                        seconds = settings.skipBack.seconds,
                         forward = false,
-                        contentDescription = "Back $SKIP_SECONDS seconds",
+                        contentDescription = "Back ${settings.skipBack.seconds} seconds",
                         modifier = Modifier.size(SkipIconSize)
                     )
                 }
@@ -194,9 +194,9 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                 }
                 IconButton(onClick = viewModel::skipForward) {
                     SkipIcon(
-                        seconds = SKIP_SECONDS,
+                        seconds = settings.skipForward.seconds,
                         forward = true,
-                        contentDescription = "Forward $SKIP_SECONDS seconds",
+                        contentDescription = "Forward ${settings.skipForward.seconds} seconds",
                         modifier = Modifier.size(SkipIconSize)
                     )
                 }

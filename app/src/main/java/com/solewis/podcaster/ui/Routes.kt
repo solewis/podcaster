@@ -29,4 +29,7 @@ sealed interface Route {
 
     @Serializable
     data object NowPlaying : Route
+
+    @Serializable
+    data object Settings : Route
 }
