@@ -24,6 +24,12 @@ ANDROID_SERIAL=emulator-5554 \
 
 CI runs both tiers in parallel on every PR (`.github/workflows/ci.yml`).
 
+The on-device tier is for what genuinely cannot run on the JVM: real ExoPlayer with real decoders,
+a real `MediaSession`, Room against real SQLite, and Android's own XML parser. When a feature's
+correctness depends on any of those, its test belongs there rather than behind a fake — the sleep
+timer's "end of episode" mode is the example, since it is implemented entirely as `AutoAdvancer`
+declining one real `STATE_ENDED`.
+
 ## Road to the Play Store
 
 The plan is a real release, so people other than the author can use it and send feedback. Android
@@ -49,6 +55,13 @@ Sharing one would mean an episode you downloaded for a flight getting evicted to
 something streamed. `PlayerFactory` nests them so the download cache is read first and never
 written — see its doc for why read-only matters.
 
+Both caches and the download manager live in `MediaStorage` at **process** scope, not in
+`AppContainer`. Media3 allows one `SimpleCache` per directory per process, while `AppContainer` is
+deliberately built more than once (an instrumentation test installs its own). That was harmless
+until a list row started observing downloads, at which point both containers opened the download
+cache and the second threw. Only the on-device smoke tests catch this, since they are the one place
+two containers coexist.
+
 - [x] Download an episode, and delete or cancel one
 - [x] Per-episode state: queued, downloading, downloaded, failed, removing
 - [x] Downloads screen (Activity → Downloads) with a running total
@@ -58,10 +71,7 @@ written — see its doc for why read-only matters.
 - [ ] Wifi-only. Manual downloads deliberately use `Requirements.NETWORK`: tapping download is a
       request for the episode *now*, and silently waiting for wifi looks identical to being broken.
       `NETWORK_UNMETERED` belongs to auto-download, which nobody asked for episode-by-episode.
-- [ ] A download control on the **Home feed** rows. Tried and reverted: Home rows already carry
-      play and enqueue, and a third 48dp target leaves roughly 80px for the title on a 320dp-wide
-      screen. Needs the trailing actions collapsed into an overflow menu first, which is a UI
-      decision of its own. Downloading works from a show, an episode, and the Downloads screen.
+- [x] A download control on the **Home feed** rows — unblocked by the row overflow menu below.
 - [ ] Delete orphaned downloads. Unsubscribing leaves rows in Media3's index with no episode to
       label them; `DownloadsViewModel` hides them, but the files stay until deleted by hand.
 - [ ] `POST_NOTIFICATIONS`. The download progress notification is *not* exempt the way the media
@@ -98,14 +108,37 @@ Two notes on the skip amounts, since both were assumptions that turned out to be
 
 ### 3. Missing table stakes
 
-- [ ] **Mark played / unplayed by hand**, and mark-all-played for a show. No such action exists
-      anywhere right now — played state is only ever inferred from listening, which makes a fresh
-      subscription to a long-running show impossible to dig out of.
+- [x] **Mark played / unplayed by hand** (episode screen), and **mark all as played** for a show
+      (the show's overflow menu, which reports how many it changed).
+
+      Two things are load-bearing here. Marking *one* episode played stamps `lastPlayedAt`, so the
+      jump pill moves on and offers the next episode — the point of the action. Marking a *whole
+      show* played deliberately does not, because stamping the same timestamp on hundreds of rows
+      would leave `JumpTargetResolver` picking between ties and make the pill's target depend on row
+      order. And when the episode is the one loaded in the player, the mark alone is not enough:
+      `ProgressWriter` re-derives `isPlayed` from the live player position every five seconds and
+      nothing stored can stop it, so marking it also seeks to the end.
+- [x] **Row trailing actions collapsed into an overflow menu** (`EpisodeActionsMenu`), shared by
+      the Home feed and a show's episode list. Play stays a direct button; queue, download and
+      mark-played moved into `⋮`. Two 48dp targets instead of three or four, and the title got most
+      of that width back.
+
+      Download *progress* moved to the row's metadata line ("25m · Downloading 42%") rather than
+      into the menu — a menu you have to open is no place for a progress indicator. The trade is
+      that downloading is two taps instead of one, which is what Pocket Casts and Overcast do too.
 - [ ] Search and filter within a show, including filter-to-unplayed. A single show has been tested
       at 2952 episodes; scrolling that to find one is rough.
 - [ ] Share an episode
-- [ ] Sleep timer, with an "end of current episode" option. Has to keep running while the app is
-      backgrounded, so it belongs alongside the session in `PlaybackService`, not in a ViewModel.
+- [x] **Sleep timer** on Now Playing: 5/15/30/45/60 minutes, "end of episode", +5 minutes, and off.
+      App-scoped (`AppContainer`) rather than owned by a ViewModel, so it keeps counting once the
+      screen is gone — verified on device: 4:56 → 3:24 across leaving and re-entering Now Playing,
+      matching playback's own elapsed time exactly.
+
+      "End of episode" is not implemented by watching for the episode to end. An episode reaching
+      its end already leaves the player stopped, so the only thing that would carry on is
+      `AutoAdvancer` starting the next one — the timer just declines that once
+      (`consumeEndOfEpisode`). That avoids two listeners racing over the same `STATE_ENDED`, where
+      the outcome would depend on registration order.
 - [ ] Offline and error states across every screen
 
 ### 4. Import and export

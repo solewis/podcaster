@@ -173,7 +173,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 container.podcastRepository,
                                 container.episodeRepository,
                                 container.queueRepository,
-                                container.playback
+                                container.playback,
+                                container.downloads
                             )
                         }
                     }
@@ -321,7 +322,13 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.NowPlaying> {
                 val viewModel: NowPlayingViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { NowPlayingViewModel(container.playback, container.settings.observe()) }
+                        initializer {
+                            NowPlayingViewModel(
+                                container.playback,
+                                container.settings.observe(),
+                                container.sleepTimer
+                            )
+                        }
                     }
                 )
                 NowPlayingScreen(viewModel = viewModel, onBack = { navController.popBackStack() })

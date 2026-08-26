@@ -88,7 +88,11 @@ class PlaybackService : MediaLibraryService() {
         player.addListener(progressWriter)
         player.addListener(
             AutoAdvancer(player, container.queueRepository, lifecycleScope) {
-                container.settings.autoAdvance
+                // The timer is consumed first and unconditionally, never short-circuited by the
+                // setting: an armed timer has to be disarmed by the episode it was set for, or
+                // turning auto-advance off would leave it armed for every episode after this one.
+                val stoppingForSleep = container.sleepTimer.consumeEndOfEpisode()
+                container.settings.autoAdvance && !stoppingForSleep
             }
         )
     }

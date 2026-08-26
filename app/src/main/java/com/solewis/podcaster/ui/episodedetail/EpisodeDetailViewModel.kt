@@ -8,6 +8,7 @@ import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.player.Playback
+import com.solewis.podcaster.player.PlayedMarker
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -21,6 +22,8 @@ class EpisodeDetailViewModel(
     private val playback: Playback,
     private val downloads: Downloads
 ) : ViewModel() {
+
+    private val playedMarker = PlayedMarker(episodeRepository, playback)
 
     data class UiState(
         val episode: EpisodeDetailItem? = null,
@@ -69,6 +72,30 @@ class EpisodeDetailViewModel(
 
     fun enqueue() {
         viewModelScope.launch { queueRepository.enqueue(episodeId) }
+    }
+
+    /**
+     * Marks this episode played or unplayed by hand.
+     *
+     * When it happens to be the episode currently loaded in the player, the mark alone is not
+     * enough: [com.solewis.podcaster.player.ProgressWriter] re-derives `isPlayed` from the *live
+     * player position* every five seconds, so it would quietly revert the mark - and nothing stored
+     * in the database can prevent that. Seeking to the end instead makes every subsequent write
+     * agree with the mark, ends the episode so auto-advance carries on, and is what "I'm done with
+     * this one" means anyway.
+     */
+    fun togglePlayed() {
+        val current = state.value
+        val episode = current.episode ?: return
+        viewModelScope.launch {
+            playedMarker.setPlayed(
+                episodeId,
+                played = !episode.isPlayed,
+                // The player's own duration when it has one: the feed's value is often wrong, and
+                // seeking to a wrong duration would land somewhere other than the end.
+                durationMillis = current.liveDurationMillis ?: episode.durationMillis
+            )
+        }
     }
 
     fun download() {

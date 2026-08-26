@@ -8,8 +8,8 @@ import androidx.media3.exoplayer.offline.DownloadNotificationHelper
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.media3.exoplayer.scheduler.Scheduler
 import androidx.media3.exoplayer.workmanager.WorkManagerScheduler
-import com.solewis.podcaster.PodcasterApp
 import com.solewis.podcaster.R
+import com.solewis.podcaster.player.MediaStorage
 
 /**
  * Runs episode downloads. Media3's [DownloadService] does the actual work - all this supplies is
@@ -28,8 +28,10 @@ class PodcastDownloadService : DownloadService(
     /* channelDescriptionResourceId = */ 0
 ) {
 
-    override fun getDownloadManager(): DownloadManager =
-        (application as PodcasterApp).container.downloadManager
+    // Straight from [MediaStorage], not via the app graph: it is a process-wide singleton by
+    // Media3's requirement, and this service can be started by the system when no container has
+    // been assembled yet.
+    override fun getDownloadManager(): DownloadManager = MediaStorage.downloadManager(this)
 
     /**
      * Without a scheduler, a download interrupted by the process dying or the network dropping just

@@ -39,6 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.EpisodeDetailItem
 import com.solewis.podcaster.data.repo.EpisodeDownload
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.RemoveDone
 import com.solewis.podcaster.ui.common.DownloadButton
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
@@ -77,7 +79,8 @@ fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
                     onEnqueue = viewModel::enqueue,
                     download = state.download,
                     onDownload = viewModel::download,
-                    onRemoveDownload = viewModel::removeDownload
+                    onRemoveDownload = viewModel::removeDownload,
+                    onTogglePlayed = viewModel::togglePlayed
                 )
 
                 state.isLoading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -98,7 +101,8 @@ private fun EpisodeDetailContent(
     onEnqueue: () -> Unit,
     download: EpisodeDownload?,
     onDownload: () -> Unit,
-    onRemoveDownload: () -> Unit
+    onRemoveDownload: () -> Unit,
+    onTogglePlayed: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -178,6 +182,20 @@ private fun EpisodeDetailContent(
                 download = download,
                 onDownload = onDownload,
                 onRemove = onRemoveDownload
+            )
+        }
+
+        // On its own line rather than a fourth control in the row above: the row is already at the
+        // width it can carry, and this is a bookkeeping action rather than a transport one.
+        TextButton(onClick = onTogglePlayed, modifier = Modifier.testTag(TestTags.TOGGLE_PLAYED)) {
+            Icon(
+                if (episode.isPlayed) Icons.Default.RemoveDone else Icons.Default.DoneAll,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                if (episode.isPlayed) "Mark as unplayed" else "Mark as played",
+                modifier = Modifier.padding(start = 8.dp)
             )
         }
 

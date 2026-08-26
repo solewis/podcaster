@@ -4,10 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.HomeShowSummary
+import com.solewis.podcaster.data.repo.Downloads
+import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.player.Playback
+import com.solewis.podcaster.player.PlayedMarker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +28,15 @@ class HomeViewModel(
     private val podcastRepository: PodcastRepository,
     private val episodeRepository: EpisodeRepository,
     private val queueRepository: QueueRepository,
-    private val playback: Playback
+    private val playback: Playback,
+    private val downloads: Downloads
 ) : ViewModel() {
+
+    private val playedMarker = PlayedMarker(episodeRepository, playback)
+
+    /** Separate from [UiState] so a download progress tick doesn't recompose the whole feed. */
+    val downloadStates: StateFlow<Map<String, EpisodeDownload>> =
+        downloads.observe().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     data class UiState(
         val subscriptions: List<HomeShowSummary> = emptyList(),
@@ -102,4 +112,18 @@ class HomeViewModel(
         viewModelScope.launch { queueRepository.enqueue(episode.id) }
     }
 
+
+    fun download(episodeId: String) {
+        viewModelScope.launch { downloads.download(episodeId) }
+    }
+
+    fun removeDownload(episodeId: String) {
+        viewModelScope.launch { downloads.remove(episodeId) }
+    }
+
+    fun togglePlayed(episode: EpisodeFeedItem) {
+        viewModelScope.launch {
+            playedMarker.setPlayed(episode.id, played = !episode.isPlayed, durationMillis = episode.durationMillis)
+        }
+    }
 }

@@ -1,15 +1,15 @@
 package com.solewis.podcaster.player
 
 import android.os.Looper
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.SilenceMediaSource
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
+import com.solewis.podcaster.testing.awaitPlayer
+import com.solewis.podcaster.testing.onMain
+import com.solewis.podcaster.testing.silenceSource
 import com.solewis.podcaster.data.db.PodcasterDatabase
 import com.solewis.podcaster.data.db.entity.EpisodeEntity
 import com.solewis.podcaster.data.db.entity.PodcastEntity
@@ -96,18 +96,12 @@ class ProgressWriterIntegrationTest {
     }
 
     private fun loadEpisode(durationMillis: Long) {
-        // updateMediaItem, not Factory.setTag: the tag only lands on localConfiguration, leaving
-        // SilenceMediaSource's own fixed mediaId in place - so every write ProgressWriter made
-        // targeted an id that wasn't in the database and silently updated no rows.
-        val source = SilenceMediaSource(durationMillis * 1_000).apply {
-            updateMediaItem(MediaItem.Builder().setMediaId(episodeId).build())
-        }
         onMain {
-            player.setMediaSource(source)
+            player.setMediaSource(silenceSource(episodeId, durationMillis))
             player.prepare()
         }
-        awaitTrue("player ready") { onMain { player.playbackState } == Player.STATE_READY }
-        awaitTrue("the player is reporting our episode") {
+        awaitPlayer("player ready") { onMain { player.playbackState } == Player.STATE_READY }
+        awaitPlayer("the player is reporting our episode") {
             onMain { player.currentMediaItem?.mediaId } == episodeId
         }
     }
@@ -121,13 +115,13 @@ class ProgressWriterIntegrationTest {
             player.play()
             player.seekTo(120_000)
         }
-        awaitTrue("playing") { onMain { player.isPlaying } }
+        awaitPlayer("playing") { onMain { player.isPlaying } }
 
         onMain { player.pause() }
 
         // Written on pause rather than only by the 5s ticker, so quitting right after pausing
         // cannot lose up to five seconds of position.
-        awaitTrue("position persisted") { (storedEpisode()?.positionMillis ?: 0) > 0 }
+        awaitPlayer("position persisted") { (storedEpisode()?.positionMillis ?: 0) > 0 }
         val stored = storedEpisode()!!
         assertThat(stored.positionMillis).isAtLeast(120_000)
         assertThat(stored.isPlayed).isFalse()
@@ -142,11 +136,11 @@ class ProgressWriterIntegrationTest {
             player.play()
             player.seekTo(200_000)
         }
-        awaitTrue("playing past the seek") { onMain { player.currentPosition } >= 200_000 }
+        awaitPlayer("playing past the seek") { onMain { player.currentPosition } >= 200_000 }
 
         onMain { player.pause() }
 
-        awaitTrue("position persisted") { (storedEpisode()?.positionMillis ?: 0) >= 200_000 }
+        awaitPlayer("position persisted") { (storedEpisode()?.positionMillis ?: 0) >= 200_000 }
     }
 
     @Test
@@ -154,7 +148,7 @@ class ProgressWriterIntegrationTest {
         loadEpisode(durationMillis = 2_000)
         onMain { player.play() }
 
-        awaitTrue("episode marked played") { storedEpisode()?.isPlayed == true }
+        awaitPlayer("episode marked played") { storedEpisode()?.isPlayed == true }
 
         // Position resets so the next tap starts it over rather than resuming at the very end.
         assertThat(storedEpisode()?.positionMillis).isEqualTo(0)
@@ -167,7 +161,7 @@ class ProgressWriterIntegrationTest {
 
         // Feeds frequently omit or misstate duration; the player is the only reliable source, and
         // every "Nm left" label depends on it.
-        awaitTrue("duration backfilled") { storedEpisode()?.durationMillis != null }
+        awaitPlayer("duration backfilled") { storedEpisode()?.durationMillis != null }
         val stored = storedEpisode()!!
         assertThat(stored.durationMillis).isWithin(2_000).of(300_000)
         assertThat(stored.durationIsExact).isTrue()
@@ -180,7 +174,7 @@ class ProgressWriterIntegrationTest {
             player.play()
             player.seekTo(90_000)
         }
-        awaitTrue("playing past the seek") { onMain { player.currentPosition } >= 90_000 }
+        awaitPlayer("playing past the seek") { onMain { player.currentPosition } >= 90_000 }
 
         // What PlaybackService.onDestroy does: the process is going away, so there is no chance to
         // wait for a coroutine.
@@ -189,25 +183,4 @@ class ProgressWriterIntegrationTest {
         assertThat(storedEpisode()!!.positionMillis).isAtLeast(90_000)
     }
 
-    private fun awaitTrue(what: String, condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + TIMEOUT_MILLIS
-        while (System.currentTimeMillis() < deadline) {
-            if (condition()) return
-            Thread.sleep(POLL_MILLIS)
-        }
-        throw AssertionError("Timed out after ${TIMEOUT_MILLIS}ms waiting for: $what")
-    }
-
-    /** ExoPlayer insists on its application thread; the instrumentation thread is not it. */
-    private fun <T> onMain(block: () -> T): T {
-        var result: T? = null
-        InstrumentationRegistry.getInstrumentation().runOnMainSync { result = block() }
-        @Suppress("UNCHECKED_CAST")
-        return result as T
-    }
-
-    private companion object {
-        const val TIMEOUT_MILLIS = 15_000L
-        const val POLL_MILLIS = 25L
-    }
 }

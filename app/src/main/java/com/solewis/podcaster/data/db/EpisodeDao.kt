@@ -209,6 +209,46 @@ interface EpisodeDao {
     suspend fun setProgress(id: String, positionMillis: Long, isPlayed: Boolean, now: Long)
 
     /**
+     * Marks an episode played by hand.
+     *
+     * Stamps `lastPlayedAt` as well as `playedAt`, so the show's jump pill follows the action -
+     * marking an episode played is a statement about where you are in a show, and the pill should
+     * move on to offer the next one rather than ignoring it.
+     */
+    @Query("UPDATE episodes SET isPlayed = 1, playedAt = :now, lastPlayedAt = :now WHERE id = :id")
+    suspend fun markPlayed(id: String, now: Long)
+
+    /**
+     * The inverse: back to never-listened, position included, since "unplayed" that still resumes
+     * three quarters of the way in would be a lie.
+     *
+     * Clearing `lastPlayedAt` also makes the row eligible for [deleteIfNeverPlayed] again. That is
+     * the honest consequence of declaring it never played, and there is nothing left on the row to
+     * lose by then.
+     */
+    @Query(
+        """
+        UPDATE episodes SET isPlayed = 0, playedAt = NULL, lastPlayedAt = NULL, positionMillis = 0
+        WHERE id = :id
+        """
+    )
+    suspend fun markUnplayed(id: String)
+
+    /**
+     * Clears a show's backlog. Returns how many rows changed, so the screen can say so.
+     *
+     * Deliberately leaves `lastPlayedAt` alone, unlike [markPlayed]. Stamping the same timestamp on
+     * hundreds of episodes would leave [com.solewis.podcaster.domain.JumpTargetResolver] picking
+     * "the greatest lastPlayedAt" from a set of ties, making the jump pill's target depend on row
+     * order. Untouched, whatever you last actually listened to stays the anchor.
+     *
+     * Only touches unplayed rows, so it cannot rewrite the completion date of something you
+     * genuinely finished months ago.
+     */
+    @Query("UPDATE episodes SET isPlayed = 1, playedAt = :now WHERE podcastId = :podcastId AND isPlayed = 0")
+    suspend fun markAllPlayedForPodcast(podcastId: Long, now: Long): Int
+
+    /**
      * Backfills a real duration once the player has reported one - feeds are frequently missing
      * or wrong here (verified against real captured feeds). The `WHERE` clause is a no-op guard,
      * not just an optimization: the player reports this on every `onEvents` firing during

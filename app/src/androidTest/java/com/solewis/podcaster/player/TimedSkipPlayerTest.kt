@@ -3,11 +3,12 @@ package com.solewis.podcaster.player
 import android.os.Looper
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.SilenceMediaSource
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
+import com.solewis.podcaster.testing.awaitPlayer
+import com.solewis.podcaster.testing.onMain
+import com.solewis.podcaster.testing.silenceSource
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -40,9 +41,7 @@ class TimedSkipPlayerTest {
             sessionPlayer = TimedSkipPlayer(exoPlayer)
             // Silence rather than a real episode: it prepares instantly, needs no network, and is
             // seekable with a known duration, which is all the seek assertions below depend on.
-            exoPlayer.setMediaSource(
-                SilenceMediaSource.Factory().setDurationUs(EPISODE_MILLIS * 1_000).createMediaSource()
-            )
+            exoPlayer.setMediaSource(silenceSource("ep", EPISODE_MILLIS))
             exoPlayer.prepare()
         }
         awaitReady()
@@ -144,33 +143,12 @@ class TimedSkipPlayerTest {
 
     private fun seekTo(positionMillis: Long) {
         onMain { exoPlayer.seekTo(positionMillis) }
-        awaitTrue { onMain { exoPlayer.currentPosition } >= positionMillis }
+        awaitPlayer("seek landed") { onMain { exoPlayer.currentPosition } >= positionMillis }
     }
 
 
-    private fun awaitReady() = awaitTrue {
+    private fun awaitReady() = awaitPlayer("player ready") {
         onMain { exoPlayer.playbackState } == Player.STATE_READY
-    }
-
-    /** ExoPlayer's work is asynchronous even for silence, so every assertion has to wait it out. */
-    private fun awaitTrue(condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + TIMEOUT_MILLIS
-        while (System.currentTimeMillis() < deadline) {
-            if (condition()) return
-            Thread.sleep(POLL_MILLIS)
-        }
-        throw AssertionError("Condition still false after ${TIMEOUT_MILLIS}ms")
-    }
-
-    /**
-     * Both players insist on their application thread, and the instrumentation thread this test
-     * body runs on is not it.
-     */
-    private fun <T> onMain(block: () -> T): T {
-        var result: T? = null
-        InstrumentationRegistry.getInstrumentation().runOnMainSync { result = block() }
-        @Suppress("UNCHECKED_CAST")
-        return result as T
     }
 
     private companion object {
@@ -178,7 +156,5 @@ class TimedSkipPlayerTest {
         const val EPISODE_MILLIS = 600_000L
         const val START_MILLIS = 120_000L
         const val TOLERANCE_MILLIS = 1_000L
-        const val TIMEOUT_MILLIS = 10_000L
-        const val POLL_MILLIS = 50L
     }
 }

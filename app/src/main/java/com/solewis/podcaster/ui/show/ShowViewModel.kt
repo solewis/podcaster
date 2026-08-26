@@ -14,6 +14,7 @@ import com.solewis.podcaster.data.repo.RefreshResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.domain.JumpTargetResolver
 import com.solewis.podcaster.player.Playback
+import com.solewis.podcaster.player.PlayedMarker
 import com.solewis.podcaster.ui.common.formatDuration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,8 @@ class ShowViewModel(
     private val playback: Playback,
     private val downloads: Downloads
 ) : ViewModel() {
+
+    private val playedMarker = PlayedMarker(episodeRepository, playback)
 
     data class UiState(
         val podcast: PodcastEntity? = null,
@@ -58,6 +61,10 @@ class ShowViewModel(
 
     /** Flips once the unsubscribe completes, so the screen can navigate back - there is nothing
      * left here to show once the podcast row (and its episodes) are gone. */
+    /** How many episodes the last "mark all played" changed; null when there is nothing to report. */
+    private val _markedAllPlayed = MutableStateFlow<Int?>(null)
+    val markedAllPlayed: StateFlow<Int?> = _markedAllPlayed.asStateFlow()
+
     private val _didUnsubscribe = MutableStateFlow(false)
     val didUnsubscribe: StateFlow<Boolean> = _didUnsubscribe.asStateFlow()
 
@@ -94,6 +101,32 @@ class ShowViewModel(
 
     fun enqueue(episodeId: String) {
         viewModelScope.launch { queueRepository.enqueue(episodeId) }
+    }
+
+    /**
+     * Clears the backlog. Emits the number marked so the screen can confirm it - an action that
+     * silently changes a few hundred rows needs to say what it did.
+     */
+    fun markAllPlayed() {
+        viewModelScope.launch {
+            _markedAllPlayed.value = episodeRepository.markAllPlayed(podcastId)
+        }
+    }
+
+    /** Cleared once shown, so the message does not reappear on every recomposition. */
+    fun clearMarkedAllPlayed() {
+        _markedAllPlayed.value = null
+    }
+
+    /**
+     * Duration comes from the row rather than a fresh lookup - the list already has it, and
+     * [PlayedMarker] needs it only to seek an episode that is loaded in the player.
+     */
+    fun togglePlayed(episodeId: String) {
+        val episode = state.value.episodes.firstOrNull { it.id == episodeId } ?: return
+        viewModelScope.launch {
+            playedMarker.setPlayed(episodeId, played = !episode.isPlayed, durationMillis = episode.durationMillis)
+        }
     }
 
     fun download(episodeId: String) {
