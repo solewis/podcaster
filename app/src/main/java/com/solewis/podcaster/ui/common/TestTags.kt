@@ -29,6 +29,9 @@ object TestTags {
     const val MINI_PLAYER = "miniPlayer"
     const val RESUME_PILL = "resumePill"
     const val DOWNLOADS_LIST = "downloadsList"
+    const val TOGGLE_PLAYED = "togglePlayed"
+    const val SHOW_MENU = "showMenu"
+    const val MARK_ALL_PLAYED = "markAllPlayed"
 
     /**
      * Carries the state, not just the identity: the whole risk with a one-control-many-states

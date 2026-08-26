@@ -105,7 +105,10 @@ class SearchViewModelTest {
         vm.onQueryChange("")
         advanceTimeBy(DEBOUNCE_MILLIS + 1)
 
-        val state = vm.state.awaitValue { it.results.isEmpty() }
+        // Both conditions in the predicate, not one awaited and the other asserted: clearing the
+        // query updates results and the spinner separately, so awaiting only the empty results can
+        // match a state that still has isSearching true and then fail the assertion below.
+        val state = vm.state.awaitValue { it.results.isEmpty() && !it.isSearching }
         assertThat(state.isSearching).isFalse()
         assertThat(searchHost.requestCount).isEqualTo(1)
     }

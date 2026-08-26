@@ -87,9 +87,21 @@ There is no Settings screen at all today.
 
 ### 3. Missing table stakes
 
-- [ ] **Mark played / unplayed by hand**, and mark-all-played for a show. No such action exists
-      anywhere right now — played state is only ever inferred from listening, which makes a fresh
-      subscription to a long-running show impossible to dig out of.
+- [x] **Mark played / unplayed by hand** (episode screen), and **mark all as played** for a show
+      (the show's overflow menu, which reports how many it changed).
+
+      Two things are load-bearing here. Marking *one* episode played stamps `lastPlayedAt`, so the
+      jump pill moves on and offers the next episode — the point of the action. Marking a *whole
+      show* played deliberately does not, because stamping the same timestamp on hundreds of rows
+      would leave `JumpTargetResolver` picking between ties and make the pill's target depend on row
+      order. And when the episode is the one loaded in the player, the mark alone is not enough:
+      `ProgressWriter` re-derives `isPlayed` from the live player position every five seconds and
+      nothing stored can stop it, so marking it also seeks to the end.
+- [ ] **Collapse row trailing actions into an overflow menu.** Now blocking two things: a download
+      control on Home rows, and marking played from a row instead of only from the episode screen.
+      Show rows already carry three 48dp targets (play, queue, download), which leaves about 80px
+      for the title on a 320dp-wide screen — a fourth is not available. Worth doing as its own
+      change rather than worked around a third time.
 - [ ] Search and filter within a show, including filter-to-unplayed. A single show has been tested
       at 2952 episodes; scrolling that to find one is rough.
 - [ ] Share an episode

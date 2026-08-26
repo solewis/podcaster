@@ -58,6 +58,10 @@ class ShowViewModel(
 
     /** Flips once the unsubscribe completes, so the screen can navigate back - there is nothing
      * left here to show once the podcast row (and its episodes) are gone. */
+    /** How many episodes the last "mark all played" changed; null when there is nothing to report. */
+    private val _markedAllPlayed = MutableStateFlow<Int?>(null)
+    val markedAllPlayed: StateFlow<Int?> = _markedAllPlayed.asStateFlow()
+
     private val _didUnsubscribe = MutableStateFlow(false)
     val didUnsubscribe: StateFlow<Boolean> = _didUnsubscribe.asStateFlow()
 
@@ -94,6 +98,21 @@ class ShowViewModel(
 
     fun enqueue(episodeId: String) {
         viewModelScope.launch { queueRepository.enqueue(episodeId) }
+    }
+
+    /**
+     * Clears the backlog. Emits the number marked so the screen can confirm it - an action that
+     * silently changes a few hundred rows needs to say what it did.
+     */
+    fun markAllPlayed() {
+        viewModelScope.launch {
+            _markedAllPlayed.value = episodeRepository.markAllPlayed(podcastId)
+        }
+    }
+
+    /** Cleared once shown, so the message does not reappear on every recomposition. */
+    fun clearMarkedAllPlayed() {
+        _markedAllPlayed.value = null
     }
 
     fun download(episodeId: String) {

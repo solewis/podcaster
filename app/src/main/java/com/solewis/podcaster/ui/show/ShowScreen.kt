@@ -66,6 +66,10 @@ import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.ui.common.BackButtonRow
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import com.solewis.podcaster.ui.common.DownloadButton
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
@@ -95,6 +99,19 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     var selectedTab by remember { mutableIntStateOf(0) }
     var highlightedEpisodeId by remember { mutableStateOf<String?>(null) }
     var pendingUnsubscribe by remember { mutableStateOf(false) }
+    var showMenuOpen by remember { mutableStateOf(false) }
+
+    val markedAllPlayed by viewModel.markedAllPlayed.collectAsState()
+    LaunchedEffect(markedAllPlayed) {
+        // Says what it did: an action that silently rewrites a few hundred rows is indistinguishable
+        // from one that did nothing.
+        markedAllPlayed?.let { count ->
+            snackbarHostState.showSnackbar(
+                if (count == 0) "Nothing left to mark" else "Marked $count ${if (count == 1) "episode" else "episodes"} as played"
+            )
+            viewModel.clearMarkedAllPlayed()
+        }
+    }
 
     LaunchedEffect(refreshError) {
         refreshError?.let { snackbarHostState.showSnackbar(it) }
@@ -155,12 +172,41 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                             Spacer(modifier = Modifier.width(12.dp))
                             PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(72.dp))
                         }
-                        Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             SubscribeButton(
                                 isSubscribed = true,
                                 isBusy = false,
                                 onClick = { pendingUnsubscribe = true }
                             )
+                            Spacer(modifier = Modifier.weight(1f))
+                            // A menu rather than another button: per-show actions are only going to
+                            // accumulate (a speed override, intro trimming), and the episode rows
+                            // below have already run out of room for trailing controls.
+                            Box {
+                                IconButton(
+                                    onClick = { showMenuOpen = true },
+                                    modifier = Modifier.testTag(TestTags.SHOW_MENU)
+                                ) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "More actions for this show")
+                                }
+                                DropdownMenu(
+                                    expanded = showMenuOpen,
+                                    onDismissRequest = { showMenuOpen = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Mark all as played") },
+                                        leadingIcon = { Icon(Icons.Default.DoneAll, contentDescription = null) },
+                                        onClick = {
+                                            showMenuOpen = false
+                                            viewModel.markAllPlayed()
+                                        },
+                                        modifier = Modifier.testTag(TestTags.MARK_ALL_PLAYED)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
