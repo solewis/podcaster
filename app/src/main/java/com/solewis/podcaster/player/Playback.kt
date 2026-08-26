@@ -47,6 +47,13 @@ interface Playback {
 
     suspend fun togglePlayPause()
 
+    /**
+     * Unconditional, unlike [togglePlayPause] - for callers that mean "stop" rather than "the user
+     * pressed the button", such as [SleepTimer]. Toggling would resume playback that had already
+     * been paused by hand.
+     */
+    suspend fun pause()
+
     suspend fun seekTo(positionMillis: Long)
 
     suspend fun skipForward()

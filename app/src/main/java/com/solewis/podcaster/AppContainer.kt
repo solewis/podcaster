@@ -22,6 +22,10 @@ import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.player.MediaStorage
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayerConnection
+import com.solewis.podcaster.player.SleepTimer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
 
 /**
@@ -80,6 +84,14 @@ class AppContainer(
 
     /** Lazy so a screen test that never plays anything never binds to the playback service. */
     val playback: Playback by lazy { playbackFactory(appContext) }
+
+    /**
+     * App-scoped, so it keeps counting once Now Playing is gone and the phone is face-down - which
+     * is the entire point of a sleep timer. Its scope is deliberately not a ViewModel's.
+     */
+    val sleepTimer: SleepTimer by lazy {
+        SleepTimer(playback, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
+    }
 
     companion object {
 

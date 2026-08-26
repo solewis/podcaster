@@ -29,6 +29,8 @@ class FakePlayback : Playback {
     val restored = mutableListOf<PlayableEpisode>()
     var togglePlayPauseCount = 0
         private set
+    var pauseCount = 0
+        private set
     val seekedTo = mutableListOf<Long>()
     var skipForwardCount = 0
         private set
@@ -58,6 +60,11 @@ class FakePlayback : Playback {
 
     override suspend fun togglePlayPause() {
         togglePlayPauseCount++
+    }
+
+    override suspend fun pause() {
+        pauseCount++
+        _state.value = _state.value.copy(isPlaying = false)
     }
 
     override suspend fun seekTo(positionMillis: Long) {

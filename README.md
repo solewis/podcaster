@@ -123,8 +123,16 @@ Two notes on the skip amounts, since both were assumptions that turned out to be
 - [ ] Search and filter within a show, including filter-to-unplayed. A single show has been tested
       at 2952 episodes; scrolling that to find one is rough.
 - [ ] Share an episode
-- [ ] Sleep timer, with an "end of current episode" option. Has to keep running while the app is
-      backgrounded, so it belongs alongside the session in `PlaybackService`, not in a ViewModel.
+- [x] **Sleep timer** on Now Playing: 5/15/30/45/60 minutes, "end of episode", +5 minutes, and off.
+      App-scoped (`AppContainer`) rather than owned by a ViewModel, so it keeps counting once the
+      screen is gone — verified on device: 4:56 → 3:24 across leaving and re-entering Now Playing,
+      matching playback's own elapsed time exactly.
+
+      "End of episode" is not implemented by watching for the episode to end. An episode reaching
+      its end already leaves the player stopped, so the only thing that would carry on is
+      `AutoAdvancer` starting the next one — the timer just declines that once
+      (`consumeEndOfEpisode`). That avoids two listeners racing over the same `STATE_ENDED`, where
+      the outcome would depend on registration order.
 - [ ] Offline and error states across every screen
 
 ### 4. Import and export

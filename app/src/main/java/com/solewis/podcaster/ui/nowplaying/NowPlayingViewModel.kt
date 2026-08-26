@@ -6,6 +6,8 @@ import com.solewis.podcaster.data.settings.AppSettings
 import com.solewis.podcaster.player.PlaybackUiState
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.ProgressUiState
+import com.solewis.podcaster.player.SleepTimer
+import com.solewis.podcaster.player.SleepTimerState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +20,8 @@ class NowPlayingViewModel(
      * The settings as a `Flow` rather than the store itself, so the screen's skip buttons can be
      * driven without this ViewModel needing a `Context` - and so a test can hand it a fixed value.
      */
-    settings: Flow<AppSettings>
+    settings: Flow<AppSettings>,
+    private val sleepTimer: SleepTimer
 ) : ViewModel() {
 
     val playbackState: StateFlow<PlaybackUiState> = playback.state
@@ -27,6 +30,17 @@ class NowPlayingViewModel(
     /** The skip buttons print the amount, so they have to read the setting, not a constant. */
     val settings: StateFlow<AppSettings> =
         settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
+
+    /** Straight from the timer, which outlives this ViewModel - see [SleepTimer]. */
+    val sleepTimerState: StateFlow<SleepTimerState> = sleepTimer.state
+
+    fun startSleepTimer(minutes: Int) = sleepTimer.start(minutes * 60_000L)
+
+    fun startSleepTimerAtEndOfEpisode() = sleepTimer.startEndOfEpisode()
+
+    fun extendSleepTimer(minutes: Int) = sleepTimer.extend(minutes * 60_000L)
+
+    fun cancelSleepTimer() = sleepTimer.cancel()
 
     fun togglePlayPause() {
         viewModelScope.launch { playback.togglePlayPause() }

@@ -35,20 +35,26 @@ object TestTags {
     const val SETTINGS_BUTTON = "settingsButton"
     const val AUTO_ADVANCE_SWITCH = "autoAdvanceSwitch"
     const val TOGGLE_PLAYED = "togglePlayed"
+    const val SHOW_MENU = "showMenu"
+    const val MARK_ALL_PLAYED = "markAllPlayed"
     const val MENU_ENQUEUE = "menuEnqueue"
     const val MENU_TOGGLE_PLAYED = "menuTogglePlayed"
     const val MENU_DOWNLOAD = "menuDownload"
+    const val SLEEP_TIMER = "sleepTimer"
+    const val SLEEP_TIMER_EXTEND = "sleepTimerExtend"
+    const val SLEEP_TIMER_OFF = "sleepTimerOff"
+    const val SLEEP_TIMER_END_OF_EPISODE = "sleepTimerEndOfEpisode"
 
     /** Per-episode, since a list has one of these per row and a test has to open a specific one. */
     fun episodeMenu(episodeTitle: String) = "episodeMenu:$episodeTitle"
-    const val SHOW_MENU = "showMenu"
-    const val MARK_ALL_PLAYED = "markAllPlayed"
 
     /** Direction included: the two rows are identical apart from it, which is the bug worth catching. */
     fun skipChoice(forward: Boolean, amount: SkipAmount) =
         "skipChoice:${if (forward) "forward" else "back"}:${amount.seconds}"
 
     fun themeChoice(mode: ThemeMode) = "themeChoice:${mode.name}"
+
+    fun sleepPreset(minutes: Int) = "sleepPreset:$minutes"
 
     /**
      * Carries the state, not just the identity: the whole risk with a one-control-many-states
