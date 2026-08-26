@@ -322,6 +322,31 @@ class ShowViewModelTest {
     }
 
     @Test
+    fun marking_the_show_played_clears_the_backlog_and_says_how_many() =
+        runTest(mainDispatcher.dispatcher) {
+            val vm = loadedViewModel()
+            graph.db.episodeDao().setProgress("$podcastId:1", 600_000, isPlayed = true, now = 5_000)
+
+            vm.markAllPlayed()
+
+            // Two of the three, since episode 1 was already finished - the count goes on screen.
+            assertThat(vm.markedAllPlayed.awaitValue { it != null }).isEqualTo(2)
+            assertThat(vm.state.awaitValue { s -> s.episodes.all { it.isPlayed } }.episodes).hasSize(3)
+        }
+
+    @Test
+    fun the_confirmation_is_cleared_once_shown() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+        vm.markAllPlayed()
+        vm.markedAllPlayed.awaitValue { it != null }
+
+        vm.clearMarkedAllPlayed()
+
+        // Otherwise the snackbar returns on every recomposition of the screen.
+        assertThat(vm.markedAllPlayed.value).isNull()
+    }
+
+    @Test
     fun unsubscribing_signals_the_screen_to_leave() = runTest(mainDispatcher.dispatcher) {
         val vm = loadedViewModel()
 

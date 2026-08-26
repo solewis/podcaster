@@ -34,6 +34,9 @@ object TestTags {
     const val SETTINGS_SCREEN = "settingsScreen"
     const val SETTINGS_BUTTON = "settingsButton"
     const val AUTO_ADVANCE_SWITCH = "autoAdvanceSwitch"
+    const val TOGGLE_PLAYED = "togglePlayed"
+    const val SHOW_MENU = "showMenu"
+    const val MARK_ALL_PLAYED = "markAllPlayed"
 
     /** Direction included: the two rows are identical apart from it, which is the bug worth catching. */
     fun skipChoice(forward: Boolean, amount: SkipAmount) =

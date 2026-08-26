@@ -199,4 +199,64 @@ class EpisodeDetailViewModelTest {
         assertThat(vm.state.awaitValue { it.download != null }.download!!.status)
             .isEqualTo(DownloadStatus.DOWNLOADED)
     }
+
+    @Test
+    fun marking_an_episode_played_from_the_screen_records_it() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+
+        vm.togglePlayed()
+
+        assertThat(vm.state.awaitValue { it.episode?.isPlayed == true }.episode?.isPlayed).isTrue()
+    }
+
+    @Test
+    fun marking_a_played_episode_again_returns_it_to_unplayed() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel(isPlayed = true, positionMillis = 400_000)
+
+        vm.togglePlayed()
+
+        val episode = vm.state.awaitValue { it.episode?.isPlayed == false }.episode!!
+        assertThat(episode.positionMillis).isEqualTo(0)
+    }
+
+    @Test
+    fun marking_the_loaded_episode_played_also_sends_it_to_the_end() =
+        runTest(mainDispatcher.dispatcher) {
+            val vm = loadedViewModel()
+            graph.playback.emitPlaying(episodeId)
+            vm.state.awaitValue { it.isPlayingThis }
+
+            vm.togglePlayed()
+
+            // Without this the mark is silently reverted: ProgressWriter re-derives isPlayed from
+            // the live player position every five seconds, and no stored value can stop it. Seeking
+            // to the end makes every later write agree with the mark.
+            awaitTrue("seeked to the end") { graph.playback.seekedTo == listOf(600_000L) }
+        }
+
+    @Test
+    fun marking_an_episode_that_is_not_loaded_leaves_the_player_alone() =
+        runTest(mainDispatcher.dispatcher) {
+            val vm = loadedViewModel()
+            graph.playback.emitPlaying("$podcastId:2")
+
+            vm.togglePlayed()
+
+            vm.state.awaitValue { it.episode?.isPlayed == true }
+            settle()
+            // Seeking here would jump a completely different episode to its end.
+            assertThat(graph.playback.seekedTo).isEmpty()
+        }
+
+    @Test
+    fun marking_unplayed_never_touches_the_player() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel(isPlayed = true)
+        graph.playback.emitPlaying(episodeId)
+
+        vm.togglePlayed()
+
+        vm.state.awaitValue { it.episode?.isPlayed == false }
+        settle()
+        assertThat(graph.playback.seekedTo).isEmpty()
+    }
 }

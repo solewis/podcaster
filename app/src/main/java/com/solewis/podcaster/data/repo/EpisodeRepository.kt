@@ -29,6 +29,19 @@ class EpisodeRepository(
         episodeDao.setProgress(episodeId, positionMillis, isPlayed, now())
     }
 
+    /** See [EpisodeDao.markPlayed] - moves the show's jump target on, deliberately. */
+    suspend fun markPlayed(episodeId: String) {
+        episodeDao.markPlayed(episodeId, now())
+    }
+
+    suspend fun markUnplayed(episodeId: String) {
+        episodeDao.markUnplayed(episodeId)
+    }
+
+    /** Returns how many episodes were actually marked, for the confirmation message. */
+    suspend fun markAllPlayed(podcastId: Long): Int =
+        episodeDao.markAllPlayedForPodcast(podcastId, now())
+
     suspend fun backfillDuration(episodeId: String, durationMillis: Long) {
         episodeDao.backfillDuration(episodeId, durationMillis)
     }

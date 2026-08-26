@@ -71,6 +71,35 @@ class EpisodeDetailViewModel(
         viewModelScope.launch { queueRepository.enqueue(episodeId) }
     }
 
+    /**
+     * Marks this episode played or unplayed by hand.
+     *
+     * When it happens to be the episode currently loaded in the player, the mark alone is not
+     * enough: [com.solewis.podcaster.player.ProgressWriter] re-derives `isPlayed` from the *live
+     * player position* every five seconds, so it would quietly revert the mark - and nothing stored
+     * in the database can prevent that. Seeking to the end instead makes every subsequent write
+     * agree with the mark, ends the episode so auto-advance carries on, and is what "I'm done with
+     * this one" means anyway.
+     */
+    fun togglePlayed() {
+        val current = state.value
+        val episode = current.episode ?: return
+        viewModelScope.launch {
+            if (episode.isPlayed) {
+                episodeRepository.markUnplayed(episodeId)
+                return@launch
+            }
+            episodeRepository.markPlayed(episodeId)
+            val duration = current.liveDurationMillis ?: episode.durationMillis
+            if (isLoadedInPlayer() && duration != null) {
+                playback.seekTo(duration)
+            }
+        }
+    }
+
+    /** Not the same as playing: a paused episode is still the one the writer will report on. */
+    private fun isLoadedInPlayer() = playback.state.value.episodeId == episodeId
+
     fun download() {
         viewModelScope.launch { downloads.download(episodeId) }
     }
