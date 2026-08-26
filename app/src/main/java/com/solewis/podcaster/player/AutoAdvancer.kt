@@ -15,11 +15,19 @@ import kotlinx.coroutines.launch
 class AutoAdvancer(
     private val player: ExoPlayer,
     private val queueRepository: QueueRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    /**
+     * Consulted per ended episode, not captured, so a decision made while this one was playing -
+     * arming the sleep timer, say - still applies.
+     */
+    private val shouldAdvance: () -> Boolean = { true }
 ) : Player.Listener {
 
     override fun onPlaybackStateChanged(playbackState: Int) {
         if (playbackState != Player.STATE_ENDED) return
+        // An episode ending already leaves the player stopped, so declining here *is* stopping -
+        // there is nothing further to pause.
+        if (!shouldAdvance()) return
         val endedEpisodeId = player.currentMediaItem?.mediaId ?: return
 
         scope.launch {

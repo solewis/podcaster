@@ -29,6 +29,12 @@ object TestTags {
     const val MINI_PLAYER = "miniPlayer"
     const val RESUME_PILL = "resumePill"
     const val DOWNLOADS_LIST = "downloadsList"
+    const val SLEEP_TIMER = "sleepTimer"
+    const val SLEEP_TIMER_EXTEND = "sleepTimerExtend"
+    const val SLEEP_TIMER_OFF = "sleepTimerOff"
+    const val SLEEP_TIMER_END_OF_EPISODE = "sleepTimerEndOfEpisode"
+
+    fun sleepPreset(minutes: Int) = "sleepPreset:$minutes"
 
     /**
      * Carries the state, not just the identity: the whole risk with a one-control-many-states

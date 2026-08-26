@@ -187,6 +187,12 @@ class PlayerConnection(
         if (mediaController.isPlaying) mediaController.pause() else mediaController.play()
     }
 
+    override suspend fun pause() {
+        // Not loadedController(): pausing something that was never loaded has nothing to pause, and
+        // loading it just to stop it would start a service and a buffer for no reason.
+        controller?.pause()
+    }
+
     override suspend fun seekTo(positionMillis: Long) {
         loadedController().seekTo(positionMillis)
     }

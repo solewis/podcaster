@@ -64,7 +64,13 @@ class PlaybackService : MediaLibraryService() {
 
         progressWriter = ProgressWriter(player, container.episodeRepository, lifecycleScope)
         player.addListener(progressWriter)
-        player.addListener(AutoAdvancer(player, container.queueRepository, lifecycleScope))
+        player.addListener(
+            AutoAdvancer(player, container.queueRepository, lifecycleScope) {
+                // Consumed unconditionally, before any other reason not to advance, so an armed
+                // timer is always disarmed by the episode it was set for.
+                !container.sleepTimer.consumeEndOfEpisode()
+            }
+        )
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = mediaSession

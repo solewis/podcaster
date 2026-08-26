@@ -44,10 +44,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material3.HorizontalDivider
+import com.solewis.podcaster.player.SleepTimerState
+import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.common.SkipIcon
 import com.solewis.podcaster.ui.common.SkipIconSize
 import com.solewis.podcaster.ui.common.formatTimer
@@ -63,11 +68,16 @@ private val TRANSPORT_BUTTON_SPACING = 36.dp
 
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f)
 
+/** The usual set. Nothing below 5 - a timer you have to renew constantly is worse than none. */
+private val SLEEP_MINUTES = listOf(5, 15, 30, 45, 60)
+private const val EXTEND_MINUTES = 5
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
     val playback by viewModel.playbackState.collectAsState()
     val progress by viewModel.progress.collectAsState()
+    val sleepTimer by viewModel.sleepTimerState.collectAsState()
 
     var isDragging by remember { mutableStateOf(false) }
     var dragPositionMillis by remember { mutableFloatStateOf(0f) }
@@ -204,9 +214,88 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            SpeedControl(currentSpeed = playback.speed, onSpeedChange = viewModel::setSpeed)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SpeedControl(currentSpeed = playback.speed, onSpeedChange = viewModel::setSpeed)
+                SleepTimerControl(
+                    state = sleepTimer,
+                    onStart = viewModel::startSleepTimer,
+                    onStartEndOfEpisode = viewModel::startSleepTimerAtEndOfEpisode,
+                    onExtend = { viewModel.extendSleepTimer(EXTEND_MINUTES) },
+                    onCancel = viewModel::cancelSleepTimer
+                )
+            }
         }
     }
+}
+
+/**
+ * Off, this is a plain "Sleep timer". Running, the button itself *is* the countdown - the number has
+ * to be readable without opening anything, since the reason you set a sleep timer is that you are
+ * about to stop looking at the screen.
+ */
+@Composable
+private fun SleepTimerControl(
+    state: SleepTimerState,
+    onStart: (Int) -> Unit,
+    onStartEndOfEpisode: () -> Unit,
+    onExtend: () -> Unit,
+    onCancel: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            modifier = Modifier.testTag(TestTags.SLEEP_TIMER)
+        ) {
+            Icon(
+                Icons.Default.Bedtime,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp).padding(end = 2.dp)
+            )
+            Text(sleepTimerLabel(state))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (state != SleepTimerState.Off) {
+                DropdownMenuItem(
+                    text = { Text("+$EXTEND_MINUTES minutes") },
+                    onClick = { onExtend(); expanded = false },
+                    modifier = Modifier.testTag(TestTags.SLEEP_TIMER_EXTEND)
+                )
+                DropdownMenuItem(
+                    text = { Text("Turn off") },
+                    onClick = { onCancel(); expanded = false },
+                    modifier = Modifier.testTag(TestTags.SLEEP_TIMER_OFF)
+                )
+                HorizontalDivider()
+            }
+            SLEEP_MINUTES.forEach { minutes ->
+                DropdownMenuItem(
+                    text = { Text("$minutes minutes") },
+                    onClick = { onStart(minutes); expanded = false },
+                    modifier = Modifier.testTag(TestTags.sleepPreset(minutes))
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("End of episode") },
+                leadingIcon = if (state == SleepTimerState.EndOfEpisode) {
+                    { Icon(Icons.Default.Check, contentDescription = null) }
+                } else {
+                    null
+                },
+                onClick = { onStartEndOfEpisode(); expanded = false },
+                modifier = Modifier.testTag(TestTags.SLEEP_TIMER_END_OF_EPISODE)
+            )
+        }
+    }
+}
+
+private fun sleepTimerLabel(state: SleepTimerState): String = when (state) {
+    SleepTimerState.Off -> "Sleep timer"
+    SleepTimerState.EndOfEpisode -> "End of episode"
+    // Rounded up, so a timer with 200ms left still reads 0:01 rather than 0:00 - counting to zero
+    // and *then* stopping is what someone watching it expects.
+    is SleepTimerState.Running -> formatTimer((state.remainingMillis + 999) / 1000 * 1000) ?: ""
 }
 
 @Composable
