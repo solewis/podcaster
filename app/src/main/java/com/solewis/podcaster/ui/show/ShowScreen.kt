@@ -70,8 +70,9 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import com.solewis.podcaster.ui.common.DownloadButton
+import com.solewis.podcaster.ui.common.EpisodeActionsMenu
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
+import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.SubscribeButton
@@ -248,7 +249,8 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                         onEnqueue = { viewModel.enqueue(episode.id) },
                                         download = downloadStates[episode.id],
                                         onDownload = { viewModel.download(episode.id) },
-                                        onRemoveDownload = { viewModel.removeDownload(episode.id) }
+                                        onRemoveDownload = { viewModel.removeDownload(episode.id) },
+                                        onTogglePlayed = { viewModel.togglePlayed(episode.id) }
                                     )
                                     HorizontalDivider()
                                 }
@@ -340,7 +342,8 @@ private fun EpisodeRow(
     onEnqueue: () -> Unit,
     download: EpisodeDownload?,
     onDownload: () -> Unit,
-    onRemoveDownload: () -> Unit
+    onRemoveDownload: () -> Unit,
+    onTogglePlayed: () -> Unit
 ) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isHighlighted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
@@ -407,8 +410,12 @@ private fun EpisodeRow(
                 positionMillis = episode.positionMillis,
                 isPlayed = episode.isPlayed
             )
-            if (progress.label.isNotEmpty()) {
-                Text(progress.label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+            val label = listOfNotNull(
+                progress.label.takeIf { it.isNotEmpty() },
+                downloadStatusLabel(download)
+            ).joinToString(" · ")
+            if (label.isNotEmpty()) {
+                Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
             }
             if (progress.showBar) {
                 EpisodeProgressBar(
@@ -424,13 +431,14 @@ private fun EpisodeRow(
                 IconButton(onClick = onPlay) {
                     Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
                 }
-                IconButton(onClick = onEnqueue) {
-                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add ${episode.title} to queue")
-                }
-                DownloadButton(
+                EpisodeActionsMenu(
+                    episodeTitle = episode.title,
+                    isPlayed = episode.isPlayed,
                     download = download,
+                    onEnqueue = onEnqueue,
                     onDownload = onDownload,
-                    onRemove = onRemoveDownload
+                    onRemoveDownload = onRemoveDownload,
+                    onTogglePlayed = onTogglePlayed
                 )
             }
             if (episode.isPlayed) {

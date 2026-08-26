@@ -45,7 +45,8 @@ class HomeViewModelTest {
             graph.podcastRepository,
             graph.episodeRepository,
             graph.queueRepository,
-            graph.playback
+            graph.playback,
+            graph.downloads
         )
     )
 
@@ -229,5 +230,31 @@ class HomeViewModelTest {
         vm.togglePlayPause()
 
         awaitTrue("toggle reached playback") { graph.playback.togglePlayPauseCount == 1 }
+    }
+
+    @Test
+    fun an_episode_can_be_downloaded_from_the_home_feed() = runTest(mainDispatcher.dispatcher) {
+        seedShowWithEpisodes()
+        val vm = loadedViewModel()
+
+        vm.download("$podcastId:1")
+
+        // Downloading from Home was blocked until the row's trailing actions moved into a menu -
+        // there was no room for a fourth 48dp button.
+        awaitTrue("download requested") { graph.downloads.requested == listOf("$podcastId:1") }
+    }
+
+    @Test
+    fun an_episode_can_be_marked_played_from_the_home_feed() = runTest(mainDispatcher.dispatcher) {
+        seedShowWithEpisodes()
+        val vm = loadedViewModel()
+        val episode = vm.state.awaitValue { it.episodes.isNotEmpty() }
+            .episodes.first { it.id == "$podcastId:1" }
+
+        vm.togglePlayed(episode)
+
+        awaitTrue("marked played") {
+            graph.db.episodeDao().getById("$podcastId:1")?.isPlayed == true
+        }
     }
 }

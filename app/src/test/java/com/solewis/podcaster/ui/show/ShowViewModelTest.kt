@@ -322,6 +322,28 @@ class ShowViewModelTest {
     }
 
     @Test
+    fun an_episode_can_be_marked_played_from_a_row() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+
+        vm.togglePlayed("$podcastId:2")
+
+        val marked = vm.state.awaitValue { s -> s.episodes.any { it.id == "$podcastId:2" && it.isPlayed } }
+        // Only that one - a row action that marked its neighbours would be a quiet disaster.
+        assertThat(marked.episodes.filter { it.isPlayed }.map { it.id }).containsExactly("$podcastId:2")
+    }
+
+    @Test
+    fun marking_a_played_row_again_returns_it_to_unplayed() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+        vm.togglePlayed("$podcastId:2")
+        vm.state.awaitValue { s -> s.episodes.any { it.id == "$podcastId:2" && it.isPlayed } }
+
+        vm.togglePlayed("$podcastId:2")
+
+        assertThat(vm.state.awaitValue { s -> s.episodes.none { it.isPlayed } }.episodes).hasSize(3)
+    }
+
+    @Test
     fun marking_the_show_played_clears_the_backlog_and_says_how_many() =
         runTest(mainDispatcher.dispatcher) {
             val vm = loadedViewModel()
