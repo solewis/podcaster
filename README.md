@@ -24,6 +24,12 @@ ANDROID_SERIAL=emulator-5554 \
 
 CI runs both tiers in parallel on every PR (`.github/workflows/ci.yml`).
 
+The on-device tier is for what genuinely cannot run on the JVM: real ExoPlayer with real decoders,
+a real `MediaSession`, Room against real SQLite, and Android's own XML parser. When a feature's
+correctness depends on any of those, its test belongs there rather than behind a fake — the sleep
+timer's "end of episode" mode is the example, since it is implemented entirely as `AutoAdvancer`
+declining one real `STATE_ENDED`.
+
 ## Road to the Play Store
 
 The plan is a real release, so people other than the author can use it and send feedback. Android
