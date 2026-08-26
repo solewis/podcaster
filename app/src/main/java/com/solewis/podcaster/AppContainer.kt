@@ -25,7 +25,7 @@ import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.data.repo.SearchRepository
 import com.solewis.podcaster.data.repo.ShowPreviewRepository
 import com.solewis.podcaster.data.repo.SubscriptionRepository
-import com.solewis.podcaster.data.settings.PlaybackSettings
+import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayerConnection
 import okhttp3.OkHttpClient
@@ -67,8 +67,8 @@ class AppContainer(
     val showPreviewRepository = ShowPreviewRepository(feedFetcher)
     val queueRepository = QueueRepository(database.queueDao(), episodeRepository)
 
-    /** Not per-show state, so it has nowhere to live in [database] - see [PlaybackSettings]. */
-    val playbackSettings = PlaybackSettings(appContext)
+    /** Not per-show state, so it has nowhere to live in [database] - see [SettingsStore]. */
+    val settings = SettingsStore(appContext)
 
     /** Shared by both caches and by [downloadManager] - Media3 keeps its own index in here. */
     private val databaseProvider by lazy { StandaloneDatabaseProvider(appContext) }

@@ -1,6 +1,8 @@
 package com.solewis.podcaster.ui.common
 
 import com.solewis.podcaster.data.repo.DownloadStatus
+import com.solewis.podcaster.data.settings.SkipAmount
+import com.solewis.podcaster.data.settings.ThemeMode
 
 /**
  * Stable handles for UI tests.
@@ -29,6 +31,15 @@ object TestTags {
     const val MINI_PLAYER = "miniPlayer"
     const val RESUME_PILL = "resumePill"
     const val DOWNLOADS_LIST = "downloadsList"
+    const val SETTINGS_SCREEN = "settingsScreen"
+    const val SETTINGS_BUTTON = "settingsButton"
+    const val AUTO_ADVANCE_SWITCH = "autoAdvanceSwitch"
+
+    /** Direction included: the two rows are identical apart from it, which is the bug worth catching. */
+    fun skipChoice(forward: Boolean, amount: SkipAmount) =
+        "skipChoice:${if (forward) "forward" else "back"}:${amount.seconds}"
+
+    fun themeChoice(mode: ThemeMode) = "themeChoice:${mode.name}"
 
     /**
      * Carries the state, not just the identity: the whole risk with a one-control-many-states

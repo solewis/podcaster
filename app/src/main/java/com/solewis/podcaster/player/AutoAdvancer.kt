@@ -15,11 +15,16 @@ import kotlinx.coroutines.launch
 class AutoAdvancer(
     private val player: ExoPlayer,
     private val queueRepository: QueueRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    /** Read per event, not captured, so turning it off takes effect on the episode ending now. */
+    private val enabled: () -> Boolean = { true }
 ) : Player.Listener {
 
     override fun onPlaybackStateChanged(playbackState: Int) {
         if (playbackState != Player.STATE_ENDED) return
+        // Checked here rather than at construction: with this off, an episode ending is simply the
+        // end - the queue is left intact for whenever it is asked for.
+        if (!enabled()) return
         val endedEpisodeId = player.currentMediaItem?.mediaId ?: return
 
         scope.launch {

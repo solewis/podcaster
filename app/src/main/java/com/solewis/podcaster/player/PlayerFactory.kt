@@ -22,8 +22,6 @@ object PlayerFactory {
     /** Also used for downloads, so both halves of the app identify themselves the same way. */
     const val USER_AGENT = "Podcaster/1.0 (Android; personal use, not for distribution)"
 
-    private const val SEEK_BACK_MS = 15_000L
-    private const val SEEK_FORWARD_MS = 15_000L
 
     /**
      * [downloadCache] is read first and never written, [streamCache] beneath it absorbs everything
@@ -36,6 +34,9 @@ object PlayerFactory {
      * measuring how much space downloads occupy, and never evicted, since that cache has no
      * evictor by design.
      */
+    // No seek increments set here on purpose: they are fixed at build time and so cannot carry a
+    // user setting. TimedSkipPlayer, which wraps this player for the session, owns them instead -
+    // setting them in both places would just be a second source of truth for the same number.
     fun create(context: Context, downloadCache: SimpleCache, streamCache: SimpleCache): ExoPlayer {
         val httpDataSourceFactory = DefaultHttpDataSource.Factory().setUserAgent(USER_AGENT)
         val streamCacheFactory = CacheDataSource.Factory()
@@ -58,8 +59,6 @@ object PlayerFactory {
             .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
-            .setSeekBackIncrementMs(SEEK_BACK_MS)
-            .setSeekForwardIncrementMs(SEEK_FORWARD_MS)
             .build()
     }
 }

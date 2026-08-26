@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Pause
@@ -32,6 +34,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
@@ -41,14 +44,31 @@ import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.ScreenTitle
+import com.solewis.podcaster.ui.common.TestTags
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel, onOpenShow: (Long) -> Unit, onOpenEpisode: (String) -> Unit) {
+fun HomeScreen(
+    viewModel: HomeViewModel,
+    onOpenShow: (Long) -> Unit,
+    onOpenEpisode: (String) -> Unit,
+    onOpenSettings: () -> Unit
+) {
     val state by viewModel.state.collectAsState()
 
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).statusBarsPadding()) {
-            ScreenTitle("Library")
+            // Settings hangs off the first screen you land on rather than taking a fourth tab: it
+            // is somewhere you go once and then forget about, which is the opposite of a tab.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ScreenTitle("Library")
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.padding(end = 12.dp).testTag(TestTags.SETTINGS_BUTTON)
+                ) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings")
+                }
+            }
             if (state.isLoading) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()

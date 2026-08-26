@@ -1,10 +1,15 @@
 package com.solewis.podcaster.ui.nowplaying
 
 import com.google.common.truth.Truth.assertThat
+import com.solewis.podcaster.data.settings.AppSettings
+import com.solewis.podcaster.data.settings.SkipAmount
 import com.solewis.podcaster.testing.FakePlayback
 import com.solewis.podcaster.testing.MainDispatcherRule
 import com.solewis.podcaster.testing.ViewModelHost
 import com.solewis.podcaster.testing.awaitTrue
+import com.solewis.podcaster.testing.awaitValue
+import com.solewis.podcaster.testing.keepHot
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Rule
@@ -22,7 +27,8 @@ class NowPlayingViewModelTest {
 
     private val playback = FakePlayback()
     private val host = ViewModelHost()
-    private val viewModel = host.hosting(NowPlayingViewModel(playback))
+    private val settings = MutableStateFlow(AppSettings())
+    private val viewModel = host.hosting(NowPlayingViewModel(playback, settings))
 
     @After
     fun tearDown() = host.close()
@@ -53,5 +59,16 @@ class NowPlayingViewModelTest {
                 playback.seekedTo == listOf(90_000L) &&
                 playback.speedsSet == listOf(1.5f)
         }
+    }
+
+    @Test
+    fun the_skip_buttons_read_the_configured_amounts() = runTest(mainDispatcher.dispatcher) {
+        keepHot(viewModel.settings)
+        settings.value = AppSettings(skipBack = SkipAmount.THIRTY, skipForward = SkipAmount.FIVE)
+
+        // Back and forward are set independently, and the buttons print the number they will seek -
+        // so surfacing one for both would put a visibly wrong figure on screen.
+        val shown = viewModel.settings.awaitValue { it.skipBack == SkipAmount.THIRTY }
+        assertThat(shown.skipForward).isEqualTo(SkipAmount.FIVE)
     }
 }

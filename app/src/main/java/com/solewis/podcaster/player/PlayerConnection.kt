@@ -9,7 +9,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.solewis.podcaster.data.repo.PlayableEpisode
-import com.solewis.podcaster.data.settings.PlaybackSettings
+import com.solewis.podcaster.data.settings.SettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
  */
 class PlayerConnection(
     private val context: Context,
-    private val settings: PlaybackSettings = PlaybackSettings(context)
+    private val settings: SettingsStore = SettingsStore(context)
 ) : Playback {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)

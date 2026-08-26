@@ -54,6 +54,8 @@ import com.solewis.podcaster.ui.nowplaying.NowPlayingViewModel
 import com.solewis.podcaster.ui.queue.QueueViewModel
 import com.solewis.podcaster.ui.search.SearchScreen
 import com.solewis.podcaster.ui.search.SearchViewModel
+import com.solewis.podcaster.ui.settings.SettingsScreen
+import com.solewis.podcaster.ui.settings.SettingsViewModel
 import com.solewis.podcaster.ui.show.ShowScreen
 import com.solewis.podcaster.ui.show.ShowViewModel
 import com.solewis.podcaster.ui.showpreview.ShowPreviewScreen
@@ -98,8 +100,10 @@ fun PodcasterRoot(container: AppContainer) {
     }
 
     // Hidden on Now Playing itself - showing a mini player and tab bar over the full player
-    // screen is redundant chrome covering the very thing you navigated there to see.
-    val isNowPlaying = currentDestination?.hasRoute(Route.NowPlaying::class) == true
+    // screen is redundant chrome covering the very thing you navigated there to see. Settings is
+    // hidden for the same reason: it is a place you go and come back from, not a tab.
+    val isNowPlaying = currentDestination?.hasRoute(Route.NowPlaying::class) == true ||
+        currentDestination?.hasRoute(Route.Settings::class) == true
 
     Scaffold(
         // Leaves the status bar inset for each screen to handle itself (most via ScreenTitle/
@@ -177,7 +181,8 @@ fun PodcasterRoot(container: AppContainer) {
                 HomeScreen(
                     viewModel = viewModel,
                     onOpenShow = { podcastId -> navController.navigate(Route.Show(podcastId)) },
-                    onOpenEpisode = { episodeId -> navController.navigate(Route.EpisodeDetail(episodeId)) }
+                    onOpenEpisode = { episodeId -> navController.navigate(Route.EpisodeDetail(episodeId)) },
+                    onOpenSettings = { navController.navigate(Route.Settings) }
                 )
             }
             composable<Route.Activity> {
@@ -209,6 +214,14 @@ fun PodcasterRoot(container: AppContainer) {
                     onOpenShow = { podcastId -> navController.navigate(Route.Show(podcastId)) },
                     onOpenEpisode = { episodeId -> navController.navigate(Route.EpisodeDetail(episodeId)) }
                 )
+            }
+            composable<Route.Settings> {
+                val viewModel: SettingsViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { SettingsViewModel(container.settings) }
+                    }
+                )
+                SettingsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
             }
             composable<Route.Search> {
                 val viewModel: SearchViewModel = viewModel(
@@ -308,7 +321,7 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.NowPlaying> {
                 val viewModel: NowPlayingViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { NowPlayingViewModel(container.playback) }
+                        initializer { NowPlayingViewModel(container.playback, container.settings.observe()) }
                     }
                 )
                 NowPlayingScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
