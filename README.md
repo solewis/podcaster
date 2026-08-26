@@ -49,6 +49,13 @@ Sharing one would mean an episode you downloaded for a flight getting evicted to
 something streamed. `PlayerFactory` nests them so the download cache is read first and never
 written — see its doc for why read-only matters.
 
+Both caches and the download manager live in `MediaStorage` at **process** scope, not in
+`AppContainer`. Media3 allows one `SimpleCache` per directory per process, while `AppContainer` is
+deliberately built more than once (an instrumentation test installs its own). That was harmless
+until a list row started observing downloads, at which point both containers opened the download
+cache and the second threw. Only the on-device smoke tests catch this, since they are the one place
+two containers coexist.
+
 - [x] Download an episode, and delete or cancel one
 - [x] Per-episode state: queued, downloading, downloaded, failed, removing
 - [x] Downloads screen (Activity → Downloads) with a running total
@@ -58,10 +65,7 @@ written — see its doc for why read-only matters.
 - [ ] Wifi-only. Manual downloads deliberately use `Requirements.NETWORK`: tapping download is a
       request for the episode *now*, and silently waiting for wifi looks identical to being broken.
       `NETWORK_UNMETERED` belongs to auto-download, which nobody asked for episode-by-episode.
-- [ ] A download control on the **Home feed** rows. Tried and reverted: Home rows already carry
-      play and enqueue, and a third 48dp target leaves roughly 80px for the title on a 320dp-wide
-      screen. Needs the trailing actions collapsed into an overflow menu first, which is a UI
-      decision of its own. Downloading works from a show, an episode, and the Downloads screen.
+- [x] A download control on the **Home feed** rows — unblocked by the row overflow menu below.
 - [ ] Delete orphaned downloads. Unsubscribing leaves rows in Media3's index with no episode to
       label them; `DownloadsViewModel` hides them, but the files stay until deleted by hand.
 - [ ] `POST_NOTIFICATIONS`. The download progress notification is *not* exempt the way the media
@@ -97,11 +101,14 @@ There is no Settings screen at all today.
       order. And when the episode is the one loaded in the player, the mark alone is not enough:
       `ProgressWriter` re-derives `isPlayed` from the live player position every five seconds and
       nothing stored can stop it, so marking it also seeks to the end.
-- [ ] **Collapse row trailing actions into an overflow menu.** Now blocking two things: a download
-      control on Home rows, and marking played from a row instead of only from the episode screen.
-      Show rows already carry three 48dp targets (play, queue, download), which leaves about 80px
-      for the title on a 320dp-wide screen — a fourth is not available. Worth doing as its own
-      change rather than worked around a third time.
+- [x] **Row trailing actions collapsed into an overflow menu** (`EpisodeActionsMenu`), shared by
+      the Home feed and a show's episode list. Play stays a direct button; queue, download and
+      mark-played moved into `⋮`. Two 48dp targets instead of three or four, and the title got most
+      of that width back.
+
+      Download *progress* moved to the row's metadata line ("25m · Downloading 42%") rather than
+      into the menu — a menu you have to open is no place for a progress indicator. The trade is
+      that downloading is two taps instead of one, which is what Pocket Casts and Overcast do too.
 - [ ] Search and filter within a show, including filter-to-unplayed. A single show has been tested
       at 2952 episodes; scrolling that to find one is rough.
 - [ ] Share an episode

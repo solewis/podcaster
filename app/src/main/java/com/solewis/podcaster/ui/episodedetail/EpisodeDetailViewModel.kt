@@ -8,6 +8,7 @@ import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.player.Playback
+import com.solewis.podcaster.player.PlayedMarker
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -21,6 +22,8 @@ class EpisodeDetailViewModel(
     private val playback: Playback,
     private val downloads: Downloads
 ) : ViewModel() {
+
+    private val playedMarker = PlayedMarker(episodeRepository, playback)
 
     data class UiState(
         val episode: EpisodeDetailItem? = null,
@@ -85,20 +88,15 @@ class EpisodeDetailViewModel(
         val current = state.value
         val episode = current.episode ?: return
         viewModelScope.launch {
-            if (episode.isPlayed) {
-                episodeRepository.markUnplayed(episodeId)
-                return@launch
-            }
-            episodeRepository.markPlayed(episodeId)
-            val duration = current.liveDurationMillis ?: episode.durationMillis
-            if (isLoadedInPlayer() && duration != null) {
-                playback.seekTo(duration)
-            }
+            playedMarker.setPlayed(
+                episodeId,
+                played = !episode.isPlayed,
+                // The player's own duration when it has one: the feed's value is often wrong, and
+                // seeking to a wrong duration would land somewhere other than the end.
+                durationMillis = current.liveDurationMillis ?: episode.durationMillis
+            )
         }
     }
-
-    /** Not the same as playing: a paused episode is still the one the writer will report on. */
-    private fun isLoadedInPlayer() = playback.state.value.episodeId == episodeId
 
     fun download() {
         viewModelScope.launch { downloads.download(episodeId) }

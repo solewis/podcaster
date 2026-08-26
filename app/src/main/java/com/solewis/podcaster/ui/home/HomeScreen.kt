@@ -35,9 +35,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
+import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.db.model.HomeShowSummary
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
+import com.solewis.podcaster.ui.common.EpisodeActionsMenu
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
+import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.ScreenTitle
@@ -45,6 +48,7 @@ import com.solewis.podcaster.ui.common.ScreenTitle
 @Composable
 fun HomeScreen(viewModel: HomeViewModel, onOpenShow: (Long) -> Unit, onOpenEpisode: (String) -> Unit) {
     val state by viewModel.state.collectAsState()
+    val downloadStates by viewModel.downloadStates.collectAsState()
 
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).statusBarsPadding()) {
@@ -73,7 +77,11 @@ fun HomeScreen(viewModel: HomeViewModel, onOpenShow: (Long) -> Unit, onOpenEpiso
                             nowPlayingDurationMillis = state.nowPlayingDurationMillis,
                             onClick = { onOpenEpisode(episode.id) },
                             onPlayOrToggle = { if (isNowPlaying) viewModel.togglePlayPause() else viewModel.play(episode) },
-                            onEnqueue = { viewModel.enqueue(episode) }
+                            onEnqueue = { viewModel.enqueue(episode) },
+                            download = downloadStates[episode.id],
+                            onDownload = { viewModel.download(episode.id) },
+                            onRemoveDownload = { viewModel.removeDownload(episode.id) },
+                            onTogglePlayed = { viewModel.togglePlayed(episode) }
                         )
                         HorizontalDivider()
                     }
@@ -109,7 +117,11 @@ private fun FeedEpisodeRow(
     nowPlayingDurationMillis: Long?,
     onClick: () -> Unit,
     onPlayOrToggle: () -> Unit,
-    onEnqueue: () -> Unit
+    onEnqueue: () -> Unit,
+    download: EpisodeDownload?,
+    onDownload: () -> Unit,
+    onRemoveDownload: () -> Unit,
+    onTogglePlayed: () -> Unit
 ) {
     Row(
         // Tappable to open episode details; the play/enqueue icons keep their own click targets,
@@ -145,9 +157,13 @@ private fun FeedEpisodeRow(
                 livePositionMillis = nowPlayingPositionMillis.takeIf { isNowPlaying },
                 liveDurationMillis = nowPlayingDurationMillis.takeIf { isNowPlaying }
             )
-            if (progress.label.isNotEmpty()) {
+            val label = listOfNotNull(
+                progress.label.takeIf { it.isNotEmpty() },
+                downloadStatusLabel(download)
+            ).joinToString(" · ")
+            if (label.isNotEmpty()) {
                 Text(
-                    progress.label,
+                    label,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp)
@@ -171,9 +187,15 @@ private fun FeedEpisodeRow(
                         else -> Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
                     }
                 }
-                IconButton(onClick = onEnqueue) {
-                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add ${episode.title} to queue")
-                }
+                EpisodeActionsMenu(
+                    episodeTitle = episode.title,
+                    isPlayed = episode.isPlayed,
+                    download = download,
+                    onEnqueue = onEnqueue,
+                    onDownload = onDownload,
+                    onRemoveDownload = onRemoveDownload,
+                    onTogglePlayed = onTogglePlayed
+                )
             }
             if (episode.isPlayed) {
                 Icon(

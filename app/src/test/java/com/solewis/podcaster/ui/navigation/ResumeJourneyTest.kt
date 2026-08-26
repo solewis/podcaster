@@ -12,6 +12,7 @@ import com.solewis.podcaster.testing.TestGraph
 import com.solewis.podcaster.testing.awaitTag
 import com.solewis.podcaster.testing.awaitText
 import com.solewis.podcaster.testing.episodeRow
+import com.solewis.podcaster.testing.clickEpisodeRow
 import com.solewis.podcaster.ui.PodcasterRoot
 import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.theme.PodcasterTheme
@@ -110,7 +111,7 @@ class ResumeJourneyTest {
         compose.onNodeWithTag(TestTags.RESUME_PILL).performClick()
         compose.waitForIdle()
 
-        compose.onNodeWithText("Episode 2").performClick()
+        compose.clickEpisodeRow("Episode 2")
         compose.waitForIdle()
 
         compose.onNodeWithTag(TestTags.EPISODE_DETAIL_SCREEN).assertIsDisplayed()

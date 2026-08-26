@@ -30,6 +30,12 @@ object TestTags {
     const val RESUME_PILL = "resumePill"
     const val DOWNLOADS_LIST = "downloadsList"
     const val TOGGLE_PLAYED = "togglePlayed"
+    const val MENU_ENQUEUE = "menuEnqueue"
+    const val MENU_TOGGLE_PLAYED = "menuTogglePlayed"
+    const val MENU_DOWNLOAD = "menuDownload"
+
+    /** Per-episode, since a list has one of these per row and a test has to open a specific one. */
+    fun episodeMenu(episodeTitle: String) = "episodeMenu:$episodeTitle"
     const val SHOW_MENU = "showMenu"
     const val MARK_ALL_PLAYED = "markAllPlayed"
 

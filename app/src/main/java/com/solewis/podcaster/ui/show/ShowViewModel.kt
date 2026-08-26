@@ -14,6 +14,7 @@ import com.solewis.podcaster.data.repo.RefreshResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.domain.JumpTargetResolver
 import com.solewis.podcaster.player.Playback
+import com.solewis.podcaster.player.PlayedMarker
 import com.solewis.podcaster.ui.common.formatDuration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,8 @@ class ShowViewModel(
     private val playback: Playback,
     private val downloads: Downloads
 ) : ViewModel() {
+
+    private val playedMarker = PlayedMarker(episodeRepository, playback)
 
     data class UiState(
         val podcast: PodcastEntity? = null,
@@ -113,6 +116,17 @@ class ShowViewModel(
     /** Cleared once shown, so the message does not reappear on every recomposition. */
     fun clearMarkedAllPlayed() {
         _markedAllPlayed.value = null
+    }
+
+    /**
+     * Duration comes from the row rather than a fresh lookup - the list already has it, and
+     * [PlayedMarker] needs it only to seek an episode that is loaded in the player.
+     */
+    fun togglePlayed(episodeId: String) {
+        val episode = state.value.episodes.firstOrNull { it.id == episodeId } ?: return
+        viewModelScope.launch {
+            playedMarker.setPlayed(episodeId, played = !episode.isPlayed, durationMillis = episode.durationMillis)
+        }
     }
 
     fun download(episodeId: String) {

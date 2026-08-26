@@ -13,6 +13,7 @@ import com.solewis.podcaster.testing.TestGraph
 import com.solewis.podcaster.testing.awaitTag
 import com.solewis.podcaster.testing.awaitText
 import com.solewis.podcaster.testing.episodeRow
+import com.solewis.podcaster.testing.clickEpisodeRow
 import com.solewis.podcaster.ui.PodcasterRoot
 import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.theme.PodcasterTheme
@@ -107,7 +108,7 @@ class TabNavigationTest {
     fun tapping_home_from_an_episode_detail_goes_home() {
         launchApp()
         compose.awaitText("Episode 2")
-        compose.onNodeWithText("Episode 2").performClick()
+        compose.clickEpisodeRow("Episode 2")
         compose.waitForIdle()
         compose.onNodeWithTag(TestTags.EPISODE_DETAIL_SCREEN).assertIsDisplayed()
 
