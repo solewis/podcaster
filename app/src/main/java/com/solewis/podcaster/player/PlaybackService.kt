@@ -40,7 +40,12 @@ class PlaybackService : MediaLibraryService() {
     override fun onCreate() {
         super.onCreate()
         val container = (application as PodcasterApp).container
-        player = PlayerFactory.create(this, container.mediaCache)
+        player = PlayerFactory.create(this, container.downloadCache, container.streamCache)
+        // Before the persister is attached, so reading the saved speed back doesn't immediately
+        // rewrite it. This is the only place speed is applied, which is what makes it hold for
+        // playback started from Android Auto or a media button as well as from the app's own UI.
+        player.setPlaybackSpeed(container.playbackSettings.speed)
+        player.addListener(SpeedPersister(container.playbackSettings))
         // Only the session sees the wrapper - it exists purely to expose the 15s seeks as
         // next/previous for external controllers. ProgressWriter and AutoAdvancer below stay on
         // the real ExoPlayer, since they care about actual playlist and position semantics.

@@ -63,8 +63,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.db.model.EpisodeListItem
+import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.ui.common.BackButtonRow
+import com.solewis.podcaster.ui.common.DownloadButton
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
@@ -84,6 +86,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     val state by viewModel.state.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val refreshError by viewModel.refreshError.collectAsState()
+    val downloadStates by viewModel.downloadStates.collectAsState()
     val didUnsubscribe by viewModel.didUnsubscribe.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -196,7 +199,10 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                         isHighlighted = episode.id == highlightedEpisodeId,
                                         onClick = { onOpenEpisode(episode.id) },
                                         onPlay = { viewModel.play(episode.id) },
-                                        onEnqueue = { viewModel.enqueue(episode.id) }
+                                        onEnqueue = { viewModel.enqueue(episode.id) },
+                                        download = downloadStates[episode.id],
+                                        onDownload = { viewModel.download(episode.id) },
+                                        onRemoveDownload = { viewModel.removeDownload(episode.id) }
                                     )
                                     HorizontalDivider()
                                 }
@@ -285,7 +291,10 @@ private fun EpisodeRow(
     isHighlighted: Boolean,
     onClick: () -> Unit,
     onPlay: () -> Unit,
-    onEnqueue: () -> Unit
+    onEnqueue: () -> Unit,
+    download: EpisodeDownload?,
+    onDownload: () -> Unit,
+    onRemoveDownload: () -> Unit
 ) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isHighlighted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
@@ -372,6 +381,11 @@ private fun EpisodeRow(
                 IconButton(onClick = onEnqueue) {
                     Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add ${episode.title} to queue")
                 }
+                DownloadButton(
+                    download = download,
+                    onDownload = onDownload,
+                    onRemove = onRemoveDownload
+                )
             }
             if (episode.isPlayed) {
                 Icon(

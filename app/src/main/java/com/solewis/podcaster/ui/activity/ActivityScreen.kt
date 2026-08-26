@@ -18,6 +18,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.solewis.podcaster.ui.common.ScreenTitle
+import com.solewis.podcaster.ui.downloads.DownloadsList
+import com.solewis.podcaster.ui.downloads.DownloadsViewModel
 import com.solewis.podcaster.ui.queue.QueueList
 import com.solewis.podcaster.ui.queue.QueueViewModel
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsList
@@ -25,7 +27,7 @@ import com.solewis.podcaster.ui.subscriptions.SubscriptionsViewModel
 import androidx.compose.ui.platform.testTag
 import com.solewis.podcaster.ui.common.TestTags
 
-private val SEGMENTS = listOf("Queue", "Subscriptions")
+private val SEGMENTS = listOf("Queue", "Downloads", "Subscriptions")
 
 /**
  * Queue and Subscriptions share a tab because both are "what's going on with your listening
@@ -37,8 +39,10 @@ private val SEGMENTS = listOf("Queue", "Subscriptions")
 @Composable
 fun ActivityScreen(
     queueViewModel: QueueViewModel,
+    downloadsViewModel: DownloadsViewModel,
     subscriptionsViewModel: SubscriptionsViewModel,
-    onOpenShow: (Long) -> Unit
+    onOpenShow: (Long) -> Unit,
+    onOpenEpisode: (String) -> Unit
 ) {
     // Saveable, not plain remember: navigating into a show and back recreates this
     // composable, and a plain remember would silently drop you back on Queue even though
@@ -60,6 +64,11 @@ fun ActivityScreen(
             }
             when (selectedSegment) {
                 0 -> QueueList(viewModel = queueViewModel, modifier = Modifier.fillMaxSize())
+                1 -> DownloadsList(
+                    viewModel = downloadsViewModel,
+                    onOpenEpisode = onOpenEpisode,
+                    modifier = Modifier.fillMaxSize()
+                )
                 else -> SubscriptionsList(
                     viewModel = subscriptionsViewModel,
                     onOpenShow = onOpenShow,

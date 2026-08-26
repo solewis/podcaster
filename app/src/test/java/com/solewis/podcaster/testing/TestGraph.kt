@@ -23,6 +23,7 @@ class TestGraph : Closeable {
 
     val db: PodcasterDatabase = inMemoryDatabase()
     val playback = FakePlayback()
+    val downloads = FakeDownloads()
 
     /** Advance to make a later write observably later - `now` is read at each call, not captured. */
     var clock: Long = 1_000L
@@ -42,13 +43,15 @@ class TestGraph : Closeable {
 
     /**
      * The whole app graph over this test's database, for tests that drive real screens through
-     * `PodcasterRoot`. Playback is the fake, so nothing binds to the playback service.
+     * `PodcasterRoot`. Playback and downloads are the fakes, so nothing binds to the playback
+     * service and no cache directories are opened.
      */
     fun appContainer(httpClient: OkHttpClient = OkHttpClient()): AppContainer = AppContainer(
         context = ApplicationProvider.getApplicationContext(),
         database = db,
         httpClient = httpClient,
-        playbackFactory = { playback }
+        playbackFactory = { playback },
+        downloadsOverride = downloads
     )
 
     private val viewModels = ViewModelHost()

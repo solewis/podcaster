@@ -38,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.EpisodeDetailItem
+import com.solewis.podcaster.data.repo.EpisodeDownload
+import com.solewis.podcaster.ui.common.DownloadButton
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.PodcastArtwork
@@ -72,7 +74,10 @@ fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
                     livePositionMillis = state.livePositionMillis,
                     liveDurationMillis = state.liveDurationMillis,
                     onTogglePlay = viewModel::togglePlay,
-                    onEnqueue = viewModel::enqueue
+                    onEnqueue = viewModel::enqueue,
+                    download = state.download,
+                    onDownload = viewModel::download,
+                    onRemoveDownload = viewModel::removeDownload
                 )
 
                 state.isLoading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -90,7 +95,10 @@ private fun EpisodeDetailContent(
     livePositionMillis: Long?,
     liveDurationMillis: Long?,
     onTogglePlay: () -> Unit,
-    onEnqueue: () -> Unit
+    onEnqueue: () -> Unit,
+    download: EpisodeDownload?,
+    onDownload: () -> Unit,
+    onRemoveDownload: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -165,6 +173,12 @@ private fun EpisodeDetailContent(
             OutlinedButton(onClick = onEnqueue) {
                 Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add to queue")
             }
+            Spacer(modifier = Modifier.width(4.dp))
+            DownloadButton(
+                download = download,
+                onDownload = onDownload,
+                onRemove = onRemoveDownload
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))

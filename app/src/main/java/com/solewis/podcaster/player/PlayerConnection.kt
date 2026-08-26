@@ -9,6 +9,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.solewis.podcaster.data.repo.PlayableEpisode
+import com.solewis.podcaster.data.settings.PlaybackSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,12 +27,23 @@ import kotlinx.coroutines.launch
  * before the controller finishes connecting are silently dropped by Media3, which is why every
  * public method here goes through the suspending [controller] rather than a nullable field.
  */
-class PlayerConnection(private val context: Context) : Playback {
+class PlayerConnection(
+    private val context: Context,
+    private val settings: PlaybackSettings = PlaybackSettings(context)
+) : Playback {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var controller: MediaController? = null
 
-    private val _state = MutableStateFlow(PlaybackUiState())
+    /**
+     * Set by [restore] and consumed by the first command that needs a real player - see
+     * [loadedController].
+     */
+    private var restored: PlayableEpisode? = null
+
+    // Seeded with the saved speed rather than 1x so Now Playing shows the right number on its
+    // first frame, before any controller has connected to confirm it.
+    private val _state = MutableStateFlow(PlaybackUiState(speed = settings.speed))
     override val state: StateFlow<PlaybackUiState> = _state.asStateFlow()
 
     private val _progress = MutableStateFlow(ProgressUiState())
@@ -115,27 +127,76 @@ class PlayerConnection(private val context: Context) : Playback {
     }
 
     override suspend fun play(episode: PlayableEpisode) {
+        restored = null
         val mediaController = controller()
         mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
         mediaController.prepare()
         mediaController.play()
     }
 
-    override suspend fun togglePlayPause() {
+    /**
+     * Re-seeds the UI only. Killing the app takes the playback service and its `ExoPlayer` with
+     * it, and the player's own playlist is the sole source of [PlaybackUiState] - so without this
+     * the app comes back with no player at all, even though the position was in Room the whole
+     * time.
+     *
+     * Nothing is loaded into a player here, deliberately. Doing that would mean binding the
+     * playback service and buffering audio on every cold start, including the many launches where
+     * the user only wants to browse; [loadedController] defers both to the first command that
+     * genuinely needs a player.
+     *
+     * Overwrites whatever [state] holds, so it must not be called over a live session - see
+     * [PlaybackRestorer], which owns that decision.
+     */
+    override suspend fun restore(episode: PlayableEpisode) {
+        restored = episode
+        _state.value = _state.value.copy(
+            episodeId = episode.episodeId,
+            title = episode.title,
+            podcastTitle = episode.podcastTitle,
+            artworkUrl = episode.artworkUrl,
+            isPlaying = false
+        )
+        _progress.value = ProgressUiState(
+            positionMillis = episode.startPositionMillis,
+            durationMillis = episode.durationMillis
+        )
+    }
+
+    /**
+     * The controller, with a [restored] episode loaded into it if one is still pending. Every
+     * transport command goes through this rather than [controller] so the first tap on a restored
+     * player does the loading that [restore] skipped, instead of being issued to an empty player
+     * and silently doing nothing.
+     */
+    private suspend fun loadedController(): MediaController {
         val mediaController = controller()
+        val episode = restored ?: return mediaController
+        restored = null
+        // Guarded because the session may have acquired an item by another route since the
+        // restore - Android Auto, or a media button resuming playback while the app sat idle.
+        if (mediaController.currentMediaItem == null) {
+            mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
+            mediaController.prepare()
+        }
+        return mediaController
+    }
+
+    override suspend fun togglePlayPause() {
+        val mediaController = loadedController()
         if (mediaController.isPlaying) mediaController.pause() else mediaController.play()
     }
 
     override suspend fun seekTo(positionMillis: Long) {
-        controller().seekTo(positionMillis)
+        loadedController().seekTo(positionMillis)
     }
 
     override suspend fun skipForward() {
-        controller().seekForward()
+        loadedController().seekForward()
     }
 
     override suspend fun skipBack() {
-        controller().seekBack()
+        loadedController().seekBack()
     }
 
     override suspend fun setSpeed(speed: Float) {

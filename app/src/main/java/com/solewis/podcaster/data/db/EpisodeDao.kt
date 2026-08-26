@@ -172,6 +172,18 @@ interface EpisodeDao {
     suspend fun getLastListened(podcastId: Long): EpisodeListItem?
 
     /**
+     * The episode played most recently across every subscription - what the app puts back in the
+     * mini player at startup, and what the car is offered when it asks to resume playback with the
+     * app not running.
+     *
+     * A full entity rather than a list projection because both callers need `enclosureUrl` to
+     * actually play the thing. Backed by the standalone `lastPlayedAt` index, so it stays a single
+     * index lookup rather than a sweep as the library grows.
+     */
+    @Query("SELECT * FROM episodes WHERE lastPlayedAt IS NOT NULL ORDER BY lastPlayedAt DESC LIMIT 1")
+    suspend fun getMostRecentlyPlayed(): EpisodeEntity?
+
+    /**
      * Removes episodes that vanished from a refreshed feed - but only ones with no listen
      * history. Publishers pull episodes; losing that history to someone else's takedown would be
      * worse than leaving an occasional orphaned row behind.

@@ -3,6 +3,7 @@ package com.solewis.podcaster.ui.show
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.solewis.podcaster.data.db.model.SortOrder
+import com.solewis.podcaster.data.repo.DownloadStatus
 import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.data.repo.SubscribeResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
@@ -14,6 +15,7 @@ import com.solewis.podcaster.testing.awaitTrue
 import com.solewis.podcaster.testing.awaitValue
 import com.solewis.podcaster.testing.episodeRow
 import com.solewis.podcaster.testing.keepHot
+import com.solewis.podcaster.testing.settle
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -58,7 +60,8 @@ class ShowViewModelTest {
                 graph.episodeRepository,
                 subscriptions,
                 graph.queueRepository,
-                graph.playback
+                graph.playback,
+                graph.downloads
             )
         )
 
@@ -243,6 +246,79 @@ class ShowViewModelTest {
         awaitTrue("the first refresh finished") { !vm.isRefreshing.value }
 
         assertThat(host.requestCount).isEqualTo(2)
+    }
+
+    /** A host-backed subscription, so requests to it can be counted. */
+    private suspend fun subscribedToHost(): SubscriptionRepository {
+        val repository =
+            SubscriptionRepository(graph.db.podcastDao(), graph.db.episodeDao(), FeedFetcher()) { graph.clock }
+        host.enqueueFeed("rotating_token_v1.xml")
+        podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        return repository
+    }
+
+    @Test
+    fun opening_a_show_checks_for_new_episodes_without_being_asked() =
+        runTest(mainDispatcher.dispatcher) {
+            val repository = subscribedToHost()
+            graph.clock += SubscriptionRepository.STALE_AFTER_MILLIS + 1
+            host.enqueueNotModified()
+
+            viewModel(repository)
+
+            // The whole point of opening a show is to see what is in it now. Before this, the
+            // answer was whatever had last been fetched until you found the refresh button.
+            awaitTrue("the show was checked on open") { host.requestCount == 2 }
+        }
+
+    @Test
+    fun reopening_a_show_just_checked_makes_no_request() = runTest(mainDispatcher.dispatcher) {
+        val repository = subscribedToHost()
+
+        viewModel(repository)
+
+        settle()
+        assertThat(host.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun the_automatic_check_stays_invisible_even_when_the_feed_is_down() =
+        runTest(mainDispatcher.dispatcher) {
+            val repository = subscribedToHost()
+            graph.clock += SubscriptionRepository.STALE_AFTER_MILLIS + 1
+            host.enqueueStatus(503)
+
+            val vm = viewModel(repository)
+
+            awaitTrue("the check happened") { host.requestCount == 2 }
+            settle()
+            // Nobody asked for this one, so a snackbar over a screen that opened fine would be
+            // noise - and sharing the spinner flag would let it swallow a real tap on refresh.
+            assertThat(vm.refreshError.value).isNull()
+            assertThat(vm.isRefreshing.value).isFalse()
+        }
+
+    @Test
+    fun downloading_from_a_row_asks_for_that_episode() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+
+        vm.download("$podcastId:2")
+
+        awaitTrue("download requested") { graph.downloads.requested == listOf("$podcastId:2") }
+    }
+
+    @Test
+    fun a_rows_download_state_reaches_the_screen() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+        keepHot(vm.downloadStates)
+
+        graph.downloads.emit("$podcastId:2", DownloadStatus.DOWNLOADING, percent = 30f)
+
+        // Keyed by episode id, because the row that draws the progress ring has to be the row for
+        // the episode actually downloading.
+        val states = vm.downloadStates.awaitValue { it.isNotEmpty() }
+        assertThat(states.keys).containsExactly("$podcastId:2")
+        assertThat(states.getValue("$podcastId:2").percent).isEqualTo(30f)
     }
 
     @Test

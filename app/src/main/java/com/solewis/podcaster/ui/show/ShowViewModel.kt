@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
+import com.solewis.podcaster.data.repo.Downloads
+import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.QueueRepository
@@ -27,7 +29,8 @@ class ShowViewModel(
     private val episodeRepository: EpisodeRepository,
     private val subscriptionRepository: SubscriptionRepository,
     private val queueRepository: QueueRepository,
-    private val playback: Playback
+    private val playback: Playback,
+    private val downloads: Downloads
 ) : ViewModel() {
 
     data class UiState(
@@ -44,6 +47,10 @@ class ShowViewModel(
         buildUiState(podcast, episodes)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
+    /** Separate from [state] so a download progress tick doesn't recompose the whole episode list. */
+    val downloadStates: StateFlow<Map<String, EpisodeDownload>> = downloads.observe()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
     private val _refreshError = MutableStateFlow<String?>(null)
@@ -53,6 +60,19 @@ class ShowViewModel(
      * left here to show once the podcast row (and its episodes) are gone. */
     private val _didUnsubscribe = MutableStateFlow(false)
     val didUnsubscribe: StateFlow<Boolean> = _didUnsubscribe.asStateFlow()
+
+    init {
+        // Opening a show asks one question above all others - is there a new episode - so check,
+        // rather than showing whatever was last fetched and waiting for the refresh button to be
+        // found. Skipped when this show was checked recently, and a 304 when nothing changed.
+        //
+        // Deliberately invisible: it raises neither [isRefreshing] nor [refreshError]. Nobody asked
+        // for it, so a feed that is down has no business throwing a snackbar over a screen that
+        // opened fine, and sharing the spinner flag with refresh() would let this swallow a real
+        // tap on the refresh button. The list is already on screen from Room and updates itself
+        // when new rows land. Failures are still recorded on the podcast row.
+        viewModelScope.launch { subscriptionRepository.refreshIfStale(podcastId) }
+    }
 
     fun refresh() {
         if (_isRefreshing.value) return
@@ -74,6 +94,14 @@ class ShowViewModel(
 
     fun enqueue(episodeId: String) {
         viewModelScope.launch { queueRepository.enqueue(episodeId) }
+    }
+
+    fun download(episodeId: String) {
+        viewModelScope.launch { downloads.download(episodeId) }
+    }
+
+    fun removeDownload(episodeId: String) {
+        viewModelScope.launch { downloads.remove(episodeId) }
     }
 
     fun toggleSortOrder() {

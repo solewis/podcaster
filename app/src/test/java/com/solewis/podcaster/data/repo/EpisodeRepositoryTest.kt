@@ -45,6 +45,35 @@ class EpisodeRepositoryTest {
     }
 
     @Test
+    fun the_episode_to_restore_is_the_one_played_most_recently_anywhere() = runTest {
+        val otherShow = db.podcastDao().insert(podcastRow(title = "Show B"))
+        db.episodeDao().insertNew(listOf(episodeRow(podcastId, "1", lastPlayedAt = 5_000)))
+        db.episodeDao().insertNew(listOf(episodeRow(otherShow, "1", lastPlayedAt = 9_000)))
+
+        // Across every subscription, not just the last show visited - the mini player follows what
+        // you were actually listening to.
+        assertThat(repository.getLastPlayed()?.episodeId).isEqualTo("$otherShow:1")
+    }
+
+    @Test
+    fun a_library_nothing_has_been_played_from_has_nothing_to_restore() = runTest {
+        db.episodeDao().insertNew(listOf(episodeRow(podcastId, "1"), episodeRow(podcastId, "2")))
+
+        assertThat(repository.getLastPlayed()).isNull()
+    }
+
+    @Test
+    fun a_restored_episode_carries_the_duration_the_feed_gave() = runTest {
+        db.episodeDao().insertNew(
+            listOf(episodeRow(podcastId, "1", lastPlayedAt = 5_000, durationMillis = 1_800_000))
+        )
+
+        // Without this the restored mini player has a position but no scale to draw it against,
+        // and shows an empty progress bar until the player loads the media.
+        assertThat(repository.getLastPlayed()?.durationMillis).isEqualTo(1_800_000)
+    }
+
+    @Test
     fun a_finished_episode_starts_over_rather_than_resuming_near_the_end() = runTest {
         // There is nothing left to resume to, and a stale near-the-end position would flash
         // briefly before the completion check corrected it.

@@ -136,6 +136,7 @@ dependencies {
 
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
+    implementation(libs.media3.exoplayer.workmanager)
     implementation(libs.kotlinx.coroutines.guava)
 
     implementation(libs.work.runtime.ktx)

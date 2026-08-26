@@ -7,7 +7,12 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.solewis.podcaster.data.remote.HttpClient
+import com.solewis.podcaster.player.PlaybackRestorer
 import com.solewis.podcaster.work.RefreshAllWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Application entry point. Owns the single [AppContainer] instance, read from Compose via
@@ -18,12 +23,31 @@ open class PodcasterApp : Application(), SingletonImageLoader.Factory {
     lateinit var container: AppContainer
         private set
 
+    /** For the one piece of startup work that outlives no particular screen - see [restoreLastPlayed]. */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     override fun onCreate() {
         super.onCreate()
         container = createContainer()
         if (schedulesBackgroundRefresh) {
             RefreshAllWorker.schedule(this)
         }
+        restoreLastPlayed()
+    }
+
+    /**
+     * Brings the mini player back after the app has been killed. Killing it takes the playback
+     * service and its `ExoPlayer` down too, and the player's playlist is the only thing the UI's
+     * playback state was ever built from - so without this the app reopens with no player at all,
+     * even though the position was written to Room all along.
+     *
+     * Here rather than in a screen because playback outlives every screen: the state is ready
+     * before the first frame, and an Activity recreation doesn't re-run it. Nothing is loaded or
+     * buffered - see [com.solewis.podcaster.player.PlayerConnection.restore].
+     */
+    private fun restoreLastPlayed() {
+        val restorer = PlaybackRestorer(container.episodeRepository, container.playback)
+        appScope.launch { restorer.restore() }
     }
 
     /**

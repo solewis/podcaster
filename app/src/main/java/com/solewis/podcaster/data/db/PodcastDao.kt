@@ -41,6 +41,17 @@ interface PodcastDao {
     @Query("SELECT id FROM podcasts")
     suspend fun getAllIds(): List<Long>
 
+    /**
+     * Subscriptions not checked since [before], including any never checked at all. Backs the
+     * automatic refreshes (opening the app, opening a show), which skip anything already fresh so
+     * that reopening the app twice in a minute costs nothing.
+     *
+     * Deliberately not filtered on `lastRefreshFailedAt`: a feed that failed an hour ago is
+     * exactly the one worth trying again.
+     */
+    @Query("SELECT id FROM podcasts WHERE lastRefreshedAt IS NULL OR lastRefreshedAt < :before")
+    suspend fun getStaleIds(before: Long): List<Long>
+
     @Query("SELECT * FROM podcasts WHERE id = :id")
     fun observeById(id: Long): Flow<PodcastEntity?>
 

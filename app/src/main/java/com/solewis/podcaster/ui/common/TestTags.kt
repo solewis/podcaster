@@ -1,5 +1,7 @@
 package com.solewis.podcaster.ui.common
 
+import com.solewis.podcaster.data.repo.DownloadStatus
+
 /**
  * Stable handles for UI tests.
  *
@@ -26,4 +28,12 @@ object TestTags {
     const val EPISODE_DETAIL_SCREEN = "episodeDetailScreen"
     const val MINI_PLAYER = "miniPlayer"
     const val RESUME_PILL = "resumePill"
+    const val DOWNLOADS_LIST = "downloadsList"
+
+    /**
+     * Carries the state, not just the identity: the whole risk with a one-control-many-states
+     * button is that it renders the wrong state, which a tag naming only "the download button"
+     * could never catch.
+     */
+    fun downloadButton(status: DownloadStatus?) = "downloadButton:${status?.name ?: "NONE"}"
 }

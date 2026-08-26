@@ -38,6 +38,13 @@ interface Playback {
 
     suspend fun play(episode: PlayableEpisode)
 
+    /**
+     * Puts [episode] back in front of the user after the app was killed - shown, paused, at its
+     * saved position - without starting playback. See [PlayerConnection.restore] for what is and
+     * is not actually loaded into a player.
+     */
+    suspend fun restore(episode: PlayableEpisode)
+
     suspend fun togglePlayPause()
 
     suspend fun seekTo(positionMillis: Long)

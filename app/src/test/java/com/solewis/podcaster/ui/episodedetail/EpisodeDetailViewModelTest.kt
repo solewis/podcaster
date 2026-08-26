@@ -3,11 +3,13 @@ package com.solewis.podcaster.ui.episodedetail
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.solewis.podcaster.testing.MainDispatcherRule
+import com.solewis.podcaster.data.repo.DownloadStatus
 import com.solewis.podcaster.testing.TestGraph
 import com.solewis.podcaster.testing.awaitTrue
 import com.solewis.podcaster.testing.awaitValue
 import com.solewis.podcaster.testing.episodeRow
 import com.solewis.podcaster.testing.keepHot
+import com.solewis.podcaster.testing.settle
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -49,7 +51,13 @@ class EpisodeDetailViewModelTest {
             episodeRow(podcastId, "2")
         )
         val vm = graph.hosting(
-            EpisodeDetailViewModel(episodeId, graph.episodeRepository, graph.queueRepository, graph.playback)
+            EpisodeDetailViewModel(
+                episodeId,
+                graph.episodeRepository,
+                graph.queueRepository,
+                graph.playback,
+                graph.downloads
+            )
         )
         keepHot(vm.state)
         vm.state.awaitValue { it.episode != null }
@@ -173,5 +181,22 @@ class EpisodeDetailViewModelTest {
 
         awaitTrue("queue row written") { graph.db.queueDao().getAllOrdered().isNotEmpty() }
         assertThat(graph.db.queueDao().getAllOrdered().single().episodeId).isEqualTo(episodeId)
+    }
+
+    @Test
+    fun the_download_shown_is_this_episodes_and_not_another() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+
+        graph.downloads.emit("$podcastId:2", DownloadStatus.DOWNLOADED)
+
+        // The state map covers the whole library, so the screen has to pick its own key out of it -
+        // getting that wrong would show a download badge on an episode that has none.
+        settle()
+        assertThat(vm.state.value.download).isNull()
+
+        graph.downloads.emit("$podcastId:1", DownloadStatus.DOWNLOADED)
+
+        assertThat(vm.state.awaitValue { it.download != null }.download!!.status)
+            .isEqualTo(DownloadStatus.DOWNLOADED)
     }
 }
