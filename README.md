@@ -43,17 +43,29 @@ Play plus Auto-category review.
 
 ### 1. Downloads
 
-Unusually well set up already: `SimpleCache` is a process-wide singleton and `MediaItemMapper`
-sets `customCacheKey` to the episode id specifically so downloads and the streaming cache can
-share one store. Media3's `DownloadManager`/`DownloadService` plugs into exactly that.
+Built on Media3's `DownloadManager`/`DownloadService`. There are deliberately **two** caches: a
+`NoOpCacheEvictor` download cache in `filesDir`, and the LRU-evicted streaming cache in `cacheDir`.
+Sharing one would mean an episode you downloaded for a flight getting evicted to make room for
+something streamed. `PlayerFactory` nests them so the download cache is read first and never
+written — see its doc for why read-only matters.
 
-- [ ] Download an episode, and delete a download
-- [ ] Per-episode state: queued, downloading, downloaded, failed
-- [ ] A Downloads screen, with total size
-- [ ] Storage cap, and auto-delete once played
-- [ ] Wifi-only constraint
-- [ ] `FOREGROUND_SERVICE_DATA_SYNC` — note the daily runtime budget on Android 14+, and that it
-      needs its own Play Console justification
+- [x] Download an episode, and delete or cancel one
+- [x] Per-episode state: queued, downloading, downloaded, failed, removing
+- [x] Downloads screen (Activity → Downloads) with a running total
+- [x] `FOREGROUND_SERVICE_DATA_SYNC`, and `WorkManagerScheduler` so an interrupted download resumes
+- [ ] Storage cap, and auto-delete once played — nothing evicts the download cache by design, so
+      its size is currently governed only by what you delete by hand
+- [ ] Wifi-only. Manual downloads deliberately use `Requirements.NETWORK`: tapping download is a
+      request for the episode *now*, and silently waiting for wifi looks identical to being broken.
+      `NETWORK_UNMETERED` belongs to auto-download, which nobody asked for episode-by-episode.
+- [ ] A download control on the **Home feed** rows. Tried and reverted: Home rows already carry
+      play and enqueue, and a third 48dp target leaves roughly 80px for the title on a 320dp-wide
+      screen. Needs the trailing actions collapsed into an overflow menu first, which is a UI
+      decision of its own. Downloading works from a show, an episode, and the Downloads screen.
+- [ ] Delete orphaned downloads. Unsubscribing leaves rows in Media3's index with no episode to
+      label them; `DownloadsViewModel` hides them, but the files stay until deleted by hand.
+- [ ] `POST_NOTIFICATIONS`. The download progress notification is *not* exempt the way the media
+      notification is, so on Android 13+ with the permission denied, downloads run silently.
 
 ### 2. Settings
 

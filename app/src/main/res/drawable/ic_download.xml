@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification small icon for downloads. Single-colour and solid, since the status bar renders
+     it as a mask - a stroked outline disappears at that size. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M11,3h2v8h3.5L12,16.5L7.5,11H11V3zM5,19h14v2H5V19z" />
+</vector>

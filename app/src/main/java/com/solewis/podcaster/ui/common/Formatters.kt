@@ -44,3 +44,16 @@ fun formatTimer(millis: Long?): String? {
         "%d:%02d".format(minutes, seconds)
     }
 }
+
+/**
+ * Storage sizes, e.g. 54,000,000 -> "51 MB". Binary units (1024) because that is what the system's
+ * own storage settings report, and a download that reads as a different size in two places on the
+ * same phone looks like a bug. Whole numbers above a megabyte - nobody choosing what to delete
+ * cares about the decimal.
+ */
+fun formatBytes(bytes: Long): String = when {
+    bytes < 1024 -> "$bytes B"
+    bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+    bytes < 1024L * 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
+    else -> "%.1f GB".format(bytes.toDouble() / (1024L * 1024 * 1024))
+}

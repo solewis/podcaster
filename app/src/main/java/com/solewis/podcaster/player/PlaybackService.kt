@@ -40,7 +40,7 @@ class PlaybackService : MediaLibraryService() {
     override fun onCreate() {
         super.onCreate()
         val container = (application as PodcasterApp).container
-        player = PlayerFactory.create(this, container.mediaCache)
+        player = PlayerFactory.create(this, container.downloadCache, container.streamCache)
         // Before the persister is attached, so reading the saved speed back doesn't immediately
         // rewrite it. This is the only place speed is applied, which is what makes it hold for
         // playback started from Android Auto or a media button as well as from the app's own UI.

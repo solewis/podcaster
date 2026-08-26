@@ -3,6 +3,8 @@ package com.solewis.podcaster.ui.episodedetail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.db.model.EpisodeDetailItem
+import com.solewis.podcaster.data.repo.Downloads
+import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.player.Playback
@@ -16,7 +18,8 @@ class EpisodeDetailViewModel(
     private val episodeId: String,
     private val episodeRepository: EpisodeRepository,
     private val queueRepository: QueueRepository,
-    private val playback: Playback
+    private val playback: Playback,
+    private val downloads: Downloads
 ) : ViewModel() {
 
     data class UiState(
@@ -30,21 +33,25 @@ class EpisodeDetailViewModel(
          * progress writer next flushes.
          */
         val livePositionMillis: Long? = null,
-        val liveDurationMillis: Long? = null
+        val liveDurationMillis: Long? = null,
+        /** Null when this episode is not downloaded and nothing is in flight for it. */
+        val download: EpisodeDownload? = null
     )
 
     val state: StateFlow<UiState> = combine(
         episodeRepository.observeEpisodeDetail(episodeId),
         playback.state,
-        playback.progress
-    ) { episode, playback, progress ->
+        playback.progress,
+        downloads.observe()
+    ) { episode, playback, progress, downloadStates ->
         val isThis = playback.episodeId == episodeId
         UiState(
             episode = episode,
             isLoading = false,
             isPlayingThis = isThis && playback.isPlaying,
             livePositionMillis = progress.positionMillis.takeIf { isThis },
-            liveDurationMillis = progress.durationMillis?.takeIf { isThis }
+            liveDurationMillis = progress.durationMillis?.takeIf { isThis },
+            download = downloadStates[episodeId]
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
@@ -62,5 +69,13 @@ class EpisodeDetailViewModel(
 
     fun enqueue() {
         viewModelScope.launch { queueRepository.enqueue(episodeId) }
+    }
+
+    fun download() {
+        viewModelScope.launch { downloads.download(episodeId) }
+    }
+
+    fun removeDownload() {
+        viewModelScope.launch { downloads.remove(episodeId) }
     }
 }

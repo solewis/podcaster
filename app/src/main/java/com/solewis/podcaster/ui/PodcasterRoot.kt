@@ -45,6 +45,7 @@ import com.solewis.podcaster.ui.activity.ActivityScreen
 import com.solewis.podcaster.ui.common.MiniPlayer
 import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.episodedetail.EpisodeDetailScreen
+import com.solewis.podcaster.ui.downloads.DownloadsViewModel
 import com.solewis.podcaster.ui.episodedetail.EpisodeDetailViewModel
 import com.solewis.podcaster.ui.home.HomeScreen
 import com.solewis.podcaster.ui.home.HomeViewModel
@@ -190,10 +191,23 @@ fun PodcasterRoot(container: AppContainer) {
                         initializer { SubscriptionsViewModel(container.podcastRepository, container.subscriptionRepository) }
                     }
                 )
+                val downloadsViewModel: DownloadsViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer {
+                            DownloadsViewModel(
+                                container.episodeRepository,
+                                container.downloads,
+                                container.playback
+                            )
+                        }
+                    }
+                )
                 ActivityScreen(
                     queueViewModel = queueViewModel,
+                    downloadsViewModel = downloadsViewModel,
                     subscriptionsViewModel = subscriptionsViewModel,
-                    onOpenShow = { podcastId -> navController.navigate(Route.Show(podcastId)) }
+                    onOpenShow = { podcastId -> navController.navigate(Route.Show(podcastId)) },
+                    onOpenEpisode = { episodeId -> navController.navigate(Route.EpisodeDetail(episodeId)) }
                 )
             }
             composable<Route.Search> {
@@ -262,7 +276,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 container.episodeRepository,
                                 container.subscriptionRepository,
                                 container.queueRepository,
-                                container.playback
+                                container.playback,
+                                container.downloads
                             )
                         }
                     }
@@ -282,7 +297,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 episodeId = route.episodeId,
                                 episodeRepository = container.episodeRepository,
                                 queueRepository = container.queueRepository,
-                                playback = container.playback
+                                playback = container.playback,
+                                downloads = container.downloads
                             )
                         }
                     }

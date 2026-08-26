@@ -3,6 +3,7 @@ package com.solewis.podcaster.ui.show
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.solewis.podcaster.data.db.model.SortOrder
+import com.solewis.podcaster.data.repo.DownloadStatus
 import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.data.repo.SubscribeResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
@@ -59,7 +60,8 @@ class ShowViewModelTest {
                 graph.episodeRepository,
                 subscriptions,
                 graph.queueRepository,
-                graph.playback
+                graph.playback,
+                graph.downloads
             )
         )
 
@@ -295,6 +297,29 @@ class ShowViewModelTest {
             assertThat(vm.refreshError.value).isNull()
             assertThat(vm.isRefreshing.value).isFalse()
         }
+
+    @Test
+    fun downloading_from_a_row_asks_for_that_episode() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+
+        vm.download("$podcastId:2")
+
+        awaitTrue("download requested") { graph.downloads.requested == listOf("$podcastId:2") }
+    }
+
+    @Test
+    fun a_rows_download_state_reaches_the_screen() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+        keepHot(vm.downloadStates)
+
+        graph.downloads.emit("$podcastId:2", DownloadStatus.DOWNLOADING, percent = 30f)
+
+        // Keyed by episode id, because the row that draws the progress ring has to be the row for
+        // the episode actually downloading.
+        val states = vm.downloadStates.awaitValue { it.isNotEmpty() }
+        assertThat(states.keys).containsExactly("$podcastId:2")
+        assertThat(states.getValue("$podcastId:2").percent).isEqualTo(30f)
+    }
 
     @Test
     fun unsubscribing_signals_the_screen_to_leave() = runTest(mainDispatcher.dispatcher) {

@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
+import com.solewis.podcaster.data.repo.Downloads
+import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.QueueRepository
@@ -27,7 +29,8 @@ class ShowViewModel(
     private val episodeRepository: EpisodeRepository,
     private val subscriptionRepository: SubscriptionRepository,
     private val queueRepository: QueueRepository,
-    private val playback: Playback
+    private val playback: Playback,
+    private val downloads: Downloads
 ) : ViewModel() {
 
     data class UiState(
@@ -43,6 +46,10 @@ class ShowViewModel(
     ) { podcast, episodes ->
         buildUiState(podcast, episodes)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
+
+    /** Separate from [state] so a download progress tick doesn't recompose the whole episode list. */
+    val downloadStates: StateFlow<Map<String, EpisodeDownload>> = downloads.observe()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -87,6 +94,14 @@ class ShowViewModel(
 
     fun enqueue(episodeId: String) {
         viewModelScope.launch { queueRepository.enqueue(episodeId) }
+    }
+
+    fun download(episodeId: String) {
+        viewModelScope.launch { downloads.download(episodeId) }
+    }
+
+    fun removeDownload(episodeId: String) {
+        viewModelScope.launch { downloads.remove(episodeId) }
     }
 
     fun toggleSortOrder() {
