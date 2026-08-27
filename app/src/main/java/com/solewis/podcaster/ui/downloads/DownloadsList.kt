@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.repo.DownloadStatus
+import com.solewis.podcaster.ui.common.EmptyState
 import com.solewis.podcaster.ui.common.DownloadButton
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
@@ -47,14 +48,9 @@ fun DownloadsList(
     val totalBytes by viewModel.totalBytes.collectAsState()
 
     if (rows.isEmpty()) {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                "Nothing downloaded yet - tap the download icon on an episode to keep it offline.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(32.dp)
-            )
-        }
+        // Names the menu, not an icon: downloading moved behind an episode row's overflow when the
+        // trailing controls ran out of room, so "tap the download icon" had stopped being true.
+        EmptyState("Nothing downloaded yet - use an episode's menu to keep it offline.", modifier)
         return
     }
 

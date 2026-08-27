@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.entity.PodcastEntity
+import com.solewis.podcaster.ui.common.EmptyState
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
 
@@ -43,9 +44,7 @@ fun SubscriptionsList(viewModel: SubscriptionsViewModel, onOpenShow: (Long) -> U
 
     PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = viewModel::refreshAll, modifier = modifier) {
         if (podcasts.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No shows yet - search to subscribe to one.", style = MaterialTheme.typography.bodyLarge)
-            }
+            EmptyState("No shows yet - search to subscribe to one.")
         } else {
             LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
                 items(podcasts, key = { it.id }) { podcast ->

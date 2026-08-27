@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.db.model.HomeShowSummary
+import com.solewis.podcaster.ui.common.EmptyState
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.EpisodeActionsMenu
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
@@ -78,9 +79,7 @@ fun HomeScreen(
                     CircularProgressIndicator()
                 }
             } else if (state.subscriptions.isEmpty()) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("No shows yet - search to subscribe to one.", style = MaterialTheme.typography.bodyLarge)
-                }
+                EmptyState("No shows yet - search to subscribe to one.", Modifier.weight(1f))
             } else {
                 LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                     item {

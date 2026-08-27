@@ -3,19 +3,25 @@ package com.solewis.podcaster.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Calm doesn't mean washed out: a deep, near-black petrol carries every primary action and accent
- * (a "focus" hue, not an urgent one), warm stone for secondary accents, and a soft clay for the
- * rare tertiary highlight - against warm-neutral surfaces rather than stark white/black. One
- * decisive accent against a quiet neutral base, rather than everything muted at once, which is
- * what read as bland rather than minimalist.
+ * Calm doesn't mean washed out: one aqua carries every primary action and accent (a "focus" hue,
+ * not an urgent one), warm stone for secondary accents, and a soft clay for the rare tertiary
+ * highlight - against warm-neutral surfaces rather than stark white/black. One decisive accent
+ * against a quiet neutral base, rather than everything muted at once, which is what read as bland
+ * rather than minimalist.
  *
- * The dark-theme primary is deliberately *not* the same value: #002B36 is far too dark to sit on
- * a dark surface, so the dark palette lifts the same hue to a legible tint instead. Reusing the
- * light value there would leave primary-coloured text and icons all but invisible.
+ * The two themes take the *same hue at different tones*, which is the mechanism behind an accent
+ * that looks deliberate in both: light mode uses a mid tone that still reads as a colour, dark mode
+ * a light one that stays legible on a dark surface. The light value used to be #002B36 - so dark it
+ * read as ink rather than as aqua, which left tinted surfaces looking merely grey and selected
+ * controls falling back on the warm secondary. #00677D is the same hue at a tone that shows.
+ *
+ * Both are checked against the surfaces they actually land on: #00677D gives 6.2:1 on the light
+ * background and 6.5:1 for white text on top, so primary-coloured labels stay past AA rather than
+ * only just reaching it. Anything lighter drops toward 4:1 and starts to fail the small labels.
  */
 
-// Primary - deep petrol.
-val TealLight = Color(0xFF002B36)
+// Primary - aqua. Light is roughly tone 40, dark roughly tone 80, of one hue.
+val TealLight = Color(0xFF00677D)
 val OnTealLight = Color(0xFFFFFFFF)
 val TealContainerLight = Color(0xFFC4E5EF)
 val OnTealContainerLight = Color(0xFF001016)

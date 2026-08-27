@@ -35,7 +35,11 @@ fun MiniPlayer(
 ) {
     if (playback.episodeId == null) return
 
-    Surface(tonalElevation = 3.dp) {
+    // A tint rather than tonalElevation: elevation blends surfaceTint into the surface, which over
+    // a warm cream background lands on a washed-out grey with barely any edge to it - about 1.06:1,
+    // effectively invisible. The primary container is the same accent the rest of the app uses and
+    // gives the bar a real boundary in both themes.
+    Surface(color = MaterialTheme.colorScheme.primaryContainer) {
         Column(
             modifier = Modifier
                 .testTag(TestTags.MINI_PLAYER)

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -72,6 +73,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                             selected = settings.theme == mode,
                             onClick = { viewModel.setTheme(mode) },
                             label = { Text(mode.label()) },
+                            colors = accentChipColors(),
                             modifier = Modifier.testTag(TestTags.themeChoice(mode))
                         )
                     }
@@ -89,6 +91,19 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
         }
     }
 }
+
+
+/**
+ * Selected chips in the app's own accent rather than `FilterChip`'s default, which is the *warm
+ * secondary* - so with a warm background the selected and unselected states differed mostly in
+ * warmth, not in colour, and "which one is on" was genuinely hard to read at a glance.
+ */
+@Composable
+private fun accentChipColors() = FilterChipDefaults.filterChipColors(
+    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+)
 
 @Composable
 private fun SettingSection(title: String, content: @Composable () -> Unit) {
@@ -123,6 +138,7 @@ private fun SkipAmountRow(selected: SkipAmount, forward: Boolean, onSelect: (Ski
                     )
                 },
                 label = { Text("${amount.seconds}s") },
+                colors = accentChipColors(),
                 modifier = Modifier.testTag(TestTags.skipChoice(forward, amount))
             )
         }
