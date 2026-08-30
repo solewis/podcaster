@@ -84,7 +84,7 @@ class HomeViewModel(
     }
 
     fun togglePlayPause() {
-        viewModelScope.launch { playback.togglePlayPause() }
+        viewModelScope.launch { playbackStarter.togglePlayPause() }
     }
 
     fun enqueue(episode: EpisodeFeedItem) {

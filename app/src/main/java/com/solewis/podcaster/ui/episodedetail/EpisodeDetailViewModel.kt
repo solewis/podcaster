@@ -68,7 +68,7 @@ class EpisodeDetailViewModel(
     fun togglePlay() {
         viewModelScope.launch {
             if (state.value.isPlayingThis) {
-                playback.togglePlayPause()
+                playbackStarter.togglePlayPause()
                 return@launch
             }
             val playable = episodeRepository.getPlayableById(episodeId) ?: return@launch

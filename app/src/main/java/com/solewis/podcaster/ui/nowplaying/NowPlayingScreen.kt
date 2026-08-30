@@ -97,6 +97,12 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
     val sliderPositionMillis = when {
         isDragging -> dragPositionMillis
         pendingSeekMillis != null -> pendingSeekMillis!!.toFloat()
+        // Pinned to zero until a duration is known, rather than shown against the placeholder
+        // range. There is a real window - between pressing play on a resumed episode and the
+        // player reporting its duration - where the position is already 75,000ms and the range is
+        // still 0..1, and a Slider clamps that to the far right. The bar shot to the end and then
+        // snapped back the instant the duration landed, which looked like a seek nobody asked for.
+        progress.durationMillis == null -> 0f
         else -> progress.positionMillis.toFloat()
     }
 

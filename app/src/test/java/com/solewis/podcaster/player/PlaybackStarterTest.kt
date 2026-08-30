@@ -167,4 +167,43 @@ class PlaybackStarterTest {
         // meant to replace.
         assertThat(starter.pendingEpisodeId.value).isNull()
     }
+
+    @Test
+    fun resuming_a_loaded_episode_offline_refuses_rather_than_doing_nothing() =
+        runTest(mainDispatcher.dispatcher) {
+            val starter = starter()
+            playback.emitPaused("ep-1")
+            connectivity.online = false
+
+            starter.togglePlayPause()
+
+            // The original hang, reachable from the one control most likely to be pressed after
+            // playback stops: the guard used to cover only *new* episodes, so resuming a loaded
+            // one with no network silently did nothing at all.
+            assertThat(playback.togglePlayPauseCount).isEqualTo(0)
+        }
+
+    @Test
+    fun resuming_a_downloaded_episode_offline_still_works() = runTest(mainDispatcher.dispatcher) {
+        val starter = starter()
+        playback.emitPaused("ep-1")
+        downloads.emit("ep-1", DownloadStatus.DOWNLOADED)
+        connectivity.online = false
+
+        starter.togglePlayPause()
+
+        awaitTrue("resumed") { playback.togglePlayPauseCount == 1 }
+    }
+
+    @Test
+    fun pausing_is_never_blocked_by_the_network() = runTest(mainDispatcher.dispatcher) {
+        val starter = starter()
+        playback.emitPlaying("ep-1")
+        connectivity.online = false
+
+        starter.togglePlayPause()
+
+        // Refusing to *stop* audio because there is no connection would be absurd.
+        awaitTrue("paused") { playback.togglePlayPauseCount == 1 }
+    }
 }

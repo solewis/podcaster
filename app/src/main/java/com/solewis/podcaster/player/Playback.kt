@@ -1,6 +1,7 @@
 package com.solewis.podcaster.player
 
 import com.solewis.podcaster.data.repo.PlayableEpisode
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 data class PlaybackUiState(
@@ -35,6 +36,13 @@ interface Playback {
 
     /** Ticks while playing; also updated on any seek, from any source. */
     val progress: StateFlow<ProgressUiState>
+
+    /**
+     * Playback failing after it had started - most often a buffer running dry with no network left
+     * to refill it. Nothing surfaced these before, so an episode that stopped mid-sentence looked
+     * like the app had simply given up without saying anything.
+     */
+    val errors: SharedFlow<String>
 
     suspend fun play(episode: PlayableEpisode)
 

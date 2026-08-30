@@ -6,6 +6,7 @@ import com.solewis.podcaster.data.settings.AppSettings
 import com.solewis.podcaster.player.PlaybackUiState
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.ProgressUiState
+import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.SleepTimer
 import com.solewis.podcaster.player.SleepTimerState
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +22,8 @@ class NowPlayingViewModel(
      * driven without this ViewModel needing a `Context` - and so a test can hand it a fixed value.
      */
     settings: Flow<AppSettings>,
-    private val sleepTimer: SleepTimer
+    private val sleepTimer: SleepTimer,
+    private val playbackStarter: PlaybackStarter
 ) : ViewModel() {
 
     val playbackState: StateFlow<PlaybackUiState> = playback.state
@@ -43,7 +45,7 @@ class NowPlayingViewModel(
     fun cancelSleepTimer() = sleepTimer.cancel()
 
     fun togglePlayPause() {
-        viewModelScope.launch { playback.togglePlayPause() }
+        viewModelScope.launch { playbackStarter.togglePlayPause() }
     }
 
     fun seekTo(positionMillis: Long) {

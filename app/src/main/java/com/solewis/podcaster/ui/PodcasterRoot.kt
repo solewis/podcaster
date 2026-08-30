@@ -63,6 +63,7 @@ import com.solewis.podcaster.ui.show.ShowViewModel
 import com.solewis.podcaster.ui.showpreview.ShowPreviewScreen
 import com.solewis.podcaster.ui.showpreview.ShowPreviewViewModel
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsViewModel
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
 @Composable
@@ -111,7 +112,8 @@ fun PodcasterRoot(container: AppContainer) {
     // places, and a failure that only some of them could report would be silent from the others.
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
-        container.playbackStarter.messages.collect { snackbarHostState.showSnackbar(it) }
+        merge(container.playbackStarter.messages, container.playback.errors)
+            .collect { snackbarHostState.showSnackbar(it) }
     }
 
     Scaffold(
@@ -128,7 +130,7 @@ fun PodcasterRoot(container: AppContainer) {
                     MiniPlayer(
                         playback = playback,
                         progress = playbackProgress,
-                        onTogglePlayPause = { scope.launch { container.playback.togglePlayPause() } },
+                        onTogglePlayPause = { scope.launch { container.playbackStarter.togglePlayPause() } },
                         onExpand = { navController.navigate(Route.NowPlaying) }
                     )
                     // Same base color as the screen behind it (background == surface in this
@@ -341,7 +343,8 @@ fun PodcasterRoot(container: AppContainer) {
                             NowPlayingViewModel(
                                 container.playback,
                                 container.settings.observe(),
-                                container.sleepTimer
+                                container.sleepTimer,
+                                container.playbackStarter
                             )
                         }
                     }

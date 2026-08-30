@@ -93,6 +93,10 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     val refreshError by viewModel.refreshError.collectAsState()
     val downloadStates by viewModel.downloadStates.collectAsState()
     val pendingEpisodeId by viewModel.pendingEpisodeId.collectAsState()
+    val nowPlaying by viewModel.nowPlaying.collectAsState()
+    val nowPlayingId = nowPlaying.episodeId
+    val livePosition = nowPlaying.positionMillis
+    val liveDuration = nowPlaying.durationMillis
     val didUnsubscribe by viewModel.didUnsubscribe.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -247,6 +251,8 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                         isHighlighted = episode.id == highlightedEpisodeId,
                                         onClick = { onOpenEpisode(episode.id) },
                                         isStarting = episode.id == pendingEpisodeId,
+                                        livePositionMillis = livePosition.takeIf { episode.id == nowPlayingId },
+                                        liveDurationMillis = liveDuration.takeIf { episode.id == nowPlayingId },
                                         onPlay = { viewModel.play(episode.id) },
                                         onEnqueue = { viewModel.enqueue(episode.id) },
                                         download = downloadStates[episode.id],
@@ -341,6 +347,8 @@ private fun EpisodeRow(
     isHighlighted: Boolean,
     onClick: () -> Unit,
     isStarting: Boolean,
+    livePositionMillis: Long?,
+    liveDurationMillis: Long?,
     onPlay: () -> Unit,
     onEnqueue: () -> Unit,
     download: EpisodeDownload?,
@@ -411,7 +419,11 @@ private fun EpisodeRow(
                 pubDateMillis = null,
                 durationMillis = episode.durationMillis,
                 positionMillis = episode.positionMillis,
-                isPlayed = episode.isPlayed
+                isPlayed = episode.isPlayed,
+                // Home passes these and this list did not, so the row you were actually listening
+                // to advanced in the ~5s steps of the persisted position rather than moving.
+                livePositionMillis = livePositionMillis,
+                liveDurationMillis = liveDurationMillis
             )
             val label = listOfNotNull(
                 progress.label.takeIf { it.isNotEmpty() },

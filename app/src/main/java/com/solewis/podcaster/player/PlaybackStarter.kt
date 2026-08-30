@@ -78,6 +78,31 @@ class PlaybackStarter(
         playback.play(episode)
     }
 
+    /**
+     * Resuming whatever is already loaded, guarded the same way [start] is.
+     *
+     * Without this the check covered only *new* episodes: an episode already in the player, paused
+     * because its buffer ran dry, could be asked to resume with no network and would silently do
+     * nothing at all - the original hang, reachable from the one control most likely to be pressed
+     * after playback stops.
+     *
+     * Pausing is never blocked. Only the transition into playing is worth guarding.
+     */
+    suspend fun togglePlayPause() {
+        val state = playback.state.value
+        val episodeId = state.episodeId
+        if (state.isPlaying || episodeId == null) {
+            playback.togglePlayPause()
+            return
+        }
+        if (!connectivity.isOnline() && !downloads.isDownloaded(episodeId)) {
+            _messages.tryEmit(NO_CONNECTION_MESSAGE)
+            return
+        }
+        _pendingEpisodeId.value = episodeId
+        playback.togglePlayPause()
+    }
+
     companion object {
         /**
          * Says which of the two things is missing, because the fix differs: connect to something,

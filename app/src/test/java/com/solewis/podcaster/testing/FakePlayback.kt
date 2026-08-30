@@ -4,6 +4,9 @@ import com.solewis.podcaster.data.repo.PlayableEpisode
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlaybackUiState
 import com.solewis.podcaster.player.ProgressUiState
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +27,14 @@ class FakePlayback : Playback {
 
     private val _progress = MutableStateFlow(ProgressUiState())
     override val progress: StateFlow<ProgressUiState> = _progress.asStateFlow()
+
+    private val _errors = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    override val errors: SharedFlow<String> = _errors.asSharedFlow()
+
+    /** As if the buffer ran dry with no network left to refill it. */
+    fun emitError(message: String) {
+        _errors.tryEmit(message)
+    }
 
     val played = mutableListOf<PlayableEpisode>()
     val restored = mutableListOf<PlayableEpisode>()

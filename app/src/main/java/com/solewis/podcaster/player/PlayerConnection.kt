@@ -14,6 +14,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import androidx.media3.common.PlaybackException
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,6 +52,9 @@ class PlayerConnection(
 
     private val _progress = MutableStateFlow(ProgressUiState())
     override val progress: StateFlow<ProgressUiState> = _progress.asStateFlow()
+
+    private val _errors = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    override val errors: SharedFlow<String> = _errors.asSharedFlow()
 
     init {
         scope.launch {
@@ -116,6 +123,21 @@ class PlayerConnection(
                 // latter already refers to the incoming item, which is the same trap documented
                 // on ProgressWriter for recording progress against the wrong episode.
                 publishProgress(newPosition.positionMs)
+            }
+
+            /**
+             * The buffer running out with no network to refill it arrives here, which is what an
+             * episode stopping a minute after the signal went actually is. Reported rather than
+             * swallowed: silence with no explanation is indistinguishable from a crash.
+             */
+            override fun onPlayerError(error: PlaybackException) {
+                _errors.tryEmit(
+                    if (error.errorCode in NETWORK_ERROR_CODES) {
+                        "Playback stopped - no connection"
+                    } else {
+                        "Playback stopped - couldn't load this episode"
+                    }
+                )
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
@@ -211,5 +233,14 @@ class PlayerConnection(
 
     private companion object {
         const val PROGRESS_TICK_MILLIS = 500L
+
+        /** Worth telling apart, because "no connection" is actionable and "broken feed" is not. */
+        val NETWORK_ERROR_CODES = setOf(
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+            PlaybackException.ERROR_CODE_IO_NO_PERMISSION,
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+        )
     }
 }

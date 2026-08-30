@@ -52,6 +52,21 @@ class ShowViewModel(
         buildUiState(podcast, episodes)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
+    /** Whatever is currently audible, so the row for it can move rather than step every 5s. */
+    data class NowPlaying(
+        val episodeId: String? = null,
+        val positionMillis: Long = 0,
+        val durationMillis: Long? = null
+    )
+
+    val nowPlaying: StateFlow<NowPlaying> = combine(playback.state, playback.progress) { state, progress ->
+        NowPlaying(
+            episodeId = state.episodeId.takeIf { state.isPlaying },
+            positionMillis = progress.positionMillis,
+            durationMillis = progress.durationMillis
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NowPlaying())
+
     /** The episode waiting to become audible, so a tapped row can show it - see [PlaybackStarter]. */
     val pendingEpisodeId: StateFlow<String?> = playbackStarter.pendingEpisodeId
 
