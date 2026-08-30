@@ -50,7 +50,14 @@ class AppContainer(
      * `SimpleCache`s and Media3's `DownloadManager` - none of which exist on the JVM, and all of
      * which touch real directories. Null keeps the real graph.
      */
-    private val downloadsOverride: Downloads? = null
+    private val downloadsOverride: Downloads? = null,
+    /**
+     * For the graph's own long-lived coroutines. Injectable so a test can own its lifetime: an
+     * app-scoped scope that nothing can cancel is, in a test process, a scope that outlives the
+     * test - and a `Dispatchers.Main` one at that, which then collides with the next test's
+     * `setMain` as "Dispatchers.Main is used concurrently with setting it".
+     */
+    private val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 ) {
 
     private val appContext = context.applicationContext
@@ -89,9 +96,7 @@ class AppContainer(
      * App-scoped, so it keeps counting once Now Playing is gone and the phone is face-down - which
      * is the entire point of a sleep timer. Its scope is deliberately not a ViewModel's.
      */
-    val sleepTimer: SleepTimer by lazy {
-        SleepTimer(playback, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
-    }
+    val sleepTimer: SleepTimer by lazy { SleepTimer(playback, appScope) }
 
     companion object {
 

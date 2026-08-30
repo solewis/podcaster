@@ -115,4 +115,28 @@ class SettingsScreenTest {
         assertThat(store.autoAdvance).isFalse()
         compose.onNodeWithTag(TestTags.AUTO_ADVANCE_SWITCH).assertIsOff()
     }
+
+    @Test
+    fun starting_playback_in_the_car_is_off_until_it_is_asked_for() {
+        launch()
+
+        compose.onNodeWithTag(TestTags.AUTO_PLAY_IN_CAR_SWITCH).performScrollTo().assertIsOff()
+        compose.onNodeWithTag(TestTags.AUTO_PLAY_IN_CAR_SWITCH).performClick()
+        compose.waitForIdle()
+
+        assertThat(store.autoPlayInCar).isTrue()
+    }
+
+    @Test
+    fun the_two_playback_toggles_are_independent() {
+        launch()
+
+        compose.onNodeWithTag(TestTags.AUTO_PLAY_IN_CAR_SWITCH).performScrollTo().performClick()
+        compose.waitForIdle()
+
+        // Two switches sitting next to each other, one of them added later - exactly the pair a
+        // copy-paste wires to the same setting.
+        assertThat(store.autoPlayInCar).isTrue()
+        assertThat(store.autoAdvance).isTrue()
+    }
 }

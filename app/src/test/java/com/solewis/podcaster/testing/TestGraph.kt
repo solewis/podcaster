@@ -9,6 +9,10 @@ import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.AppContainer
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import okhttp3.OkHttpClient
 import java.io.Closeable
 
@@ -46,12 +50,19 @@ class TestGraph : Closeable {
      * `PodcasterRoot`. Playback and downloads are the fakes, so nothing binds to the playback
      * service and no cache directories are opened.
      */
+    /**
+     * Owns the lifetime of the graph's app-scoped coroutines, so they end with the test rather than
+     * outliving it on a `Dispatchers.Main` that the next test is about to replace.
+     */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     fun appContainer(httpClient: OkHttpClient = OkHttpClient()): AppContainer = AppContainer(
         context = ApplicationProvider.getApplicationContext(),
         database = db,
         httpClient = httpClient,
         playbackFactory = { playback },
-        downloadsOverride = downloads
+        downloadsOverride = downloads,
+        appScope = appScope
     )
 
     private val viewModels = ViewModelHost()
@@ -66,6 +77,7 @@ class TestGraph : Closeable {
         // Order matters: cancel the ViewModels first so their sharing coroutines stop observing
         // before the database they are reading from disappears underneath them.
         viewModels.close()
+        appScope.cancel()
         db.close()
     }
 }

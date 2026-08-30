@@ -11,6 +11,7 @@ import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
 import com.solewis.podcaster.PodcasterApp
+import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.settings.AppSettings
 import com.solewis.podcaster.data.settings.SkipAmount
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -64,7 +65,8 @@ class PlaybackService : MediaLibraryService() {
             podcastRepository = container.podcastRepository,
             episodeRepository = container.episodeRepository,
             queueRepository = container.queueRepository,
-            scope = lifecycleScope
+            scope = lifecycleScope,
+            autoPlayInCar = { container.settings.autoPlayInCar }
         )
         mediaSession = MediaLibrarySession.Builder(this, sessionPlayer, callback)
             .setBitmapLoader(CacheBitmapLoader(DataSourceBitmapLoader.Builder(this).build()))
@@ -84,6 +86,8 @@ class PlaybackService : MediaLibraryService() {
                 }
         }
 
+        seedLastPlayedEpisode(container.episodeRepository)
+
         progressWriter = ProgressWriter(player, container.episodeRepository, lifecycleScope)
         player.addListener(progressWriter)
         player.addListener(
@@ -98,6 +102,10 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = mediaSession
+
+    private fun seedLastPlayedEpisode(episodeRepository: EpisodeRepository) {
+        lifecycleScope.launch { SessionSeeder(episodeRepository).seed(player) }
+    }
 
     /**
      * Without this, the system notification and Android Auto fall back to their own default

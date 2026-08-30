@@ -2,6 +2,7 @@ package com.solewis.podcaster.player
 
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.util.Util
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.SessionError
 import androidx.media3.session.MediaConstants
@@ -33,10 +34,39 @@ class PodcastLibrarySessionCallback(
     podcastRepository: PodcastRepository,
     episodeRepository: EpisodeRepository,
     queueRepository: QueueRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    /** Read per connection, not captured, so changing the setting takes effect on the next drive. */
+    private val autoPlayInCar: () -> Boolean = { false }
 ) : MediaLibrarySession.Callback {
 
     private val tree = PodcastLibraryTree(podcastRepository, episodeRepository, queueRepository)
+
+    /**
+     * Starts playing when the car connects, if that has been asked for.
+     *
+     * Fires for every controller - the app's own, the notification's, the car's - so it checks
+     * which. [MediaSession.isAutoCompanionController] is Media3's own answer for phone-projected
+     * Android Auto and `isAutomotiveController` for a built-in head unit, which beats matching on
+     * package names that are Google's to change.
+     *
+     * Routed through [Util.handlePlayButtonAction] rather than `player.play()` because the session's
+     * player is seeded but deliberately unprepared (see [PlaybackService]); this prepares an idle
+     * player first, which a bare `play()` would not.
+     *
+     * Note what this cannot do: Android Auto has its own resume-on-connect behaviour, and an app
+     * cannot decline a play command it is sent. So this setting governs whether *this app* starts
+     * playback, not whether playback can ever start by itself.
+     */
+    override fun onPostConnect(session: MediaSession, controller: ControllerInfo) {
+        if (!autoPlayInCar()) return
+        val fromCar = session.isAutoCompanionController(controller) ||
+            session.isAutomotiveController(controller)
+        // Already playing means the car reconnected mid-listen - or the user paused deliberately
+        // and Auto dropped and re-established. Either way, taking that as a cue to start would be
+        // overriding a decision rather than making one.
+        if (!fromCar || session.player.isPlaying) return
+        Util.handlePlayButtonAction(session.player)
+    }
 
     override fun onGetLibraryRoot(
         session: MediaLibrarySession,

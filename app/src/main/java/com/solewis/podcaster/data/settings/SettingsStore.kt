@@ -27,7 +27,8 @@ data class AppSettings(
     val skipBack: SkipAmount = SkipAmount.FIFTEEN,
     val skipForward: SkipAmount = SkipAmount.FIFTEEN,
     val theme: ThemeMode = ThemeMode.SYSTEM,
-    val autoAdvance: Boolean = true
+    val autoAdvance: Boolean = true,
+    val autoPlayInCar: Boolean = false
 )
 
 /**
@@ -88,11 +89,25 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean(KEY_AUTO_ADVANCE, true)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_ADVANCE, value).apply()
 
+    /**
+     * Whether connecting to the car should start playing on its own.
+     *
+     * Off by default: sound starting by itself the moment an engine turns over is assertive enough
+     * that it should be asked for. Note this governs whether *this app* starts playback - Android
+     * Auto has its own resume-on-connect behaviour that an app cannot decline, so with that enabled
+     * playback may still begin regardless. What the app guarantees either way is that the episode
+     * is loaded and showing, which is the part that was actually missing.
+     */
+    var autoPlayInCar: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_PLAY_IN_CAR, false)
+        set(value) = prefs.edit().putBoolean(KEY_AUTO_PLAY_IN_CAR, value).apply()
+
     fun snapshot() = AppSettings(
         skipBack = skipBack,
         skipForward = skipForward,
         theme = theme,
-        autoAdvance = autoAdvance
+        autoAdvance = autoAdvance,
+        autoPlayInCar = autoPlayInCar
     )
 
     /**
@@ -125,5 +140,6 @@ class SettingsStore(context: Context) {
         const val KEY_SKIP_FORWARD = "skipForwardSeconds"
         const val KEY_THEME = "theme"
         const val KEY_AUTO_ADVANCE = "autoAdvance"
+        const val KEY_AUTO_PLAY_IN_CAR = "autoPlayInCar"
     }
 }
