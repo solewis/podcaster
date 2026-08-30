@@ -14,6 +14,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -105,7 +107,15 @@ fun PodcasterRoot(container: AppContainer) {
     val isNowPlaying = currentDestination?.hasRoute(Route.NowPlaying::class) == true ||
         currentDestination?.hasRoute(Route.Settings::class) == true
 
+    // One host for playback messages rather than one per screen: an episode can be started from six
+    // places, and a failure that only some of them could report would be silent from the others.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) {
+        container.playbackStarter.messages.collect { snackbarHostState.showSnackbar(it) }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         // Leaves the status bar inset for each screen to handle itself (most via ScreenTitle/
         // BackButtonRow's own windowInsetsPadding) rather than reserving it here too - every
         // screen nests its own Scaffold below this one, and each of those defaults to reserving
@@ -174,7 +184,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 container.episodeRepository,
                                 container.queueRepository,
                                 container.playback,
-                                container.downloads
+                                container.downloads,
+                                container.playbackStarter
                             )
                         }
                     }
@@ -189,7 +200,7 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.Activity> {
                 val queueViewModel: QueueViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { QueueViewModel(container.queueRepository, container.playback) }
+                        initializer { QueueViewModel(container.queueRepository, container.playback, container.playbackStarter) }
                     }
                 )
                 val subscriptionsViewModel: SubscriptionsViewModel = viewModel(
@@ -203,7 +214,8 @@ fun PodcasterRoot(container: AppContainer) {
                             DownloadsViewModel(
                                 container.episodeRepository,
                                 container.downloads,
-                                container.playback
+                                container.playback,
+                                container.playbackStarter
                             )
                         }
                     }
@@ -264,7 +276,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 showPreviewRepository = container.showPreviewRepository,
                                 subscriptionRepository = container.subscriptionRepository,
                                 podcastRepository = container.podcastRepository,
-                                playback = container.playback
+                                playback = container.playback,
+                                playbackStarter = container.playbackStarter
                             )
                         }
                     }
@@ -291,7 +304,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 container.subscriptionRepository,
                                 container.queueRepository,
                                 container.playback,
-                                container.downloads
+                                container.downloads,
+                                container.playbackStarter
                             )
                         }
                     }
@@ -312,7 +326,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 episodeRepository = container.episodeRepository,
                                 queueRepository = container.queueRepository,
                                 playback = container.playback,
-                                downloads = container.downloads
+                                downloads = container.downloads,
+                                playbackStarter = container.playbackStarter
                             )
                         }
                     }

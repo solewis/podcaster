@@ -38,7 +38,7 @@ class QueueViewModelTest {
         graph.insertEpisodes(*(1..queued).map { episodeRow(podcastId, it.toString()) }.toTypedArray())
         (1..queued).forEach { graph.queueRepository.enqueue("$podcastId:$it") }
 
-        val vm = graph.hosting(QueueViewModel(graph.queueRepository, graph.playback))
+        val vm = graph.hosting(QueueViewModel(graph.queueRepository, graph.playback, graph.playbackStarter))
         keepHot(vm.items)
         vm.items.awaitValue { it.size == queued }
         return vm

@@ -38,6 +38,12 @@ interface Downloads {
     /** Total bytes downloads occupy on disk. */
     suspend fun downloadedBytes(): Long
 
+    /**
+     * A direct lookup rather than a read of [observe], because the caller that matters - deciding
+     * whether an episode can play without a network - needs an answer now, not a subscription.
+     */
+    suspend fun isDownloaded(episodeId: String): Boolean
+
     suspend fun download(episodeId: String)
 
     suspend fun remove(episodeId: String)

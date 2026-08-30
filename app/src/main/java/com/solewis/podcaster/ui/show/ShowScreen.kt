@@ -92,6 +92,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val refreshError by viewModel.refreshError.collectAsState()
     val downloadStates by viewModel.downloadStates.collectAsState()
+    val pendingEpisodeId by viewModel.pendingEpisodeId.collectAsState()
     val didUnsubscribe by viewModel.didUnsubscribe.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -245,6 +246,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                         podcastArtworkUrl = podcast.artworkUrl,
                                         isHighlighted = episode.id == highlightedEpisodeId,
                                         onClick = { onOpenEpisode(episode.id) },
+                                        isStarting = episode.id == pendingEpisodeId,
                                         onPlay = { viewModel.play(episode.id) },
                                         onEnqueue = { viewModel.enqueue(episode.id) },
                                         download = downloadStates[episode.id],
@@ -338,6 +340,7 @@ private fun EpisodeRow(
     podcastArtworkUrl: String?,
     isHighlighted: Boolean,
     onClick: () -> Unit,
+    isStarting: Boolean,
     onPlay: () -> Unit,
     onEnqueue: () -> Unit,
     download: EpisodeDownload?,
@@ -428,8 +431,15 @@ private fun EpisodeRow(
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Row {
-                IconButton(onClick = onPlay) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+                // A spinner in the button's place, not beside it, so the row does not reflow -
+                // the wait between tapping play and hearing anything is real (controller
+                // connection, then buffering) and used to look like nothing had happened.
+                IconButton(onClick = onPlay, enabled = !isStarting) {
+                    if (isStarting) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+                    }
                 }
                 EpisodeActionsMenu(
                     episodeTitle = episode.title,

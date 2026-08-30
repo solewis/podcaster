@@ -56,7 +56,8 @@ class EpisodeDetailViewModelTest {
                 graph.episodeRepository,
                 graph.queueRepository,
                 graph.playback,
-                graph.downloads
+                graph.downloads,
+                graph.playbackStarter
             )
         )
         keepHot(vm.state)

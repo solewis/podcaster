@@ -46,7 +46,8 @@ class HomeViewModelTest {
             graph.episodeRepository,
             graph.queueRepository,
             graph.playback,
-            graph.downloads
+            graph.downloads,
+            graph.playbackStarter
         )
     )
 

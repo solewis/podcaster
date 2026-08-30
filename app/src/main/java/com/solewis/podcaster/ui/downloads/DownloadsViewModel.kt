@@ -7,6 +7,7 @@ import com.solewis.podcaster.data.repo.DownloadStatus
 import com.solewis.podcaster.data.repo.Downloads
 import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
+import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,7 +25,8 @@ import kotlinx.coroutines.launch
 class DownloadsViewModel(
     private val episodeRepository: EpisodeRepository,
     private val downloads: Downloads,
-    private val playback: Playback
+    private val playback: Playback,
+    private val playbackStarter: PlaybackStarter
 ) : ViewModel() {
 
     data class Row(val episode: EpisodeFeedItem, val download: EpisodeDownload)
@@ -68,7 +70,7 @@ class DownloadsViewModel(
 
     fun play(episodeId: String) {
         viewModelScope.launch {
-            episodeRepository.getPlayableById(episodeId)?.let { playback.play(it) }
+            episodeRepository.getPlayableById(episodeId)?.let { playbackStarter.start(it) }
         }
     }
 

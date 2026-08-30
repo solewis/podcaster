@@ -73,6 +73,7 @@ fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
                 episode != null -> EpisodeDetailContent(
                     episode = episode,
                     isPlayingThis = state.isPlayingThis,
+                    isStarting = state.isStarting,
                     livePositionMillis = state.livePositionMillis,
                     liveDurationMillis = state.liveDurationMillis,
                     onTogglePlay = viewModel::togglePlay,
@@ -95,6 +96,7 @@ fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
 private fun EpisodeDetailContent(
     episode: EpisodeDetailItem,
     isPlayingThis: Boolean,
+    isStarting: Boolean,
     livePositionMillis: Long?,
     liveDurationMillis: Long?,
     onTogglePlay: () -> Unit,
@@ -163,13 +165,23 @@ private fun EpisodeDetailContent(
 
         Spacer(modifier = Modifier.height(20.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = onTogglePlay, modifier = Modifier.weight(1f)) {
-                Icon(
-                    if (isPlayingThis) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = null
-                )
+            Button(onClick = onTogglePlay, enabled = !isStarting, modifier = Modifier.weight(1f)) {
+                // The button keeps its label while starting rather than swapping to a bare spinner,
+                // so it does not change width and jump the row it sits in.
+                if (isStarting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(
+                        if (isPlayingThis) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null
+                    )
+                }
                 Text(
-                    playButtonLabel(isPlayingThis, progress.showBar, episode.isPlayed),
+                    if (isStarting) "Starting" else playButtonLabel(isPlayingThis, progress.showBar, episode.isPlayed),
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }

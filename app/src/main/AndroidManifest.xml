@@ -5,6 +5,10 @@
          self-documenting, and doesn't rely on a transitive dependency continuing to declare it. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Read-only, and only to answer "is there a usable connection" before starting playback, so
+         a tap with no signal fails immediately instead of hanging inside ExoPlayer's retries. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- Episode downloads. Unlike media playback, dataSync carries a daily runtime budget on

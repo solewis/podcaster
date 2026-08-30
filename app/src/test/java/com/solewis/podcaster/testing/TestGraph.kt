@@ -8,6 +8,7 @@ import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.AppContainer
+import com.solewis.podcaster.player.PlaybackStarter
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,7 @@ class TestGraph : Closeable {
     val db: PodcasterDatabase = inMemoryDatabase()
     val playback = FakePlayback()
     val downloads = FakeDownloads()
+    val connectivity = FakeConnectivity()
 
     /** Advance to make a later write observably later - `now` is read at each call, not captured. */
     var clock: Long = 1_000L
@@ -56,13 +58,17 @@ class TestGraph : Closeable {
      */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+    /** The one route into playback, so a test can take the network away and see what happens. */
+    val playbackStarter by lazy { PlaybackStarter(playback, downloads, connectivity, appScope) }
+
     fun appContainer(httpClient: OkHttpClient = OkHttpClient()): AppContainer = AppContainer(
         context = ApplicationProvider.getApplicationContext(),
         database = db,
         httpClient = httpClient,
         playbackFactory = { playback },
         downloadsOverride = downloads,
-        appScope = appScope
+        appScope = appScope,
+        connectivity = connectivity
     )
 
     private val viewModels = ViewModelHost()

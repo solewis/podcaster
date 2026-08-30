@@ -61,7 +61,8 @@ class ShowViewModelTest {
                 subscriptions,
                 graph.queueRepository,
                 graph.playback,
-                graph.downloads
+                graph.downloads,
+                graph.playbackStarter
             )
         )
 

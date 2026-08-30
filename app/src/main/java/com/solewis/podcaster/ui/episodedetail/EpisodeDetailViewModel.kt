@@ -7,6 +7,7 @@ import com.solewis.podcaster.data.repo.Downloads
 import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.QueueRepository
+import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayedMarker
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,7 +21,8 @@ class EpisodeDetailViewModel(
     private val episodeRepository: EpisodeRepository,
     private val queueRepository: QueueRepository,
     private val playback: Playback,
-    private val downloads: Downloads
+    private val downloads: Downloads,
+    private val playbackStarter: PlaybackStarter
 ) : ViewModel() {
 
     private val playedMarker = PlayedMarker(episodeRepository, playback)
@@ -38,15 +40,18 @@ class EpisodeDetailViewModel(
         val livePositionMillis: Long? = null,
         val liveDurationMillis: Long? = null,
         /** Null when this episode is not downloaded and nothing is in flight for it. */
-        val download: EpisodeDownload? = null
+        val download: EpisodeDownload? = null,
+        /** Tapped play, no sound yet - see [com.solewis.podcaster.player.PlaybackStarter]. */
+        val isStarting: Boolean = false
     )
 
     val state: StateFlow<UiState> = combine(
         episodeRepository.observeEpisodeDetail(episodeId),
         playback.state,
         playback.progress,
-        downloads.observe()
-    ) { episode, playback, progress, downloadStates ->
+        downloads.observe(),
+        playbackStarter.pendingEpisodeId
+    ) { episode, playback, progress, downloadStates, pending ->
         val isThis = playback.episodeId == episodeId
         UiState(
             episode = episode,
@@ -54,7 +59,8 @@ class EpisodeDetailViewModel(
             isPlayingThis = isThis && playback.isPlaying,
             livePositionMillis = progress.positionMillis.takeIf { isThis },
             liveDurationMillis = progress.durationMillis?.takeIf { isThis },
-            download = downloadStates[episodeId]
+            download = downloadStates[episodeId],
+            isStarting = pending == episodeId
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
@@ -66,7 +72,7 @@ class EpisodeDetailViewModel(
                 return@launch
             }
             val playable = episodeRepository.getPlayableById(episodeId) ?: return@launch
-            playback.play(playable)
+            playbackStarter.start(playable)
         }
     }
 

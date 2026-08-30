@@ -20,6 +20,9 @@ import com.solewis.podcaster.data.repo.ShowPreviewRepository
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.player.MediaStorage
+import com.solewis.podcaster.data.net.AndroidConnectivity
+import com.solewis.podcaster.data.net.Connectivity
+import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayerConnection
 import com.solewis.podcaster.player.SleepTimer
@@ -57,7 +60,9 @@ class AppContainer(
      * test - and a `Dispatchers.Main` one at that, which then collides with the next test's
      * `setMain` as "Dispatchers.Main is used concurrently with setting it".
      */
-    private val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+    /** Substituted in tests, since a JVM test cannot arrange for the network to be absent. */
+    private val connectivity: Connectivity = AndroidConnectivity(context)
 ) {
 
     private val appContext = context.applicationContext
@@ -97,6 +102,11 @@ class AppContainer(
      * is the entire point of a sleep timer. Its scope is deliberately not a ViewModel's.
      */
     val sleepTimer: SleepTimer by lazy { SleepTimer(playback, appScope) }
+
+    /** The one way an episode gets started - see [PlaybackStarter] for why that is worth centralising. */
+    val playbackStarter: PlaybackStarter by lazy {
+        PlaybackStarter(playback, downloads, connectivity, appScope)
+    }
 
     companion object {
 

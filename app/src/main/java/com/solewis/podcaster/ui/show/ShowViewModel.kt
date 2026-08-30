@@ -13,6 +13,7 @@ import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.data.repo.RefreshResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.domain.JumpTargetResolver
+import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayedMarker
 import com.solewis.podcaster.ui.common.formatDuration
@@ -31,7 +32,8 @@ class ShowViewModel(
     private val subscriptionRepository: SubscriptionRepository,
     private val queueRepository: QueueRepository,
     private val playback: Playback,
-    private val downloads: Downloads
+    private val downloads: Downloads,
+    private val playbackStarter: PlaybackStarter
 ) : ViewModel() {
 
     private val playedMarker = PlayedMarker(episodeRepository, playback)
@@ -49,6 +51,9 @@ class ShowViewModel(
     ) { podcast, episodes ->
         buildUiState(podcast, episodes)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
+
+    /** The episode waiting to become audible, so a tapped row can show it - see [PlaybackStarter]. */
+    val pendingEpisodeId: StateFlow<String?> = playbackStarter.pendingEpisodeId
 
     /** Separate from [state] so a download progress tick doesn't recompose the whole episode list. */
     val downloadStates: StateFlow<Map<String, EpisodeDownload>> = downloads.observe()
@@ -147,7 +152,7 @@ class ShowViewModel(
         val podcast = state.value.podcast ?: return
         viewModelScope.launch {
             val playable = episodeRepository.getPlayable(episodeId, podcast.title, podcast.artworkUrl) ?: return@launch
-            playback.play(playable)
+            playbackStarter.start(playable)
         }
     }
 
