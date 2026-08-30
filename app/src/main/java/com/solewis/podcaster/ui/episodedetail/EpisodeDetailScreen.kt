@@ -191,6 +191,7 @@ private fun EpisodeDetailContent(
             }
             Spacer(modifier = Modifier.width(4.dp))
             DownloadButton(
+                episodeTitle = episode.title,
                 download = download,
                 onDownload = onDownload,
                 onRemove = onRemoveDownload

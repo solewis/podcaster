@@ -119,13 +119,20 @@ class EpisodeActionsMenuTest {
     }
 
     @Test
-    fun a_finished_download_offers_to_delete_it() {
+    fun a_finished_download_names_the_action_and_confirms_it() {
         render(download = state(DownloadStatus.DOWNLOADED))
         openMenu()
 
+        // Labelled, rather than the bare check mark this replaced - which gave no indication that
+        // tapping it was the delete control at all.
         compose.onNodeWithText("Delete download").assertExists()
         compose.onNodeWithTag(TestTags.MENU_DOWNLOAD).performClick()
+        compose.waitForIdle()
 
+        assertThat(removed).isEqualTo(0)
+        compose.onNodeWithText("Delete download?").assertExists()
+        compose.onNodeWithText("Delete").performClick()
+        compose.waitForIdle()
         assertThat(removed).isEqualTo(1)
     }
 

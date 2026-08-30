@@ -10,6 +10,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.solewis.podcaster.data.repo.PlayableEpisode
 import com.solewis.podcaster.data.settings.SettingsStore
+import kotlin.math.ceil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -59,11 +60,14 @@ class PlayerConnection(
     init {
         scope.launch {
             while (true) {
-                delay(PROGRESS_TICK_MILLIS)
                 val mediaController = controller
-                if (mediaController != null && _state.value.isPlaying) {
-                    publishProgress(mediaController.currentPosition)
+                if (mediaController == null || !_state.value.isPlaying) {
+                    delay(IDLE_POLL_MILLIS)
+                    continue
                 }
+                val position = mediaController.currentPosition
+                publishProgress(position)
+                delay(millisUntilNextDisplayedSecond(position, _state.value.speed))
             }
         }
     }
@@ -232,7 +236,8 @@ class PlayerConnection(
     }
 
     private companion object {
-        const val PROGRESS_TICK_MILLIS = 500L
+        /** How often to look for playback having started, while nothing is playing. */
+        const val IDLE_POLL_MILLIS = 500L
 
         /** Worth telling apart, because "no connection" is actionable and "broken feed" is not. */
         val NETWORK_ERROR_CODES = setOf(
@@ -244,3 +249,38 @@ class PlayerConnection(
         )
     }
 }
+
+/**
+ * How long to wait before the on-screen clock should change, given where playback is and how fast
+ * it is going.
+ *
+ * The ticker used to sample every 500ms of *wall* time and then floor the result to whole seconds,
+ * which is fine only when those two rates line up. At 1.75x each sample advances 875ms of media,
+ * and since 875 does not divide 1000, one displayed second in every seven gets two samples instead
+ * of one - so that second sits on screen for twice as long as its neighbours. Roughly one visible
+ * hitch every four seconds, and the reason it was never noticed at 1x or 2x, where the rates divide
+ * evenly and every second gets the same number of samples.
+ *
+ * Waiting for the *next second boundary in media time* removes the aliasing rather than reducing
+ * it: the display advances exactly once per displayed second at any speed. It is also fewer
+ * wakeups than before at normal speed.
+ */
+internal fun millisUntilNextDisplayedSecond(positionMillis: Long, speed: Float): Long {
+    val untilNextSecond = 1_000L - (positionMillis % 1_000L)
+    val wallMillis = untilNextSecond / speed.coerceAtLeast(MIN_SPEED)
+    // Rounded *up*, so the wait lands on or a hair past the boundary. Flooring undershoots it by
+    // a fraction of a millisecond every single time, which costs a second wakeup to cover the
+    // remainder - and that wakeup lands inside the next second, making the displayed seconds
+    // uneven again in exactly the way this exists to prevent. Overshooting by under a millisecond
+    // of media is free, since the display floors to whole seconds anyway.
+    return ceil(wallMillis).toLong().coerceIn(MIN_TICK_MILLIS, MAX_TICK_MILLIS)
+}
+
+/** Guards against a nonsensical or zero speed turning the delay into an infinity. */
+private const val MIN_SPEED = 0.1f
+
+/** Never busier than 20 wakeups a second, however close to a boundary a seek happens to land. */
+private const val MIN_TICK_MILLIS = 50L
+
+/** At the slowest speed a second of media still takes at most this long to arrive. */
+private const val MAX_TICK_MILLIS = 1_000L

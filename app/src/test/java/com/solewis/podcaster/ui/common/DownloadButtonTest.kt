@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -33,6 +34,7 @@ class DownloadButtonTest {
         compose.setContent {
             PodcasterTheme {
                 DownloadButton(
+                    episodeTitle = "Patient Zero",
                     download = download,
                     onDownload = { downloadCalls++ },
                     onRemove = { removeCalls++ }
@@ -65,12 +67,40 @@ class DownloadButtonTest {
     }
 
     @Test
-    fun tapping_a_finished_download_deletes_it() {
+    fun deleting_a_finished_download_asks_first() {
         render(state(DownloadStatus.DOWNLOADED))
 
         compose.onNodeWithContentDescription("Downloaded - tap to delete").performClick()
+        compose.waitForIdle()
+
+        // An unlabelled icon quietly discarding tens of megabytes is not an obvious enough
+        // affordance for what it does.
+        assertThat(removeCalls).isEqualTo(0)
+        compose.onNodeWithText("Delete download?").assertExists()
+    }
+
+    @Test
+    fun confirming_the_dialog_deletes_it() {
+        render(state(DownloadStatus.DOWNLOADED))
+        compose.onNodeWithContentDescription("Downloaded - tap to delete").performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithText("Delete").performClick()
+        compose.waitForIdle()
 
         assertThat(removeCalls).isEqualTo(1)
+    }
+
+    @Test
+    fun keeping_it_changes_nothing() {
+        render(state(DownloadStatus.DOWNLOADED))
+        compose.onNodeWithContentDescription("Downloaded - tap to delete").performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithText("Keep").performClick()
+        compose.waitForIdle()
+
+        assertThat(removeCalls).isEqualTo(0)
     }
 
     @Test

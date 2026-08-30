@@ -27,7 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.repo.DownloadStatus
-import com.solewis.podcaster.ui.common.DownloadButton
+import com.solewis.podcaster.ui.common.EpisodeActionsMenu
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.TestTags
@@ -107,12 +107,17 @@ fun DownloadsList(
                     IconButton(onClick = { viewModel.play(row.episode.id) }) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "Play ${row.episode.title}")
                     }
-                    DownloadButton(
+                    // The same menu the other lists use, rather than a bare icon. Removing a
+                    // download was previously a tap on an unlabelled check mark, which gave no clue
+                    // that it was the delete control at all.
+                    EpisodeActionsMenu(
+                        episodeTitle = row.episode.title,
+                        isPlayed = row.episode.isPlayed,
                         download = row.download,
-                        // Only ever reached from the failed state here: every row on this screen
-                        // has a download, so the button's "not downloaded" branch cannot fire.
+                        onEnqueue = { viewModel.enqueue(row.episode.id) },
                         onDownload = { viewModel.retry(row.episode.id) },
-                        onRemove = { viewModel.remove(row.episode.id) }
+                        onRemoveDownload = { viewModel.remove(row.episode.id) },
+                        onTogglePlayed = { viewModel.togglePlayed(row.episode) }
                     )
                 }
                 HorizontalDivider()

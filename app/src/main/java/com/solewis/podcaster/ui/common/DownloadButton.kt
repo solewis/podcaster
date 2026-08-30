@@ -12,6 +12,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -30,18 +34,32 @@ import com.solewis.podcaster.data.repo.EpisodeDownload
  */
 @Composable
 fun DownloadButton(
+    episodeTitle: String,
     download: EpisodeDownload?,
     onDownload: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val status = download?.status
+    var confirmingDelete by remember { mutableStateOf(false) }
+
+    if (confirmingDelete) {
+        DeleteDownloadDialog(
+            episodeTitle = episodeTitle,
+            onConfirm = { confirmingDelete = false; onRemove() },
+            onDismiss = { confirmingDelete = false }
+        )
+    }
+
     IconButton(
         onClick = {
             when (status) {
                 null, DownloadStatus.FAILED -> onDownload()
-                // Cancelling an in-flight download and deleting a finished one are the same call:
-                // Media3 removes the partial data either way.
+                // An unlabelled icon that silently discards tens of megabytes is not an obvious
+                // enough affordance for what it does - so a finished download is confirmed first.
+                DownloadStatus.DOWNLOADED -> confirmingDelete = true
+                // Cancelling an in-flight download needs no ceremony; Media3 drops the partial
+                // data either way.
                 else -> onRemove()
             }
         },

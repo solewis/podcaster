@@ -53,6 +53,15 @@ fun EpisodeActionsMenu(
     modifier: Modifier = Modifier
 ) {
     var open by remember { mutableStateOf(false) }
+    var confirmingDelete by remember { mutableStateOf(false) }
+
+    if (confirmingDelete) {
+        DeleteDownloadDialog(
+            episodeTitle = episodeTitle,
+            onConfirm = { confirmingDelete = false; onRemoveDownload() },
+            onDismiss = { confirmingDelete = false }
+        )
+    }
 
     Box(modifier = modifier) {
         IconButton(
@@ -84,9 +93,15 @@ fun EpisodeActionsMenu(
                     open = false
                     onDownload()
                 },
+                // Only a finished download is worth confirming; cancelling one in flight has
+                // nothing to lose but the time already spent.
                 onRemove = {
                     open = false
-                    onRemoveDownload()
+                    if (download?.status == DownloadStatus.DOWNLOADED) {
+                        confirmingDelete = true
+                    } else {
+                        onRemoveDownload()
+                    }
                 }
             )
         }

@@ -7,6 +7,8 @@ import com.solewis.podcaster.data.repo.DownloadStatus
 import com.solewis.podcaster.data.repo.Downloads
 import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
+import com.solewis.podcaster.data.repo.QueueRepository
+import com.solewis.podcaster.player.PlayedMarker
 import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,8 +28,11 @@ class DownloadsViewModel(
     private val episodeRepository: EpisodeRepository,
     private val downloads: Downloads,
     private val playback: Playback,
-    private val playbackStarter: PlaybackStarter
+    private val playbackStarter: PlaybackStarter,
+    private val queueRepository: QueueRepository
 ) : ViewModel() {
+
+    private val playedMarker = PlayedMarker(episodeRepository, playback)
 
     data class Row(val episode: EpisodeFeedItem, val download: EpisodeDownload)
 
@@ -81,5 +86,15 @@ class DownloadsViewModel(
     /** For a download that failed - the only state on this screen where the button re-downloads. */
     fun retry(episodeId: String) {
         viewModelScope.launch { downloads.download(episodeId) }
+    }
+
+    fun enqueue(episodeId: String) {
+        viewModelScope.launch { queueRepository.enqueue(episodeId) }
+    }
+
+    fun togglePlayed(episode: EpisodeFeedItem) {
+        viewModelScope.launch {
+            playedMarker.setPlayed(episode.id, played = !episode.isPlayed, durationMillis = episode.durationMillis)
+        }
     }
 }

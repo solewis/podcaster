@@ -41,7 +41,7 @@ class DownloadsViewModelTest {
     fun tearDown() = graph.close()
 
     private fun viewModel() = graph.hosting(
-        DownloadsViewModel(graph.episodeRepository, graph.downloads, graph.playback, graph.playbackStarter)
+        DownloadsViewModel(graph.episodeRepository, graph.downloads, graph.playback, graph.playbackStarter, graph.queueRepository)
     )
 
     @Test

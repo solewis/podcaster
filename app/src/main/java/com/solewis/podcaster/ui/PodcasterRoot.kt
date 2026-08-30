@@ -217,7 +217,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 container.episodeRepository,
                                 container.downloads,
                                 container.playback,
-                                container.playbackStarter
+                                container.playbackStarter,
+                                container.queueRepository
                             )
                         }
                     }
