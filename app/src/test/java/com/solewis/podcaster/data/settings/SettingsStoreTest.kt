@@ -35,9 +35,6 @@ class SettingsStoreTest {
             assertThat(skipForward).isEqualTo(SkipAmount.FIFTEEN)
             assertThat(theme).isEqualTo(ThemeMode.SYSTEM)
             assertThat(autoAdvance).isTrue()
-            // Off unless asked for: sound starting by itself as an engine turns over is assertive
-            // enough that it should be opted into.
-            assertThat(autoPlayInCar).isFalse()
         }
     }
 
@@ -59,7 +56,6 @@ class SettingsStoreTest {
             skipBack = SkipAmount.FIVE
             theme = ThemeMode.DARK
             autoAdvance = false
-            autoPlayInCar = true
         }
 
         // The service and the Activity each hold their own instance, so they have to agree.
@@ -67,7 +63,6 @@ class SettingsStoreTest {
             assertThat(skipBack).isEqualTo(SkipAmount.FIVE)
             assertThat(theme).isEqualTo(ThemeMode.DARK)
             assertThat(autoAdvance).isFalse()
-            assertThat(autoPlayInCar).isTrue()
         }
     }
 

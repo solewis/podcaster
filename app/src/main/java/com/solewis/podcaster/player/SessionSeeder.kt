@@ -15,9 +15,15 @@ import com.solewis.podcaster.data.repo.EpisodeRepository
  * reading its own restored state, still showed the episode. Pressing play on the phone loaded the
  * item and Auto caught up instantly, which is the signature of exactly that gap.
  *
- * Deliberately does **not** prepare. [androidx.media3.common.util.Util.handlePlayButtonAction] -
- * which is what a session routes a play command through - prepares an idle player first. So the
- * metadata costs nothing and not a byte is fetched until somebody actually presses play.
+ * It also prepares, which an earlier version deliberately avoided in order to fetch nothing until
+ * play was pressed. That was wrong, and wrong in a way only a car reveals: an unprepared player is
+ * `STATE_IDLE` and therefore has no timeline, so `COMMAND_SEEK_BACK` and `COMMAND_SEEK_FORWARD` are
+ * *unavailable* - and Media3 disables a `CommandButton` whose player command is unavailable. The
+ * session looked controllable and was not. Verified on a device: idle reports `seekBack=false,
+ * seekFwd=false`, which is precisely a car whose skip buttons do nothing.
+ *
+ * So the buffering is the price of a session that actually works. It is bounded by the load control
+ * and only happens when a controller connects, which is to say when something already wants to play.
  */
 class SessionSeeder(private val episodeRepository: EpisodeRepository) {
 
@@ -27,5 +33,6 @@ class SessionSeeder(private val episodeRepository: EpisodeRepository) {
         // the time the database answers something may already be loaded or playing.
         if (player.currentMediaItem != null) return
         player.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
+        player.prepare()
     }
 }

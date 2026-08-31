@@ -34,7 +34,6 @@ object TestTags {
     const val SETTINGS_SCREEN = "settingsScreen"
     const val SETTINGS_BUTTON = "settingsButton"
     const val AUTO_ADVANCE_SWITCH = "autoAdvanceSwitch"
-    const val AUTO_PLAY_IN_CAR_SWITCH = "autoPlayInCarSwitch"
     const val TOGGLE_PLAYED = "togglePlayed"
     const val SHOW_MENU = "showMenu"
     const val MARK_ALL_PLAYED = "markAllPlayed"

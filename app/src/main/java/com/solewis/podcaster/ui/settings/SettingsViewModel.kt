@@ -35,8 +35,4 @@ class SettingsViewModel(private val store: SettingsStore) : ViewModel() {
     fun setAutoAdvance(enabled: Boolean) {
         store.autoAdvance = enabled
     }
-
-    fun setAutoPlayInCar(enabled: Boolean) {
-        store.autoPlayInCar = enabled
-    }
 }

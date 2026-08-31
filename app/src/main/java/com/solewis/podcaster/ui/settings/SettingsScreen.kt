@@ -79,16 +79,6 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             }
             HorizontalDivider()
             ToggleRow(
-                title = "Start playing when the car connects",
-                // Says what it governs, without promising more than it can deliver: Android Auto
-                // has its own resume behaviour that no app can decline.
-                subtitle = "Begin the episode you were listening to as soon as Android Auto connects. It is loaded and ready either way.",
-                checked = settings.autoPlayInCar,
-                onCheckedChange = viewModel::setAutoPlayInCar,
-                testTag = TestTags.AUTO_PLAY_IN_CAR_SWITCH
-            )
-            HorizontalDivider()
-            ToggleRow(
                 title = "Play the next episode automatically",
                 // Says what happens, not what the flag is called: the queue keeps its contents
                 // either way, so the honest description is about what happens at the end.

@@ -11,6 +11,7 @@ import com.solewis.podcaster.data.db.PodcasterDatabase
 import com.solewis.podcaster.data.db.entity.EpisodeEntity
 import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.repo.EpisodeRepository
+import com.solewis.podcaster.testing.awaitPlayer
 import com.solewis.podcaster.testing.onMain
 import com.solewis.podcaster.testing.silenceSource
 import kotlinx.coroutines.runBlocking
@@ -110,15 +111,31 @@ class SessionSeederTest {
     }
 
     @Test
-    fun seeding_costs_nothing_until_somebody_presses_play() {
+    fun seeding_prepares_so_the_transport_controls_are_not_dead() {
         insertEpisode(positionMillis = 90_000, lastPlayedAt = 5_000)
 
         seed()
 
-        // Idle, not buffering: the point of seeding without preparing is that a car connecting -
-        // or the service merely existing - does not pull down audio nobody asked to hear. Media3
-        // prepares an idle player on the way through a play command, so nothing is lost.
-        assertThat(onMain { player.playbackState }).isEqualTo(Player.STATE_IDLE)
+        // Not STATE_IDLE. An earlier version left it idle on purpose, to fetch nothing until play
+        // was pressed - which cost the car its skip buttons entirely, since an idle player has no
+        // timeline and so offers no seek commands for those buttons to be bound to.
+        assertThat(onMain { player.playbackState }).isNotEqualTo(Player.STATE_IDLE)
+    }
+
+    @Test
+    fun an_idle_player_offers_no_seek_commands_which_is_why_preparing_matters() {
+        // The mechanism itself, on a source that really loads. Media3 disables a CommandButton
+        // whose player command is unavailable, so this is the difference between a car whose
+        // forward/back work and one where they do nothing at all.
+        onMain { player.setMediaSource(silenceSource("ep", 600_000)) }
+        assertThat(onMain { player.isCommandAvailable(Player.COMMAND_SEEK_BACK) }).isFalse()
+        assertThat(onMain { player.isCommandAvailable(Player.COMMAND_SEEK_FORWARD) }).isFalse()
+
+        onMain { player.prepare() }
+        awaitPlayer("ready") { onMain { player.playbackState } == Player.STATE_READY }
+
+        assertThat(onMain { player.isCommandAvailable(Player.COMMAND_SEEK_BACK) }).isTrue()
+        assertThat(onMain { player.isCommandAvailable(Player.COMMAND_SEEK_FORWARD) }).isTrue()
     }
 
     @Test

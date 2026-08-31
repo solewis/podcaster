@@ -65,8 +65,7 @@ class PlaybackService : MediaLibraryService() {
             podcastRepository = container.podcastRepository,
             episodeRepository = container.episodeRepository,
             queueRepository = container.queueRepository,
-            scope = lifecycleScope,
-            autoPlayInCar = { container.settings.autoPlayInCar }
+            scope = lifecycleScope
         )
         mediaSession = MediaLibrarySession.Builder(this, sessionPlayer, callback)
             .setBitmapLoader(CacheBitmapLoader(DataSourceBitmapLoader.Builder(this).build()))

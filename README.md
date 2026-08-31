@@ -67,6 +67,12 @@ Sharing one would mean an episode you downloaded for a flight getting evicted to
 something streamed. `PlayerFactory` nests them so the download cache is read first and never
 written — see its doc for why read-only matters.
 
+`SessionSeeder` loads the last-played episode into the session as the service starts, **and
+prepares it**. Not preparing was tried and broke the car: an idle player has no timeline, so
+`COMMAND_SEEK_BACK`/`FORWARD` are unavailable, and Media3 disables a `CommandButton` bound to an
+unavailable command — the skip buttons were dead while the session looked perfectly controllable.
+Auto-play on connect is Android Auto's own behaviour and is deliberately not reimplemented here.
+
 Both caches and the download manager live in `MediaStorage` at **process** scope, not in
 `AppContainer`. Media3 allows one `SimpleCache` per directory per process, while `AppContainer` is
 deliberately built more than once (an instrumentation test installs its own). That was harmless
