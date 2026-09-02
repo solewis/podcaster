@@ -14,6 +14,7 @@ import kotlin.math.ceil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import androidx.media3.common.PlaybackException
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -149,7 +150,53 @@ class PlayerConnection(
             }
         })
         controller = newController
+        // The listener above only ever hears about *changes*. Connecting to a session that is
+        // already playing - started from the notification, the car, or a headset button - fires
+        // nothing at all, so without this the UI would sit on its default paused state while
+        // audio came out of the speaker. Read the truth once, up front.
+        adoptSessionState(newController)
         return newController
+    }
+
+    /**
+     * Replaces the UI's playback state with whatever the session actually holds.
+     *
+     * Returns false when the session has no episode loaded, which is the caller's cue that there
+     * is nothing to adopt and the saved position in Room is still the best thing to show.
+     */
+    private fun adoptSessionState(mediaController: MediaController): Boolean {
+        val item = mediaController.currentMediaItem ?: return false
+        // The session is the authority now, so a pending restore must not be applied over it -
+        // loadedController would otherwise reload this same episode at its Room position and
+        // undo a seek made from the notification.
+        restored = null
+        _state.value = PlaybackUiState(
+            episodeId = item.mediaId,
+            title = item.mediaMetadata.title?.toString(),
+            podcastTitle = item.mediaMetadata.artist?.toString(),
+            artworkUrl = item.mediaMetadata.artworkUri?.toString(),
+            isPlaying = mediaController.isPlaying,
+            speed = mediaController.playbackParameters.speed
+        )
+        publishProgress(mediaController.currentPosition)
+        return true
+    }
+
+    /**
+     * Picks up playback that was started or changed outside the app, without starting a service
+     * that isn't already there.
+     *
+     * The reported bug: play from the pull-down notification while the app is closed, then tap the
+     * notification to open it, and the app showed the episode paused while it was audibly playing.
+     * The controller is built lazily, on the first command the user issues - so on a launch where
+     * they issue none, nothing ever connected, and nothing ever contradicted the paused state
+     * [restore] had put up from Room.
+     */
+    override suspend fun syncWithSession(): Boolean {
+        // Nothing running means nothing to adopt, and asking by connecting would start the very
+        // service whose absence is the answer - see PlaybackService.isRunning.
+        if (controller == null && !PlaybackService.isRunning) return false
+        return adoptSessionState(controller())
     }
 
     override suspend fun play(episode: PlayableEpisode) {
@@ -233,6 +280,20 @@ class PlayerConnection(
 
     override suspend fun setSpeed(speed: Float) {
         controller().setPlaybackSpeed(speed)
+    }
+
+    /**
+     * Drops the controller and stops the progress ticker.
+     *
+     * Nothing in the app calls this - the connection is app-scoped and outlives every screen on
+     * purpose. It exists so a test can stand up more than one of these in a process without the
+     * discarded ones keeping a binder connection and a coroutine alive to interfere with the next.
+     */
+    @androidx.annotation.VisibleForTesting
+    fun release() {
+        controller?.release()
+        controller = null
+        scope.cancel()
     }
 
     private companion object {

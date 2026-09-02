@@ -166,5 +166,9 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    // Serves a local audio file over real HTTP for the on-device session tests. Needed because the
+    // player's data source chain is HTTP-only (see PlayerFactory), so a file:// URI is not
+    // playable through it - the same reason the JVM tests already use this for feeds.
+    androidTestImplementation(libs.okhttp.mockwebserver)
     debugImplementation(libs.compose.ui.test.manifest)
 }

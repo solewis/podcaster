@@ -47,6 +47,16 @@ interface Playback {
     suspend fun play(episode: PlayableEpisode)
 
     /**
+     * Adopts the playback service's own state, if a session is already alive, and reports whether
+     * there was one to adopt.
+     *
+     * Exists because playback can start without the app: the pull-down notification, Android Auto,
+     * a headset button. Nothing in here should start a service that is not already running - a
+     * launch where the user only wants to browse must stay as cheap as it was.
+     */
+    suspend fun syncWithSession(): Boolean
+
+    /**
      * Puts [episode] back in front of the user after the app was killed - shown, paused, at its
      * saved position - without starting playback. See [PlayerConnection.restore] for what is and
      * is not actually loaded into a player.

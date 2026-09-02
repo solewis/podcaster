@@ -54,6 +54,23 @@ class FakePlayback : Playback {
     }
 
     /**
+     * What the service would report. Defaults to "nothing running", the ordinary case; a test that
+     * wants the notification-started-it case sets [liveSessionEpisodeId] first.
+     */
+    var liveSessionEpisodeId: String? = null
+    var syncWithSessionCount = 0
+        private set
+
+    override suspend fun syncWithSession(): Boolean {
+        syncWithSessionCount++
+        val episodeId = liveSessionEpisodeId ?: return false
+        // Adopting means the session's own truth wins, playing included - the whole point being
+        // that it may well be playing when the app knew nothing about it.
+        _state.value = _state.value.copy(episodeId = episodeId, isPlaying = true)
+        return true
+    }
+
+    /**
      * Mirrors the real thing: the episode becomes what the UI shows - paused, at its saved
      * position - without any player having loaded it.
      */

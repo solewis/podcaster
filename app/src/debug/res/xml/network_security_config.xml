@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug builds only, and localhost only.
+
+    The on-device session tests serve a silent audio file from a MockWebServer on the loopback
+    interface, and cleartext HTTP has been blocked by default since API 28 - so without this the
+    player rejects the connection and nothing ever plays, which looks identical to a broken test.
+    Scoped to the loopback addresses rather than switching cleartext on wholesale, and it lives in
+    src/debug so the release manifest is untouched.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

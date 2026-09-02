@@ -14,6 +14,11 @@ class PlaybackRestorer(
 ) {
     /** No-op on a fresh install, and on any launch where nothing has ever been played. */
     suspend fun restore() {
+        // A live session outranks anything in Room. Without this check the app would open showing
+        // the last saved position, paused, over playback that was still going - which is exactly
+        // what happened when playback had been started from the pull-down notification while the
+        // app was closed. Room only records where playback *was*.
+        if (playback.syncWithSession()) return
         val episode = episodeRepository.getLastPlayed() ?: return
         // Checked after the read, not before: the read suspends, and startup races the first
         // frame, so the user may have tapped an episode in the meantime. That live session owns

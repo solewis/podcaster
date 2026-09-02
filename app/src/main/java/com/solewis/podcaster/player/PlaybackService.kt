@@ -101,6 +101,8 @@ class PlaybackService : MediaLibraryService() {
                 container.settings.autoAdvance && !stoppingForSleep
             }
         )
+        // Last, so the flag is only true once there is a session for a controller to adopt.
+        isRunning = true
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = mediaSession
@@ -116,6 +118,22 @@ class PlaybackService : MediaLibraryService() {
      * *about* the thing playing - being dropped onto a search screen after tapping it would be a
      * non-sequitur.
      */
+    companion object {
+        /**
+         * Whether a session exists for a controller to adopt state from, answerable without
+         * binding anything.
+         *
+         * Binding is what makes this worth knowing: building a `MediaController` *starts* this
+         * service, so the app cannot ask "is something playing?" by connecting - on the many
+         * launches where the user only wants to browse, that would spin up a player and an
+         * `ExoPlayer` for nothing. The service and the UI share one process (no `android:process`
+         * on the manifest entry), so a plain flag is an honest answer rather than a guess.
+         */
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+    }
+
     private fun nowPlayingIntent(): PendingIntent = PendingIntent.getActivity(
         this,
         /* requestCode = */ 0,
@@ -172,6 +190,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         progressWriter.flushBlocking()
         mediaSession.release()
         // Releases the wrapped ExoPlayer too, and detaches the listener the wrapper holds on it.

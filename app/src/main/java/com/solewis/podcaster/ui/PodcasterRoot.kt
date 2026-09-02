@@ -90,6 +90,12 @@ fun PodcasterRoot(
     // refreshStale skips anything checked recently; see its own doc for the reasoning.
     LifecycleEventEffect(Lifecycle.Event.ON_START) {
         scope.launch { container.subscriptionRepository.refreshStale() }
+        // Coming back to a session that moved on without us. Startup adopts it once, but playback
+        // can be started or paused from the notification at any point while the app sits in the
+        // background - and if no controller has been built yet there is no listener to hear it,
+        // so the app would come forward still showing whatever it last knew. Costs nothing when
+        // no session is running; see Playback.syncWithSession.
+        scope.launch { container.playback.syncWithSession() }
     }
 
     val topLevelRoutes = listOf(
