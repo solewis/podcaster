@@ -63,11 +63,17 @@ import com.solewis.podcaster.ui.show.ShowViewModel
 import com.solewis.podcaster.ui.showpreview.ShowPreviewScreen
 import com.solewis.podcaster.ui.showpreview.ShowPreviewViewModel
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
 @Composable
-fun PodcasterRoot(container: AppContainer) {
+fun PodcasterRoot(
+    container: AppContainer,
+    /** Bumped when the notification or the car asks for Now Playing; see `MainActivity`. */
+    openNowPlayingRequests: StateFlow<Int> = MutableStateFlow(0)
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -114,6 +120,15 @@ fun PodcasterRoot(container: AppContainer) {
     LaunchedEffect(Unit) {
         merge(container.playbackStarter.messages, container.playback.errors)
             .collect { snackbarHostState.showSnackbar(it) }
+    }
+
+    val nowPlayingRequest by openNowPlayingRequests.collectAsState()
+    LaunchedEffect(nowPlayingRequest) {
+        // Guarded rather than fired blindly: this re-runs on a fresh composition after a rotation,
+        // and navigating to a screen you are already on would stack a second copy of it.
+        if (nowPlayingRequest > 0 && currentDestination?.hasRoute(Route.NowPlaying::class) != true) {
+            navController.navigate(Route.NowPlaying)
+        }
     }
 
     Scaffold(

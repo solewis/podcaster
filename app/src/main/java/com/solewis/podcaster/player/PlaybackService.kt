@@ -1,5 +1,6 @@
 package com.solewis.podcaster.player
 
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.Player
@@ -10,6 +11,7 @@ import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import com.solewis.podcaster.MainActivity
 import com.solewis.podcaster.PodcasterApp
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.settings.AppSettings
@@ -68,6 +70,7 @@ class PlaybackService : MediaLibraryService() {
             scope = lifecycleScope
         )
         mediaSession = MediaLibrarySession.Builder(this, sessionPlayer, callback)
+            .setSessionActivity(nowPlayingIntent())
             .setBitmapLoader(CacheBitmapLoader(DataSourceBitmapLoader.Builder(this).build()))
             .setMediaButtonPreferences(
                 skipButtonPreferences(container.settings.skipBack, container.settings.skipForward)
@@ -101,6 +104,26 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = mediaSession
+
+    /**
+     * Where tapping the notification - or the car's "open app" - lands.
+     *
+     * Without a session activity the notification has no content intent at all, so tapping it did
+     * nothing: the transport buttons worked while the notification itself was inert. Media3's
+     * default notification provider takes the content intent from here and nowhere else.
+     *
+     * Aimed at Now Playing rather than wherever the app was last left, because the notification is
+     * *about* the thing playing - being dropped onto a search screen after tapping it would be a
+     * non-sequitur.
+     */
+    private fun nowPlayingIntent(): PendingIntent = PendingIntent.getActivity(
+        this,
+        /* requestCode = */ 0,
+        Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN_NOW_PLAYING, true),
+        // Immutable because nothing outside the app has any business rewriting it, and mutability
+        // must be stated explicitly from Android 12 onwards.
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
 
     private fun seedLastPlayedEpisode(episodeRepository: EpisodeRepository) {
         lifecycleScope.launch { SessionSeeder(episodeRepository).seed(player) }
