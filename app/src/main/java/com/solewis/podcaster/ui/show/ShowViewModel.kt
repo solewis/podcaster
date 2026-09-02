@@ -61,7 +61,9 @@ class ShowViewModel(
 
     val nowPlaying: StateFlow<NowPlaying> = combine(playback.state, playback.progress) { state, progress ->
         NowPlaying(
-            episodeId = state.episodeId.takeIf { state.isPlaying },
+            // See HomeViewModel: intent rather than audibility, so a seek does not flicker the
+            // row's icon or detach it from the live position.
+            episodeId = state.episodeId.takeIf { state.playWhenReady },
             positionMillis = progress.positionMillis,
             durationMillis = progress.durationMillis
         )

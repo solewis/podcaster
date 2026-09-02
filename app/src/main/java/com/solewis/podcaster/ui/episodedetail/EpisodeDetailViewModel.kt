@@ -56,7 +56,7 @@ class EpisodeDetailViewModel(
         UiState(
             episode = episode,
             isLoading = false,
-            isPlayingThis = isThis && playback.isPlaying,
+            isPlayingThis = isThis && playback.playWhenReady,
             livePositionMillis = progress.positionMillis.takeIf { isThis },
             liveDurationMillis = progress.durationMillis?.takeIf { isThis },
             download = downloadStates[episodeId],

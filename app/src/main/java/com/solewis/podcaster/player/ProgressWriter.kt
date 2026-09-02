@@ -56,9 +56,23 @@ class ProgressWriter(
      * ⚠️ By the time this fires, `player.currentPosition` already refers to the *new* item -
      * reading it here would silently record the wrong episode's position, the kind of bug that
      * looks like resume points "randomly" resetting. [oldPosition] is for the outgoing item.
+     *
+     * Which of the two positions to record depends on whether the episode changed, and getting
+     * that wrong is what made "mark as finished" appear not to work. A discontinuity fires for a
+     * plain seek *within* one episode too (`DISCONTINUITY_REASON_SEEK`, both `mediaItem`s the
+     * same), and recording [oldPosition] there writes the position the listener seeked away
+     * from - with `isPlayed = false`, since a mid-episode position is not complete. [PlayedMarker]
+     * marks the episode played and then seeks to the end, so that write landed immediately
+     * afterwards and reverted the mark; the row went on showing a progress bar. Independently of
+     * marking, every seek was recording the wrong position until the next 5s tick corrected it -
+     * so a seek followed by the app being killed lost the seek.
      */
     override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
         val mediaId = oldPosition.mediaItem?.mediaId ?: return
+        if (mediaId == newPosition.mediaItem?.mediaId) {
+            enqueue(mediaId, newPosition.positionMs, durationMillisOrNull())
+            return
+        }
         enqueue(mediaId, oldPosition.positionMs, durationMillisOrNull())
     }
 

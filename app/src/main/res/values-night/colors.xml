@@ -1,0 +1,5 @@
+<resources>
+    <!-- SurfaceDark. Without this the launch window stayed the light colour in dark mode, so
+         opening the app flashed a near-white screen before the dark UI appeared. -->
+    <color name="window_background">#14161B</color>
+</resources>

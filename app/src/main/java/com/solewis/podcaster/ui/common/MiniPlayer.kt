@@ -60,8 +60,10 @@ fun MiniPlayer(
                 }
                 IconButton(onClick = onTogglePlayPause) {
                     Icon(
-                        if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playback.isPlaying) "Pause" else "Play"
+                        // See NowPlayingScreen: intent rather than audibility, so a seek does
+                        // not flicker the icon.
+                        if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (playback.playWhenReady) "Pause" else "Play"
                     )
                 }
             }

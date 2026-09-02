@@ -110,3 +110,50 @@ fun silentWav(seconds: Int): ByteArray {
     // Body is zeros: silence in signed 16-bit PCM, and nothing for a decoder to object to.
     return header.array() + ByteArray(dataBytes)
 }
+
+/**
+ * A [com.solewis.podcaster.player.Playback] that drives a real [androidx.media3.exoplayer.ExoPlayer]
+ * directly, for the on-device tests that need [com.solewis.podcaster.player.PlayedMarker]'s seek to
+ * actually happen.
+ *
+ * The production implementation talks to the playback service over a `MediaController`, which these
+ * tests have no reason to stand up - they own the player. The point is only that `seekTo` moves a
+ * real player, so `ProgressWriter` sees the discontinuity a real seek produces. Everything else
+ * throws rather than quietly doing nothing, so a test that starts depending on more than this says
+ * so instead of passing for the wrong reason.
+ */
+class PlayerBackedPlayback(private val player: androidx.media3.exoplayer.ExoPlayer) :
+    com.solewis.podcaster.player.Playback {
+
+    override val state = kotlinx.coroutines.flow.MutableStateFlow(
+        com.solewis.podcaster.player.PlaybackUiState(
+            episodeId = onMain { player.currentMediaItem?.mediaId }
+        )
+    )
+
+    override val progress = kotlinx.coroutines.flow.MutableStateFlow(
+        com.solewis.podcaster.player.ProgressUiState(
+            durationMillis = onMain {
+                player.duration.takeIf { it != androidx.media3.common.C.TIME_UNSET }
+            }
+        )
+    )
+
+    override val errors = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+
+    override suspend fun seekTo(positionMillis: Long) {
+        onMain { player.seekTo(positionMillis) }
+    }
+
+    override suspend fun play(episode: com.solewis.podcaster.data.repo.PlayableEpisode) = unsupported()
+    override suspend fun syncWithSession(): Boolean = unsupported()
+    override suspend fun restore(episode: com.solewis.podcaster.data.repo.PlayableEpisode) = unsupported()
+    override suspend fun togglePlayPause() = unsupported()
+    override suspend fun pause() = unsupported()
+    override suspend fun skipForward() = unsupported()
+    override suspend fun skipBack() = unsupported()
+    override suspend fun setSpeed(speed: Float) = unsupported()
+
+    private fun unsupported(): Nothing =
+        throw UnsupportedOperationException("PlayerBackedPlayback only implements seekTo")
+}

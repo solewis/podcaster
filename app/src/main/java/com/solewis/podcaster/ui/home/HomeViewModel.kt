@@ -68,7 +68,10 @@ class HomeViewModel(
             episodes = episodes,
             isLoading = false,
             loadingEpisodeId = loading,
-            nowPlayingEpisodeId = playback.episodeId.takeIf { playback.isPlaying },
+            // playWhenReady, not isPlaying: this drives the row's pause icon *and* whether the
+            // row follows the live position, and a scrub briefly makes isPlaying false - which
+            // flicked the icon and dropped the row back to its stored position mid-drag.
+            nowPlayingEpisodeId = playback.episodeId.takeIf { playback.playWhenReady },
             nowPlayingPositionMillis = progress.positionMillis,
             nowPlayingDurationMillis = progress.durationMillis
         )

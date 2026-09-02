@@ -13,6 +13,9 @@ import com.solewis.podcaster.data.repo.EpisodeRepository
  * Seeking to the end is what makes every subsequent write agree with the mark - and it is what
  * "I'm done with this one" means anyway, since it also ends the episode and lets auto-advance carry
  * on.
+ *
+ * That only holds if the seek actually reaches the end, which is why the player's own duration is
+ * preferred over the caller's below.
  */
 class PlayedMarker(
     private val episodeRepository: EpisodeRepository,
@@ -33,8 +36,13 @@ class PlayedMarker(
         }
         episodeRepository.markPlayed(episodeId)
         // Loaded, not necessarily playing: a paused episode is still the one the writer reports on.
-        if (playback.state.value.episodeId == episodeId && durationMillis != null) {
-            playback.seekTo(durationMillis)
-        }
+        if (playback.state.value.episodeId != episodeId) return
+        // The player's own duration in preference to the caller's, which comes from the feed's
+        // <itunes:duration> and is routinely short by more than [CompletionRule]'s threshold.
+        // Seeking to a feed duration that undershoots the real one leaves playback short of the
+        // end, so the episode never reaches STATE_ENDED and the next write derives "not complete"
+        // - reverting the very mark this is meant to make stick.
+        val target = playback.progress.value.durationMillis ?: durationMillis ?: return
+        playback.seekTo(target)
     }
 }

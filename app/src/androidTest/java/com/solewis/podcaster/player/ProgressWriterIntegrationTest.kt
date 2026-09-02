@@ -7,6 +7,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.solewis.podcaster.testing.PlayerBackedPlayback
 import com.solewis.podcaster.testing.awaitPlayer
 import com.solewis.podcaster.testing.onMain
 import com.solewis.podcaster.testing.silenceSource
@@ -130,17 +131,79 @@ class ProgressWriterIntegrationTest {
     }
 
     @Test
-    fun a_seek_records_the_position_it_left_rather_than_the_one_it_arrived_at() {
+    fun a_seek_records_where_it_arrived_not_where_it_left() {
+        // This test used to be named for the opposite behaviour - and did not actually check
+        // either. It played, seeked, then *paused*, and the pause write is what satisfied its
+        // assertion; the seek's own write was never observed. Meanwhile the code really was
+        // recording the position it left, which is what broke "mark as finished" (see below) and
+        // what silently lost any seek made just before the app was killed.
+        // Seeking while *paused* is what isolates it. While playing, the 5s ticker writes the
+        // right position a moment later and a pause writes it immediately, so either one hides a
+        // wrong discontinuity write - which is exactly how this went unnoticed.
         loadEpisode(durationMillis = 600_000)
-        onMain {
-            player.play()
-            player.seekTo(200_000)
+
+        onMain { player.seekTo(200_000) }
+
+        awaitPlayer("the seek itself to be persisted") {
+            (storedEpisode()?.positionMillis ?: 0) >= 200_000
         }
-        awaitPlayer("playing past the seek") { onMain { player.currentPosition } >= 200_000 }
+        assertThat(storedEpisode()!!.positionMillis).isAtLeast(200_000)
+    }
 
-        onMain { player.pause() }
+    @Test
+    fun marking_the_loaded_episode_finished_is_not_undone_by_its_own_seek() {
+        // The reported bug: "Mark as finished" on the Home feed paused the player and jumped the
+        // bar forward, and the row went on showing a progress bar instead of "Finished".
+        //
+        // PlayedMarker writes the flag and then seeks to the end - and the seek's discontinuity
+        // write derived "not complete" from the position it had just left, immediately clearing
+        // the flag again. Nothing caught it because the two halves were only ever tested apart:
+        // MarkPlayedTest drives PlayedMarker against a FakePlayback whose seekTo appends to a
+        // list, so no ProgressWriter ever ran; and this file never involved PlayedMarker. The
+        // class's own doc comment calls that interaction "the interesting half".
+        loadEpisode(durationMillis = 600_000)
+        onMain { player.play() }
+        awaitPlayer("some progress to exist") { onMain { player.currentPosition } > 500 }
 
-        awaitPlayer("position persisted") { (storedEpisode()?.positionMillis ?: 0) >= 200_000 }
+        runBlocking {
+            PlayedMarker(repository, PlayerBackedPlayback(player)).setPlayed(
+                episodeId,
+                played = true,
+                durationMillis = 600_000
+            )
+        }
+
+        awaitPlayer("the episode to be recorded as played") { storedEpisode()?.isPlayed == true }
+        // Held, rather than true for an instant and then reverted by a later write.
+        Thread.sleep(1_000)
+        assertThat(storedEpisode()!!.isPlayed).isTrue()
+        // Honest about its own reach: with the feed's duration equal to the player's, the seek
+        // lands on the end, STATE_ENDED writes "complete", and that conflates over the bad
+        // discontinuity write - so this passes with either bug present on its own. It is the
+        // whole-flow guard; the two tests either side of it are the ones that discriminate.
+    }
+
+    @Test
+    fun marking_finished_seeks_to_the_players_duration_not_the_feeds() {
+        // Feeds routinely understate <itunes:duration>. Seeking to a duration that undershoots the
+        // real one by more than CompletionRule's threshold leaves playback short of the end, so
+        // the episode never reaches STATE_ENDED and the next write derives "not complete" - which
+        // reverts the mark even with the discontinuity fix in place.
+        loadEpisode(durationMillis = 600_000)
+        onMain { player.play() }
+        awaitPlayer("some progress to exist") { onMain { player.currentPosition } > 500 }
+
+        runBlocking {
+            PlayedMarker(repository, PlayerBackedPlayback(player)).setPlayed(
+                episodeId,
+                // Wildly short, as a broken feed would be.
+                played = true,
+                durationMillis = 60_000
+            )
+        }
+
+        awaitPlayer("the episode to be recorded as played") { storedEpisode()?.isPlayed == true }
+        assertThat(onMain { player.currentPosition }).isAtLeast(500_000)
     }
 
     @Test

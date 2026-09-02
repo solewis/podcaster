@@ -109,6 +109,14 @@ class PlayerConnection(
                 _state.value = _state.value.copy(isPlaying = isPlaying)
             }
 
+            /**
+             * Separate from [onIsPlayingChanged] because they genuinely disagree during a seek,
+             * which is the whole reason `playWhenReady` is carried - see [PlaybackUiState].
+             */
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                _state.value = _state.value.copy(playWhenReady = playWhenReady)
+            }
+
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 _state.value = _state.value.copy(
                     episodeId = mediaItem?.mediaId,
@@ -176,6 +184,7 @@ class PlayerConnection(
             podcastTitle = item.mediaMetadata.artist?.toString(),
             artworkUrl = item.mediaMetadata.artworkUri?.toString(),
             isPlaying = mediaController.isPlaying,
+            playWhenReady = mediaController.playWhenReady,
             speed = mediaController.playbackParameters.speed
         )
         publishProgress(mediaController.currentPosition)
@@ -228,7 +237,8 @@ class PlayerConnection(
             title = episode.title,
             podcastTitle = episode.podcastTitle,
             artworkUrl = episode.artworkUrl,
-            isPlaying = false
+            isPlaying = false,
+            playWhenReady = false
         )
         _progress.value = ProgressUiState(
             positionMillis = episode.startPositionMillis,

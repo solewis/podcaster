@@ -214,8 +214,10 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                 }
                 FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
                     Icon(
-                        if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playback.isPlaying) "Pause" else "Play",
+                        // playWhenReady, not isPlaying: a scrub buffers, and isPlaying dips
+                        // false for that moment - the icon used to flick to play and back.
+                        if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (playback.playWhenReady) "Pause" else "Play",
                         modifier = Modifier.size(SkipIconSize)
                     )
                 }

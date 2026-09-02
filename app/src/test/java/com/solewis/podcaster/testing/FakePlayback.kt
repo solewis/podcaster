@@ -66,7 +66,7 @@ class FakePlayback : Playback {
         val episodeId = liveSessionEpisodeId ?: return false
         // Adopting means the session's own truth wins, playing included - the whole point being
         // that it may well be playing when the app knew nothing about it.
-        _state.value = _state.value.copy(episodeId = episodeId, isPlaying = true)
+        _state.value = _state.value.copy(episodeId = episodeId, isPlaying = true, playWhenReady = true)
         return true
     }
 
@@ -81,7 +81,8 @@ class FakePlayback : Playback {
             title = episode.title,
             podcastTitle = episode.podcastTitle,
             artworkUrl = episode.artworkUrl,
-            isPlaying = false
+            isPlaying = false,
+            playWhenReady = false
         )
         _progress.value = ProgressUiState(episode.startPositionMillis, episode.durationMillis)
     }
@@ -92,7 +93,7 @@ class FakePlayback : Playback {
 
     override suspend fun pause() {
         pauseCount++
-        _state.value = _state.value.copy(isPlaying = false)
+        _state.value = _state.value.copy(isPlaying = false, playWhenReady = false)
     }
 
     override suspend fun seekTo(positionMillis: Long) {
@@ -115,12 +116,24 @@ class FakePlayback : Playback {
 
     /** The episode is now the loaded one and audible. */
     fun emitPlaying(episodeId: String) {
-        _state.value = _state.value.copy(episodeId = episodeId, isPlaying = true)
+        _state.value = _state.value.copy(episodeId = episodeId, isPlaying = true, playWhenReady = true)
     }
 
     /** Loaded but silent - what a pause looks like, and what a stalled tap looks like too. */
     fun emitPaused(episodeId: String) {
-        _state.value = _state.value.copy(episodeId = episodeId, isPlaying = false)
+        _state.value = _state.value.copy(episodeId = episodeId, isPlaying = false, playWhenReady = false)
+    }
+
+    /**
+     * Mid-seek: still meant to be playing, momentarily not making sound.
+     *
+     * A real seek drops ExoPlayer into `STATE_BUFFERING`, so `isPlaying` goes false while
+     * `playWhenReady` stays true - verified on device. This fake had no way to express that, which
+     * is why the play/pause icon flickering on every scrub was invisible to the whole UI test
+     * suite: `emitPlaying`/`emitPaused` could only describe the two steady states.
+     */
+    fun emitSeekBuffering(episodeId: String) {
+        _state.value = _state.value.copy(episodeId = episodeId, isPlaying = false, playWhenReady = true)
     }
 
     fun emitProgress(positionMillis: Long, durationMillis: Long? = null) {

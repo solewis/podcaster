@@ -1,3 +1,9 @@
 <resources>
     <color name="ic_launcher_background">#4A6572</color>
+
+    <!-- The window behind the Activity before Compose has drawn a frame. Must track
+         ui/theme/Color.kt's SurfaceLight / SurfaceDark: this is what shows during launch, so a
+         mismatch is a visible flash of the wrong colour on every cold start. Duplicated in XML
+         rather than read from Compose because the window is up before any of that exists. -->
+    <color name="window_background">#FAFAFE</color>
 </resources>

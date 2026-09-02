@@ -9,7 +9,18 @@ data class PlaybackUiState(
     val title: String? = null,
     val podcastTitle: String? = null,
     val artworkUrl: String? = null,
+    /** Actually making sound right now. What a spinner and the progress ticker care about. */
     val isPlaying: Boolean = false,
+    /**
+     * Playing *or* about to be, once buffering finishes - Media3's `playWhenReady`, and what every
+     * play/pause button should draw.
+     *
+     * The distinction is not academic. A seek drops a playing ExoPlayer into `STATE_BUFFERING`, so
+     * `isPlaying` goes false and comes back true a moment later while `playWhenReady` stays true
+     * throughout. Buttons bound to `isPlaying` therefore flicked from pause to play and back on
+     * every scrub, which read as playback having stopped and restarted itself.
+     */
+    val playWhenReady: Boolean = false,
     val speed: Float = 1f
 )
 
