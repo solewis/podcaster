@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,6 +45,7 @@ import com.solewis.podcaster.ui.common.EpisodeActionsMenu
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.EpisodeMetaLine
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.TestTags
@@ -180,14 +180,11 @@ private fun FeedEpisodeRow(
                 progress.label.takeIf { it.isNotEmpty() },
                 downloadStatusLabel(download)
             ).joinToString(" · ")
-            if (label.isNotEmpty()) {
-                Text(
-                    label,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
+            EpisodeMetaLine(
+                label = label,
+                isPlayed = episode.isPlayed,
+                modifier = Modifier.padding(top = 2.dp)
+            )
             if (progress.showBar) {
                 EpisodeProgressBar(
                     positionMillis = progress.positionMillis!!,
@@ -214,13 +211,6 @@ private fun FeedEpisodeRow(
                     onDownload = onDownload,
                     onRemoveDownload = onRemoveDownload,
                     onTogglePlayed = onTogglePlayed
-                )
-            }
-            if (episode.isPlayed) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = "Played",
-                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }

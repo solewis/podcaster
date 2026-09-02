@@ -50,8 +50,8 @@ class EpisodeProgressUiTest {
             isPlayed = true
         )
 
-        // "Played" wins over any leftover position - a full bar next to it would just be noise.
-        assertThat(ui.label).isEqualTo("Played")
+        // "Finished" wins over any leftover position - a full bar next to it would just be noise.
+        assertThat(ui.label).isEqualTo(FINISHED_LABEL)
         assertThat(ui.showBar).isFalse()
     }
 
@@ -64,7 +64,7 @@ class EpisodeProgressUiTest {
             isPlayed = true
         )
 
-        assertThat(ui.label).isEqualTo("Played")
+        assertThat(ui.label).isEqualTo(FINISHED_LABEL)
     }
 
     @Test

@@ -81,7 +81,7 @@ class EpisodeActionsMenuTest {
         render(isPlayed = false)
         openMenu()
 
-        compose.onNodeWithText("Mark as played").assertExists()
+        compose.onNodeWithText("Mark as finished").assertExists()
         compose.onNodeWithTag(TestTags.MENU_TOGGLE_PLAYED).performClick()
 
         assertThat(toggledPlayed).isEqualTo(1)
@@ -92,7 +92,7 @@ class EpisodeActionsMenuTest {
         render(isPlayed = true)
         openMenu()
 
-        compose.onNodeWithText("Mark as unplayed").assertExists()
+        compose.onNodeWithText("Mark as unfinished").assertExists()
     }
 
     @Test

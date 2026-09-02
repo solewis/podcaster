@@ -8,18 +8,18 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
 private val DarkColorScheme = darkColorScheme(
-    primary = TealDark,
-    onPrimary = OnTealDark,
-    primaryContainer = TealContainerDark,
-    onPrimaryContainer = OnTealContainerDark,
-    secondary = StoneDark,
-    onSecondary = OnStoneDark,
-    secondaryContainer = StoneContainerDark,
-    onSecondaryContainer = OnStoneContainerDark,
-    tertiary = ClayDark,
-    onTertiary = OnClayDark,
-    tertiaryContainer = ClayContainerDark,
-    onTertiaryContainer = OnClayContainerDark,
+    primary = PrimaryDark,
+    onPrimary = OnPrimaryDark,
+    primaryContainer = PrimaryContainerDark,
+    onPrimaryContainer = OnPrimaryContainerDark,
+    secondary = SecondaryDark,
+    onSecondary = OnSecondaryDark,
+    secondaryContainer = SecondaryContainerDark,
+    onSecondaryContainer = OnSecondaryContainerDark,
+    tertiary = TertiaryDark,
+    onTertiary = OnTertiaryDark,
+    tertiaryContainer = TertiaryContainerDark,
+    onTertiaryContainer = OnTertiaryContainerDark,
     background = SurfaceDark,
     onBackground = OnSurfaceDark,
     surface = SurfaceDark,
@@ -37,25 +37,25 @@ private val DarkColorScheme = darkColorScheme(
     surfaceContainer = SurfaceContainerDark,
     surfaceContainerHigh = SurfaceContainerHighDark,
     surfaceContainerHighest = SurfaceContainerHighestDark,
-    surfaceTint = TealDark,
+    surfaceTint = PrimaryDark,
     inverseSurface = InverseSurfaceDark,
     inverseOnSurface = InverseOnSurfaceDark,
-    inversePrimary = TealLight
+    inversePrimary = PrimaryLight
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = TealLight,
-    onPrimary = OnTealLight,
-    primaryContainer = TealContainerLight,
-    onPrimaryContainer = OnTealContainerLight,
-    secondary = StoneLight,
-    onSecondary = OnStoneLight,
-    secondaryContainer = StoneContainerLight,
-    onSecondaryContainer = OnStoneContainerLight,
-    tertiary = ClayLight,
-    onTertiary = OnClayLight,
-    tertiaryContainer = ClayContainerLight,
-    onTertiaryContainer = OnClayContainerLight,
+    primary = PrimaryLight,
+    onPrimary = OnPrimaryLight,
+    primaryContainer = PrimaryContainerLight,
+    onPrimaryContainer = OnPrimaryContainerLight,
+    secondary = SecondaryLight,
+    onSecondary = OnSecondaryLight,
+    secondaryContainer = SecondaryContainerLight,
+    onSecondaryContainer = OnSecondaryContainerLight,
+    tertiary = TertiaryLight,
+    onTertiary = OnTertiaryLight,
+    tertiaryContainer = TertiaryContainerLight,
+    onTertiaryContainer = OnTertiaryContainerLight,
     background = SurfaceLight,
     onBackground = OnSurfaceLight,
     surface = SurfaceLight,
@@ -73,14 +73,14 @@ private val LightColorScheme = lightColorScheme(
     surfaceContainer = SurfaceContainerLight,
     surfaceContainerHigh = SurfaceContainerHighLight,
     surfaceContainerHighest = SurfaceContainerHighestLight,
-    surfaceTint = TealLight,
+    surfaceTint = PrimaryLight,
     inverseSurface = InverseSurfaceLight,
     inverseOnSurface = InverseOnSurfaceLight,
-    inversePrimary = TealDark
+    inversePrimary = PrimaryDark
 )
 
 /**
- * Always the app's own calm palette, deliberately never Android 12+ dynamic/wallpaper color -
+ * Always the app's own slate-blue palette, deliberately never Android 12+ dynamic/wallpaper color -
  * a wallpaper-derived scheme would fight the calm, considered look this app wants (and could be
  * anything from neon to clashing, entirely outside the app's control).
  */

@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -77,6 +76,7 @@ import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.SubscribeButton
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
+import com.solewis.podcaster.ui.common.EpisodeMetaLine
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 import kotlinx.coroutines.delay
@@ -412,7 +412,7 @@ private fun EpisodeRow(
             )
 
             // Null date on purpose: this row already prints it in the header above, and passing
-            // it again would repeat it. Everything else - "20m left" vs "51m" vs "Played", and
+            // it again would repeat it. Everything else - "20m left" vs "51m" vs "Finished", and
             // whether a bar is drawn at all - is the same rule the Home feed and the detail
             // screen use, so an episode reads identically wherever you meet it.
             val progress = episodeProgressUi(
@@ -429,9 +429,14 @@ private fun EpisodeRow(
                 progress.label.takeIf { it.isNotEmpty() },
                 downloadStatusLabel(download)
             ).joinToString(" · ")
-            if (label.isNotEmpty()) {
-                Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
-            }
+            EpisodeMetaLine(
+                label = label,
+                isPlayed = episode.isPlayed,
+                modifier = Modifier.padding(top = 2.dp),
+                // This list keeps the default onSurface rather than the muted variant the Home
+                // feed uses, so the tick's own line stays as legible as the titles above it.
+                color = MaterialTheme.colorScheme.onSurface
+            )
             if (progress.showBar) {
                 EpisodeProgressBar(
                     positionMillis = progress.positionMillis!!,
@@ -461,13 +466,6 @@ private fun EpisodeRow(
                     onDownload = onDownload,
                     onRemoveDownload = onRemoveDownload,
                     onTogglePlayed = onTogglePlayed
-                )
-            }
-            if (episode.isPlayed) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = "Played",
-                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }

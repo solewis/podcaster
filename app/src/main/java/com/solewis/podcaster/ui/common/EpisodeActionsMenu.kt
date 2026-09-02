@@ -80,7 +80,10 @@ fun EpisodeActionsMenu(
                 onEnqueue()
             }
             MenuItem(
-                text = if (isPlayed) "Mark as unplayed" else "Mark as played",
+                // "finished", to match the word the row's own metadata line uses. A menu that
+                // set an episode to "played" while the line then read "Finished" left it unclear
+                // whether they were the same state.
+                text = if (isPlayed) "Mark as unfinished" else "Mark as finished",
                 icon = if (isPlayed) Icons.Default.RemoveDone else Icons.Default.DoneAll,
                 tag = TestTags.MENU_TOGGLE_PLAYED
             ) {

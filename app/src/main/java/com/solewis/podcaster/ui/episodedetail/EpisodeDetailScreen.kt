@@ -207,7 +207,7 @@ private fun EpisodeDetailContent(
                 modifier = Modifier.size(18.dp)
             )
             Text(
-                if (episode.isPlayed) "Mark as unplayed" else "Mark as played",
+                if (episode.isPlayed) "Mark as unfinished" else "Mark as finished",
                 modifier = Modifier.padding(start = 8.dp)
             )
         }
