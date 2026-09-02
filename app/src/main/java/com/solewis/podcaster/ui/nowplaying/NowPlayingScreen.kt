@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.ui.common.BackButtonRow
@@ -128,14 +129,24 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // textAlign as well as the Column's centring: that only centres each Text's *box*, and
+            // a one-line box is exactly as wide as its text, so short titles look centred either
+            // way. As soon as a title wraps to its second line the box fills the width and the
+            // lines inside align left - ragged against the centred show name directly beneath it.
             Text(
                 playback.title.orEmpty(),
                 style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
             playback.podcastTitle?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
