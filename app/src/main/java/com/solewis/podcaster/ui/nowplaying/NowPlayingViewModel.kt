@@ -29,6 +29,9 @@ class NowPlayingViewModel(
     val playbackState: StateFlow<PlaybackUiState> = playback.state
     val progress: StateFlow<ProgressUiState> = playback.progress
 
+    /** Waiting on data for long enough to be worth a spinner - see [Playback.isStalled]. */
+    val isStalled: StateFlow<Boolean> = playback.isStalled
+
     /** The skip buttons print the amount, so they have to read the setting, not a constant. */
     val settings: StateFlow<AppSettings> =
         settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())

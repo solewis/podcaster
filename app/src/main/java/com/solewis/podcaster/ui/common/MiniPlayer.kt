@@ -4,10 +4,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +32,8 @@ import androidx.compose.ui.platform.testTag
 fun MiniPlayer(
     playback: PlaybackUiState,
     progress: ProgressUiState,
+    /** Waiting on data for long enough to say so - see [com.solewis.podcaster.player.Playback.isStalled]. */
+    isStalled: Boolean,
     onTogglePlayPause: () -> Unit,
     onExpand: () -> Unit
 ) {
@@ -59,12 +63,19 @@ fun MiniPlayer(
                     }
                 }
                 IconButton(onClick = onTogglePlayPause) {
-                    Icon(
-                        // See NowPlayingScreen: intent rather than audibility, so a seek does
-                        // not flicker the icon.
-                        if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playback.playWhenReady) "Pause" else "Play"
-                    )
+                    if (isStalled) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp).testTag(TestTags.MINI_PLAYER_SPINNER),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            // See NowPlayingScreen: intent rather than audibility, so a seek does
+                            // not flicker the icon.
+                            if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playback.playWhenReady) "Pause" else "Play"
+                        )
+                    }
                 }
             }
 

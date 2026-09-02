@@ -31,6 +31,20 @@ class FakePlayback : Playback {
     private val _errors = MutableSharedFlow<String>(extraBufferCapacity = 1)
     override val errors: SharedFlow<String> = _errors.asSharedFlow()
 
+    private val _isStalled = MutableStateFlow(false)
+
+    /**
+     * Set directly rather than derived from a timer. The real one only turns true after half a
+     * second of buffering; a test asserting what a stall looks like has no business also asserting
+     * how long it takes to decide there is one - that belongs to [PlayerConnection]'s own test.
+     */
+    override val isStalled: StateFlow<Boolean> = _isStalled.asStateFlow()
+
+    /** Buffering has gone on long enough that the UI should say so. */
+    fun emitStalled(stalled: Boolean) {
+        _isStalled.value = stalled
+    }
+
     /** As if the buffer ran dry with no network left to refill it. */
     fun emitError(message: String) {
         _errors.tryEmit(message)
@@ -133,7 +147,9 @@ class FakePlayback : Playback {
      * suite: `emitPlaying`/`emitPaused` could only describe the two steady states.
      */
     fun emitSeekBuffering(episodeId: String) {
-        _state.value = _state.value.copy(episodeId = episodeId, isPlaying = false, playWhenReady = true)
+        _state.value = _state.value.copy(
+            episodeId = episodeId, isPlaying = false, playWhenReady = true, isBuffering = true
+        )
     }
 
     fun emitProgress(positionMillis: Long, durationMillis: Long? = null) {

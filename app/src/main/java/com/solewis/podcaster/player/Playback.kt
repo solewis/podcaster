@@ -21,6 +21,12 @@ data class PlaybackUiState(
      * every scrub, which read as playback having stopped and restarted itself.
      */
     val playWhenReady: Boolean = false,
+    /**
+     * The player is meant to be playing and is waiting on data. Distinct from `playWhenReady &&
+     * !isPlaying`, which is also true when playback is *suppressed* - during a phone call, say -
+     * where a loading spinner would be a lie.
+     */
+    val isBuffering: Boolean = false,
     val speed: Float = 1f
 )
 
@@ -47,6 +53,18 @@ interface Playback {
 
     /** Ticks while playing; also updated on any seek, from any source. */
     val progress: StateFlow<ProgressUiState>
+
+    /**
+     * Buffering for long enough to be worth saying so.
+     *
+     * Deliberately not the raw buffering flag. A scrub rebuffers in about 140-210ms on this
+     * device - measured, not guessed - so a spinner bound to the raw state would flash on every
+     * drag of the scrubber and be exactly the flicker that binding the icon to `isPlaying` used to
+     * cause, in a different glyph. Held back past that, it only appears when playback has genuinely
+     * stalled, which is the case that currently shows a steady pause icon over silence and no
+     * explanation at all.
+     */
+    val isStalled: StateFlow<Boolean>
 
     /**
      * Playback failing after it had started - most often a buffer running dry with no network left

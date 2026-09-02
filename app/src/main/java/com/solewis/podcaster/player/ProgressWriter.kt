@@ -34,6 +34,24 @@ class ProgressWriter(
 
     private val updates = Channel<Update>(Channel.CONFLATED)
 
+    /**
+     * The duration the player has reported for each episode it has loaded, so a write can be given
+     * the duration of the episode it is *about*.
+     *
+     * `player.duration` only ever describes whatever is loaded right now, and that is the wrong
+     * episode at exactly the moment it matters. Switching episodes writes the outgoing one's final
+     * position, and by then the player has moved on - measured on device, the discontinuity arrives
+     * with `player.duration == TIME_UNSET` because the incoming episode has not been prepared yet:
+     *
+     *     DISCONTINUITY reason=4 oldId=A oldPos=600009 newId=B newPos=0 duration=TIME_UNSET
+     *
+     * A null duration makes [CompletionRule] answer "not complete", so leaving a finished episode
+     * to play another cleared its played flag and left it showing a full progress bar instead of
+     * "Finished". A *shorter* incoming episode is the same bug pointing the other way - it would
+     * falsely complete the one being left. One entry per episode played, so this stays tiny.
+     */
+    private val reportedDurations = mutableMapOf<String, Long>()
+
     init {
         scope.launch { for (update in updates) write(update) }
         scope.launch { tick() }
@@ -70,19 +88,19 @@ class ProgressWriter(
     override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
         val mediaId = oldPosition.mediaItem?.mediaId ?: return
         if (mediaId == newPosition.mediaItem?.mediaId) {
-            enqueue(mediaId, newPosition.positionMs, durationMillisOrNull())
+            enqueue(mediaId, newPosition.positionMs)
             return
         }
-        enqueue(mediaId, oldPosition.positionMs, durationMillisOrNull())
+        enqueue(mediaId, oldPosition.positionMs)
     }
 
     override fun onPlaybackStateChanged(playbackState: Int) {
+        if (playbackState == Player.STATE_READY) rememberDuration()
         if (playbackState == Player.STATE_ENDED) {
             val mediaId = player.currentMediaItem?.mediaId ?: return
             // A position guaranteed to satisfy CompletionRule regardless of exactly what
             // player.currentPosition reports at the ENDED boundary.
-            val duration = durationMillisOrNull()
-            enqueue(mediaId, duration ?: Long.MAX_VALUE, duration)
+            enqueue(mediaId, durationFor(mediaId) ?: Long.MAX_VALUE)
         }
     }
 
@@ -90,17 +108,34 @@ class ProgressWriter(
         if (events.containsAny(Player.EVENT_TIMELINE_CHANGED, Player.EVENT_TRACKS_CHANGED)) {
             val mediaId = player.currentMediaItem?.mediaId ?: return
             val duration = durationMillisOrNull() ?: return
+            reportedDurations[mediaId] = duration
             scope.launch { episodeRepository.backfillDuration(mediaId, duration) }
         }
     }
 
-    private fun enqueueCurrentPosition() {
+    private fun rememberDuration() {
         val mediaId = player.currentMediaItem?.mediaId ?: return
-        enqueue(mediaId, player.currentPosition, durationMillisOrNull())
+        durationMillisOrNull()?.let { reportedDurations[mediaId] = it }
     }
 
-    private fun enqueue(episodeId: String, positionMillis: Long, durationMillis: Long?) {
-        updates.trySend(Update(episodeId, positionMillis, durationMillis))
+    private fun enqueueCurrentPosition() {
+        val mediaId = player.currentMediaItem?.mediaId ?: return
+        enqueue(mediaId, player.currentPosition)
+    }
+
+    private fun enqueue(episodeId: String, positionMillis: Long) {
+        updates.trySend(Update(episodeId, positionMillis, durationFor(episodeId)))
+    }
+
+    /**
+     * The duration for [episodeId] specifically - the live one only when it really is the loaded
+     * episode, and the remembered one otherwise. See [reportedDurations].
+     */
+    private fun durationFor(episodeId: String): Long? {
+        if (episodeId == player.currentMediaItem?.mediaId) {
+            durationMillisOrNull()?.let { return it }
+        }
+        return reportedDurations[episodeId]
     }
 
     private fun durationMillisOrNull(): Long? = player.duration.takeIf { it != C.TIME_UNSET }
@@ -116,7 +151,7 @@ class ProgressWriter(
     /** Best-effort final flush - called from `PlaybackService.onDestroy`, which is not suspending. */
     fun flushBlocking() {
         val mediaId = player.currentMediaItem?.mediaId ?: return
-        val update = Update(mediaId, player.currentPosition, durationMillisOrNull())
+        val update = Update(mediaId, player.currentPosition, durationFor(mediaId))
         runBlocking { write(update) }
     }
 

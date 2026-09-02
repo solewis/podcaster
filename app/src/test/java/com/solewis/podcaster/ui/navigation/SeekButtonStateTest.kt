@@ -3,6 +3,7 @@ package com.solewis.podcaster.ui.navigation
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -98,6 +99,59 @@ class SeekButtonStateTest {
 
         pauseButtons().assertCountEquals(1)
         playButtons().assertCountEquals(0)
+    }
+
+    @Test
+    fun a_short_rebuffer_shows_no_spinner_at_all() {
+        launchApp()
+        compose.awaitTag(TestTags.navTab("Home"))
+        graph.playback.emitPlaying(episodeId)
+        compose.waitForIdle()
+
+        // Buffering, but not yet long enough to have been called a stall. This is every scrub:
+        // ~140-210ms measured on device, against a 500ms threshold.
+        graph.playback.emitSeekBuffering(episodeId)
+        compose.waitForIdle()
+
+        pauseButtons().assertCountEquals(1)
+        compose.onAllNodesWithTag(TestTags.MINI_PLAYER_SPINNER, useUnmergedTree = true)
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun a_stall_replaces_the_control_with_a_spinner() {
+        launchApp()
+        compose.awaitTag(TestTags.navTab("Home"))
+        graph.playback.emitPlaying(episodeId)
+        compose.waitForIdle()
+
+        graph.playback.emitSeekBuffering(episodeId)
+        graph.playback.emitStalled(true)
+        compose.waitForIdle()
+
+        // In the button's place, so the bar does not reflow - and no icon left alongside it
+        // claiming playback is fine.
+        compose.onAllNodesWithTag(TestTags.MINI_PLAYER_SPINNER, useUnmergedTree = true)
+            .assertCountEquals(1)
+        pauseButtons().assertCountEquals(0)
+        playButtons().assertCountEquals(0)
+    }
+
+    @Test
+    fun the_spinner_goes_away_when_the_audio_comes_back() {
+        launchApp()
+        compose.awaitTag(TestTags.navTab("Home"))
+        graph.playback.emitSeekBuffering(episodeId)
+        graph.playback.emitStalled(true)
+        compose.waitForIdle()
+
+        graph.playback.emitStalled(false)
+        graph.playback.emitPlaying(episodeId)
+        compose.waitForIdle()
+
+        compose.onAllNodesWithTag(TestTags.MINI_PLAYER_SPINNER, useUnmergedTree = true)
+            .assertCountEquals(0)
+        pauseButtons().assertCountEquals(1)
     }
 
     @Test

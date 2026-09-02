@@ -29,6 +29,9 @@ object TestTags {
     const val SHOW_SCREEN = "showScreen"
     const val EPISODE_DETAIL_SCREEN = "episodeDetailScreen"
     const val MINI_PLAYER = "miniPlayer"
+
+    /** The spinner that replaces the mini player's play/pause once playback has stalled. */
+    const val MINI_PLAYER_SPINNER = "miniPlayerSpinner"
     const val RESUME_PILL = "resumePill"
     const val DOWNLOADS_LIST = "downloadsList"
     const val SETTINGS_SCREEN = "settingsScreen"

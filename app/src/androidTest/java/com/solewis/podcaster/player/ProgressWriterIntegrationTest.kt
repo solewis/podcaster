@@ -7,6 +7,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import androidx.media3.common.MediaItem
+import com.solewis.podcaster.testing.AudioHost
 import com.solewis.podcaster.testing.PlayerBackedPlayback
 import com.solewis.podcaster.testing.awaitPlayer
 import com.solewis.podcaster.testing.onMain
@@ -46,6 +48,16 @@ class ProgressWriterIntegrationTest {
     private lateinit var scope: CoroutineScope
     private var podcastId: Long = 0
     private val episodeId get() = "$podcastId:ep"
+    private val otherEpisodeId get() = "$podcastId:other"
+
+    /**
+     * Only for the incoming episode in [starting_another_episode_does_not_unfinish_the_one_you_were_on].
+     * That test needs the arriving episode's duration to still be unknown when playback moves off
+     * the outgoing one, which is the ordinary case over a network and impossible with
+     * [silenceSource] - silence prepares synchronously, so its duration is already known and the
+     * bug hides behind a plausible-looking answer.
+     */
+    private val audio = AudioHost()
 
     @Before
     fun setUp() {
@@ -75,6 +87,18 @@ class ProgressWriterIntegrationTest {
                         chronoIndex = 1,
                         displayNumber = 1,
                         firstSeenAt = 1L
+                    ),
+                    EpisodeEntity(
+                        id = otherEpisodeId,
+                        podcastId = podcastId,
+                        stableKey = "other",
+                        stableKeySource = "guid",
+                        title = "Another Episode",
+                        enclosureUrl = "https://example.com/other.mp3",
+                        feedPosition = 1,
+                        chronoIndex = 2,
+                        displayNumber = 2,
+                        firstSeenAt = 1L
                     )
                 )
             )
@@ -93,6 +117,7 @@ class ProgressWriterIntegrationTest {
     fun tearDown() {
         onMain { player.release() }
         scope.cancel()
+        audio.close()
         db.close()
     }
 
@@ -246,4 +271,74 @@ class ProgressWriterIntegrationTest {
         assertThat(storedEpisode()!!.positionMillis).isAtLeast(90_000)
     }
 
+    @Test
+    fun starting_another_episode_does_not_unfinish_the_one_you_were_on() {
+        // Reported: two episodes marked finished, the third played, a scrub in it, and back on the
+        // Home feed the *first* episode showed a full progress bar instead of "Finished".
+        //
+        // Nothing wrote to it because of the scrub. It was the moment playback moved off it: the
+        // discontinuity carries the outgoing episode's final position, but `player.duration` by
+        // then describes the incoming one and is TIME_UNSET until that is prepared. A null
+        // duration makes CompletionRule answer "not complete", so the played flag was cleared and
+        // the end-of-episode position left behind - which is exactly a full bar.
+        loadEpisode(durationMillis = 600_000)
+        onMain { player.play() }
+        awaitPlayer("some progress to exist") { onMain { player.currentPosition } > 500 }
+        runBlocking {
+            PlayedMarker(repository, PlayerBackedPlayback(player)).setPlayed(
+                episodeId, played = true, durationMillis = 600_000
+            )
+        }
+        awaitPlayer("the episode to be finished first") { storedEpisode()?.isPlayed == true }
+
+        // Over HTTP, so the incoming episode's duration is genuinely unknown for the moment the
+        // outgoing episode's write lands - measured on device, the discontinuity arrives with
+        // `player.duration == TIME_UNSET`, and a null duration is what CompletionRule reads as
+        // "not complete".
+        val url = audio.url(seconds = 120)
+        onMain {
+            player.setMediaItem(MediaItem.Builder().setMediaId(otherEpisodeId).setUri(url).build())
+            player.prepare()
+            player.play()
+        }
+        awaitPlayer("the other episode to be playing") {
+            onMain { player.currentMediaItem?.mediaId } == otherEpisodeId && onMain { player.isPlaying }
+        }
+        Thread.sleep(1_000)
+
+        assertThat(storedEpisode()!!.isPlayed).isTrue()
+        // And no leftover position to draw a bar from.
+        assertThat(storedEpisode()!!.positionMillis).isEqualTo(0)
+    }
+
+    @Test
+    fun leaving_an_episode_partway_keeps_its_resume_point_and_leaves_it_unfinished() {
+        // The other side of the same write, and a guard on the fix rather than on the bug: this
+        // one passes with or without it, because a transition always arrives before the incoming
+        // duration is known. Its job is to catch the fix overreaching - now that the write is
+        // handed the *outgoing* episode's real duration, getting that lookup wrong could complete
+        // an episode you were only halfway through.
+        loadEpisode(durationMillis = 600_000)
+        onMain {
+            player.play()
+            player.seekTo(200_000)
+        }
+        awaitPlayer("the seek to be persisted") { (storedEpisode()?.positionMillis ?: 0) >= 200_000 }
+
+        onMain {
+            // Deliberately shorter than the 200s position being left behind: if the outgoing
+            // episode were ever measured against the incoming episode's length, that would read as
+            // "complete" and finish an episode nobody finished.
+            player.setMediaSource(silenceSource(otherEpisodeId, 120_000))
+            player.prepare()
+            player.play()
+        }
+        awaitPlayer("the other episode to be playing") {
+            onMain { player.currentMediaItem?.mediaId } == otherEpisodeId && onMain { player.isPlaying }
+        }
+        Thread.sleep(1_000)
+
+        assertThat(storedEpisode()!!.isPlayed).isFalse()
+        assertThat(storedEpisode()!!.positionMillis).isAtLeast(200_000)
+    }
 }

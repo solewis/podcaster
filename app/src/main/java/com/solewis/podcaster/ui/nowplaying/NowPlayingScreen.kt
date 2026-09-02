@@ -28,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -78,6 +79,7 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
     val playback by viewModel.playbackState.collectAsState()
     val progress by viewModel.progress.collectAsState()
     val settings by viewModel.settings.collectAsState()
+    val isStalled by viewModel.isStalled.collectAsState()
     val sleepTimer by viewModel.sleepTimerState.collectAsState()
 
     var isDragging by remember { mutableStateOf(false) }
@@ -213,13 +215,24 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                     )
                 }
                 FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
-                    Icon(
-                        // playWhenReady, not isPlaying: a scrub buffers, and isPlaying dips
-                        // false for that moment - the icon used to flick to play and back.
-                        if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playback.playWhenReady) "Pause" else "Play",
-                        modifier = Modifier.size(SkipIconSize)
-                    )
+                    if (isStalled) {
+                        // In the button's place rather than beside it, so nothing reflows. Only
+                        // after half a second of waiting - a scrub rebuffers in ~200ms, and a
+                        // spinner for that would flicker exactly like the icon used to.
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(SkipIconSize),
+                            strokeWidth = 3.dp,
+                            color = LocalContentColor.current
+                        )
+                    } else {
+                        Icon(
+                            // playWhenReady, not isPlaying: a scrub buffers, and isPlaying dips
+                            // false for that moment - the icon used to flick to play and back.
+                            if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playback.playWhenReady) "Pause" else "Play",
+                            modifier = Modifier.size(SkipIconSize)
+                        )
+                    }
                 }
                 IconButton(onClick = viewModel::skipForward) {
                     SkipIcon(

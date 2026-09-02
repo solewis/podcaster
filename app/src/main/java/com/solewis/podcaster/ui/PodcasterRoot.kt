@@ -81,6 +81,7 @@ fun PodcasterRoot(
 
     val playback by container.playback.state.collectAsState()
     val playbackProgress by container.playback.progress.collectAsState()
+    val isStalled by container.playback.isStalled.collectAsState()
 
     // Keeps the library current without anyone having to ask for it. The periodic worker runs only
     // every six hours - and later than that whenever Doze defers it - so before this, opening the
@@ -149,6 +150,7 @@ fun PodcasterRoot(
             if (!isNowPlaying) {
                 Column {
                     MiniPlayer(
+                        isStalled = isStalled,
                         playback = playback,
                         progress = playbackProgress,
                         onTogglePlayPause = { scope.launch { container.playbackStarter.togglePlayPause() } },

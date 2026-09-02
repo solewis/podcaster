@@ -63,15 +63,40 @@ class AudioHost : java.io.Closeable {
 
     private val server = okhttp3.mockwebserver.MockWebServer()
 
-    /** A URL that streams [seconds] of silence. Safe to request more than once. */
+    /**
+     * A URL that streams [seconds] of silence, with byte-range support. Safe to request more than
+     * once.
+     *
+     * The ranges are not optional detail. Without them a forward seek makes ExoPlayer refetch from
+     * byte zero, and a rebuffer that takes ~200ms against a real host took long enough here to fail
+     * a test about *short* rebuffers - on the fixture rather than on the code. Every real podcast
+     * host serves ranges; a test host that does not is simply wrong.
+     */
     fun url(seconds: Int): String {
         val body = silentWav(seconds)
+        val rangeHeader = Regex("bytes=([0-9]+)-([0-9]*)")
         server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
-            override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest) =
-                okhttp3.mockwebserver.MockResponse()
-                    .setResponseCode(200)
+            override fun dispatch(
+                request: okhttp3.mockwebserver.RecordedRequest
+            ): okhttp3.mockwebserver.MockResponse {
+                val match = request.getHeader("Range")?.let { rangeHeader.find(it) }
+                    ?: return okhttp3.mockwebserver.MockResponse()
+                        .setResponseCode(200)
+                        .setHeader("Content-Type", "audio/wav")
+                        .setHeader("Accept-Ranges", "bytes")
+                        .setBody(okio.Buffer().write(body))
+
+                val start = match.groupValues[1].toInt().coerceIn(0, body.size - 1)
+                val end = match.groupValues[2].toIntOrNull()?.coerceIn(start, body.size - 1)
+                    ?: (body.size - 1)
+                val slice = body.copyOfRange(start, end + 1)
+                return okhttp3.mockwebserver.MockResponse()
+                    .setResponseCode(206)
                     .setHeader("Content-Type", "audio/wav")
-                    .setBody(okio.Buffer().write(body))
+                    .setHeader("Accept-Ranges", "bytes")
+                    .setHeader("Content-Range", "bytes $start-$end/" + body.size)
+                    .setBody(okio.Buffer().write(slice))
+            }
         }
         return server.url("/silence-${seconds}s.wav").toString()
     }
@@ -140,6 +165,9 @@ class PlayerBackedPlayback(private val player: androidx.media3.exoplayer.ExoPlay
     )
 
     override val errors = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+
+    /** Never stalls: these tests are about what gets written, not about loading indicators. */
+    override val isStalled = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     override suspend fun seekTo(positionMillis: Long) {
         onMain { player.seekTo(positionMillis) }
