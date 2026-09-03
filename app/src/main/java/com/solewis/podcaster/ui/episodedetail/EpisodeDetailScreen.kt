@@ -42,6 +42,7 @@ import com.solewis.podcaster.data.repo.EpisodeDownload
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.RemoveDone
 import com.solewis.podcaster.ui.common.DownloadButton
+import com.solewis.podcaster.ui.common.EpisodeActionsMenu
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.PodcastArtwork
@@ -186,29 +187,29 @@ private fun EpisodeDetailContent(
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
-            OutlinedButton(onClick = onEnqueue) {
-                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add to queue")
-            }
-            Spacer(modifier = Modifier.width(4.dp))
+            // Outlined, so it reads as the second button in the row rather than as an icon
+            // decorating the first.
             DownloadButton(
                 episodeTitle = episode.title,
                 download = download,
                 onDownload = onDownload,
-                onRemove = onRemoveDownload
+                onRemove = onRemoveDownload,
+                outlined = true
             )
-        }
-
-        // On its own line rather than a fourth control in the row above: the row is already at the
-        // width it can carry, and this is a bookkeeping action rather than a transport one.
-        TextButton(onClick = onTogglePlayed, modifier = Modifier.testTag(TestTags.TOGGLE_PLAYED)) {
-            Icon(
-                if (episode.isPlayed) Icons.Default.RemoveDone else Icons.Default.DoneAll,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                if (episode.isPlayed) "Mark as unfinished" else "Mark as finished",
-                modifier = Modifier.padding(start = 8.dp)
+            Spacer(modifier = Modifier.width(4.dp))
+            // Everything that is neither "play it" nor "keep it" goes behind the overflow, the
+            // same as on every episode row. Marking finished used to be a labelled text button
+            // sitting on its own line under Play, which read like a second primary action for
+            // something that is bookkeeping.
+            EpisodeActionsMenu(
+                episodeTitle = episode.title,
+                isPlayed = episode.isPlayed,
+                download = download,
+                onEnqueue = onEnqueue,
+                onDownload = onDownload,
+                onRemoveDownload = onRemoveDownload,
+                onTogglePlayed = onTogglePlayed,
+                includeDownload = false
             )
         }
 

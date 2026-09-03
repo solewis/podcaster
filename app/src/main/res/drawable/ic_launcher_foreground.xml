@@ -1,11 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    The microphone, seen *through* the windscreen.
+
+    Order matters and is the whole trick: the mic is drawn first, the mesh over the top of it. That
+    is what puts the mic behind the screen rather than on it. The mic is also drawn slightly short
+    of white and slightly transparent, because something seen through a mesh loses a little
+    contrast - at full white it jumps forward and sits on the ball instead of inside it.
+
+    Everything lives inside a radius of about 30 from centre, comfortably within the 66dp circle
+    every launcher mask keeps, so no part of the mic is ever clipped. The mesh does not need that
+    protection - it is meant to run off the edge.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Simple play-button glyph, placeholder until real branding is designed. -->
+
+    <group android:name="microphone">
+        <!-- Capsule: a pill, 24 across and 40 tall, centred. -->
+        <path
+            android:fillColor="#E8EEFA"
+            android:fillAlpha="0.92"
+            android:pathData="M42,37 A12,12 0 0 1 66,37 L66,53 A12,12 0 0 1 42,53 Z" />
+        <!-- Cradle: the arc that makes a pill read as a microphone rather than a capsule. -->
+        <path
+            android:strokeColor="#E8EEFA"
+            android:strokeAlpha="0.92"
+            android:strokeWidth="5.5"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M37,55 C37,74 71,74 71,55" />
+        <!-- Stem. Stops short of the mask edge rather than running to it: a stem cut off by the
+             circle reads as a mistake at small sizes, where the cut is only a pixel or two. -->
+        <path
+            android:strokeColor="#E8EEFA"
+            android:strokeAlpha="0.92"
+            android:strokeWidth="5.5"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M54,69 L54,82" />
+    </group>
+
+    <!-- The mesh. Two passes: a dark one to cut the shadow between the wires, a light one for the
+         wire itself, which is what makes it look woven rather than merely hatched. Kept faint on
+         purpose - at 48px this has to blur into texture, not turn into moire. -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M40,32 L78,54 L40,76 Z" />
+        android:strokeColor="#000000"
+        android:strokeAlpha="0.11"
+        android:strokeWidth="1.3"
+        android:fillColor="#00000000"
+        android:pathData="M0,6 L108,6 M0,12 L108,12 M0,18 L108,18 M0,24 L108,24 M0,30 L108,30 M0,36 L108,36 M0,42 L108,42 M0,48 L108,48 M0,54 L108,54 M0,60 L108,60 M0,66 L108,66 M0,72 L108,72 M0,78 L108,78 M0,84 L108,84 M0,90 L108,90 M0,96 L108,96 M0,102 L108,102" />
+    <path
+        android:strokeColor="#000000"
+        android:strokeAlpha="0.11"
+        android:strokeWidth="1.3"
+        android:fillColor="#00000000"
+        android:pathData="M6,0 L6,108 M12,0 L12,108 M18,0 L18,108 M24,0 L24,108 M30,0 L30,108 M36,0 L36,108 M42,0 L42,108 M48,0 L48,108 M54,0 L54,108 M60,0 L60,108 M66,0 L66,108 M72,0 L72,108 M78,0 L78,108 M84,0 L84,108 M90,0 L90,108 M96,0 L96,108 M102,0 L102,108" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.14"
+        android:strokeWidth="0.8"
+        android:fillColor="#00000000"
+        android:pathData="M0,6 L108,6 M0,12 L108,12 M0,18 L108,18 M0,24 L108,24 M0,30 L108,30 M0,36 L108,36 M0,42 L108,42 M0,48 L108,48 M0,54 L108,54 M0,60 L108,60 M0,66 L108,66 M0,72 L108,72 M0,78 L108,78 M0,84 L108,84 M0,90 L108,90 M0,96 L108,96 M0,102 L108,102" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.14"
+        android:strokeWidth="0.8"
+        android:fillColor="#00000000"
+        android:pathData="M6,0 L6,108 M12,0 L12,108 M18,0 L18,108 M24,0 L24,108 M30,0 L30,108 M36,0 L36,108 M42,0 L42,108 M48,0 L48,108 M54,0 L54,108 M60,0 L60,108 M66,0 L66,108 M72,0 L72,108 M78,0 L78,108 M84,0 L84,108 M90,0 L90,108 M96,0 L96,108 M102,0 L102,108" />
 </vector>

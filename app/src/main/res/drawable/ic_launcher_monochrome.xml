@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Themed icons (Android 13+) are re-coloured to a single tone on a single-tone background, so the
+    mesh and the sphere have nothing to say here - both are contrast, and there is no contrast left
+    to use. What survives is the shape that identifies the app, which is the microphone.
+
+    Drawn a little heavier than the colour version: a themed icon is one flat tone, so a stroke that
+    reads clearly against a shaded ball starts to look spindly on its own.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#000000"
+        android:pathData="M41,36 A13,13 0 0 1 67,36 L67,53 A13,13 0 0 1 41,53 Z" />
+    <path
+        android:strokeColor="#000000"
+        android:strokeWidth="6.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M35,55 C35,76 73,76 73,55" />
+    <path
+        android:strokeColor="#000000"
+        android:strokeWidth="6.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M54,70 L54,84" />
+</vector>

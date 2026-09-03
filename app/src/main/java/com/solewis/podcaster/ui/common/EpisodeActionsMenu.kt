@@ -50,7 +50,13 @@ fun EpisodeActionsMenu(
     onDownload: () -> Unit,
     onRemoveDownload: () -> Unit,
     onTogglePlayed: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Off where downloading already has a control of its own - the episode screen gives it a
+     * button in the action row, and offering it twice on one screen invites the reading that the
+     * two do different things.
+     */
+    includeDownload: Boolean = true
 ) {
     var open by remember { mutableStateOf(false) }
     var confirmingDelete by remember { mutableStateOf(false) }
@@ -90,7 +96,7 @@ fun EpisodeActionsMenu(
                 open = false
                 onTogglePlayed()
             }
-            DownloadMenuItem(
+            if (includeDownload) DownloadMenuItem(
                 download = download,
                 onDownload = {
                     open = false

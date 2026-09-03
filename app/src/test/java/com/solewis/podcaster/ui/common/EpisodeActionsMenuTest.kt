@@ -1,6 +1,8 @@
 package com.solewis.podcaster.ui.common
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -29,7 +31,11 @@ class EpisodeActionsMenuTest {
     private var removed = 0
     private var toggledPlayed = 0
 
-    private fun render(isPlayed: Boolean = false, download: EpisodeDownload? = null) {
+    private fun render(
+        isPlayed: Boolean = false,
+        download: EpisodeDownload? = null,
+        includeDownload: Boolean = true
+    ) {
         compose.setContent {
             PodcasterTheme {
                 EpisodeActionsMenu(
@@ -39,7 +45,8 @@ class EpisodeActionsMenuTest {
                     onEnqueue = { enqueued++ },
                     onDownload = { downloaded++ },
                     onRemoveDownload = { removed++ },
-                    onTogglePlayed = { toggledPlayed++ }
+                    onTogglePlayed = { toggledPlayed++ },
+                    includeDownload = includeDownload
                 )
             }
         }
@@ -167,5 +174,18 @@ class EpisodeActionsMenuTest {
         assertThat(downloadStatusLabel(state(DownloadStatus.DOWNLOADING, percent = 42.7f)))
             .isEqualTo("Downloading 42%")
         assertThat(downloadStatusLabel(state(DownloadStatus.FAILED))).isEqualTo("Download failed")
+    }
+
+    @Test
+    fun the_download_item_can_be_left_out_for_a_screen_that_already_offers_it() {
+        // The episode screen gives downloading a button of its own in the action row. Offering it
+        // again inside the overflow invites the reading that the two do different things.
+        render(includeDownload = false)
+        openMenu()
+
+        compose.onAllNodesWithTag(TestTags.MENU_DOWNLOAD).assertCountEquals(0)
+        // Everything that has no other home is still there.
+        compose.onNodeWithTag(TestTags.MENU_ENQUEUE).assertExists()
+        compose.onNodeWithTag(TestTags.MENU_TOGGLE_PLAYED).assertExists()
     }
 }
