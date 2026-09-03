@@ -1,54 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    The windscreen itself.
+    Flat colour, full-bleed.
 
-    Deliberately full-bleed rather than a drawn circle: an adaptive icon is already masked to the
-    launcher's shape, so letting this fill all 108dp means the mask *is* the ball's edge - crisp at
-    every size, and correct on a circle, a squircle or a teardrop without redrawing anything.
+    Full-bleed rather than a drawn circle because an adaptive icon is already masked to the
+    launcher's shape - so the mask *is* the edge, crisp at every size and correct on a circle, a
+    squircle or a teardrop without redrawing anything.
 
-    The radial gradient is what stops it reading as a flat disc. Light from the upper left, falling
-    off to a much darker lower right, which is the whole reason a sphere looks like a sphere.
-    Colours are the app's own slate blue (see ui/theme/Color.kt) taken lighter and darker than the
-    #4B6088 primary, so the icon belongs to the app rather than merely sitting next to it.
+    No gradient. An earlier version shaded this into a sphere, which was the right idea for an icon
+    trying to look like a real object and the wrong one for a flat mark, where it just muddies the
+    single colour the icon is recognised by. #4B6088 is the app's own primary (see ui/theme/Color.kt).
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <path android:pathData="M0,0h108v108h-108z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="radial"
-                android:centerX="36"
-                android:centerY="32"
-                android:gradientRadius="86">
-                <item android:offset="0" android:color="#FF7286AF" />
-                <item android:offset="0.45" android:color="#FF4F6490" />
-                <item android:offset="1" android:color="#FF25324F" />
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Specular highlight. Small, offset, and very soft - a foam ball has no hard reflection, but
-         without something catching the light up here the sphere reads as a printed circle.
-
-         Painted over the whole square rather than a circle, so it has no edge of its own. On a
-         circle the gradient was still faintly visible where the path stopped, and while a launcher
-         mask hides that, the unmasked Play Store render showed it as an arc across the top left. -->
-    <path android:pathData="M0,0h108v108h-108z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="radial"
-                android:centerX="34"
-                android:centerY="28"
-                android:gradientRadius="38">
-                <item android:offset="0" android:color="#38FFFFFF" />
-                <item android:offset="0.6" android:color="#10FFFFFF" />
-                <item android:offset="1" android:color="#00FFFFFF" />
-            </gradient>
-        </aapt:attr>
-    </path>
+    <path android:fillColor="#FF4B6088" android:pathData="M0,0h108v108h-108z" />
 </vector>

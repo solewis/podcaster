@@ -1,23 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Themed icons (Android 13+) are re-coloured to a single tone on a single-tone background, so the
-    mesh, the metal and the sphere all have nothing to say here - every one of them is contrast, and
-    there is no contrast left to spend. What survives is the outline that identifies the app.
+    colour and the long shadow have nothing to say here - both are contrast, and there is no
+    contrast left to spend. What survives is the glyph, which is already flat, so this is the same
+    shapes over again with the fill swapped.
 
-    The same silhouette as the colour icon, one step larger. A themed icon is one flat shape with no
-    shading to give it weight, so the body that reads as substantial behind a windscreen looks thin
-    on its own. The two grooves are the seam and the machined ring, kept because they are the only
-    thing distinguishing a microphone from a pill at this level of abstraction.
+    Identical geometry to the foreground on purpose: an earlier pair drifted apart, and a themed
+    icon that is a different microphone from the one on the home screen is worse than no themed icon.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Grooves cut out of the body rather than drawn over it - one path with evenOdd, so they
-         read as gaps whatever colour the launcher fills the shape with. -->
-    <path
-        android:fillColor="#000000"
-        android:fillType="evenOdd"
-        android:pathData="M37,38 A17,17 0 0 1 71,38 L71,78 A7,7 0 0 1 64,85 L44,85 A7,7 0 0 1 37,78 Z M37,59 L71,59 L71,62 L37,62 Z M37,76 L71,76 L71,78 L37,78 Z" />
+    <path android:fillColor="#000000" android:pathData="M43.00,34.00 L43.09,32.56 L43.37,31.15 L43.84,29.79 L44.47,28.50 L45.27,27.30 L46.22,26.22 L47.30,25.27 L48.50,24.47 L49.79,23.84 L51.15,23.37 L52.56,23.09 L54.00,23.00 L55.44,23.09 L56.85,23.37 L58.21,23.84 L59.50,24.47 L60.70,25.27 L61.78,26.22 L62.73,27.30 L63.53,28.50 L64.16,29.79 L64.63,31.15 L64.91,32.56 L65.00,34.00 L65.00,50.00 L64.91,51.44 L64.63,52.85 L64.16,54.21 L63.53,55.50 L62.73,56.70 L61.78,57.78 L60.70,58.73 L59.50,59.53 L58.21,60.16 L56.85,60.63 L55.44,60.91 L54.00,61.00 L52.56,60.91 L51.15,60.63 L49.79,60.16 L48.50,59.53 L47.30,58.73 L46.22,57.78 L45.27,56.70 L44.47,55.50 L43.84,54.21 L43.37,52.85 L43.09,51.44 L43.00,50.00 Z" />
+    <path android:fillColor="#000000" android:pathData="M32.00,41.00 L42.00,41.00 L42.00,44.50 L32.00,44.50 Z" />
+    <path android:fillColor="#000000" android:pathData="M66.00,41.00 L76.00,41.00 L76.00,44.50 L66.00,44.50 Z" />
+    <path android:fillColor="#000000" android:pathData="M51.00,69.00 L57.00,69.00 L57.00,80.00 L51.00,80.00 Z" />
+    <path android:fillColor="#000000" android:pathData="M41.00,79.00 L67.00,79.00 L67.00,84.00 L41.00,84.00 Z" />
+    <path android:fillColor="#000000" android:pathData="M35,43 L35,51 A19,19 0 0 0 73,51 L73,43 L69,43 L69,51 A15,15 0 0 1 39,51 L39,43 Z" />
 </vector>

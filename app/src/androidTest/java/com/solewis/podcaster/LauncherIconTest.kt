@@ -79,35 +79,26 @@ class LauncherIconTest {
         getPixel((x / 108.0 * size).toInt(), (y / 108.0 * size).toInt())
 
     @Test
-    fun the_microphone_is_actually_there_and_lighter_than_the_ball() {
+    fun the_microphone_is_actually_there_and_lighter_than_the_background() {
         val bitmap = render()
-        // The body, not the centre of the icon - the centre is grille now, and grille is
-        // deliberately a step darker. Sampling it was this test's own bug, and it caught the
-        // change honestly by failing when the mic stopped being a flat light shape.
-        val body = bitmap.at(52.0, 72.0)
-        // A point on the ball well clear of the mic, at about 4 o'clock.
-        val ball = bitmap.at(84.0, 67.0)
+        val capsule = bitmap.at(54.0, 40.0)
+        // Flat background, up and left of the glyph and clear of its shadow.
+        val background = bitmap.at(24.0, 28.0)
 
-        // The mic reads *through* the mesh rather than sitting on top of it, so it is deliberately
-        // not white - but it still has to be clearly lighter than what surrounds it, or the icon is
-        // a plain disc at launcher size.
-        assertThat(luminance(body) - luminance(ball)).isGreaterThan(60.0)
+        // A white glyph on a mid blue. If this ever narrows, the icon has become a flat disc.
+        assertThat(luminance(capsule) - luminance(background)).isGreaterThan(90.0)
     }
 
     @Test
-    fun the_grille_is_a_step_darker_than_the_body_but_still_lighter_than_the_ball() {
+    fun the_long_shadow_falls_to_the_lower_right() {
         val bitmap = render()
-        val grille = bitmap.at(52.0, 40.0)
-        val body = bitmap.at(52.0, 72.0)
-        val ball = bitmap.at(84.0, 67.0)
+        val lit = bitmap.at(26.0, 26.0)
+        val shadowed = bitmap.at(86.0, 86.0)
 
-        // Two finishes on one object. Darker than the body, or the basket reads as painted metal
-        // rather than as mesh...
-        assertThat(luminance(grille)).isLessThan(luminance(body))
-        // ...but still clearly lighter than the ball. Taken genuinely dark it stopped being metal
-        // and became a hole, and at 48px - where the weave has blurred away entirely - the icon
-        // was a black blob with a white foot.
-        assertThat(luminance(grille) - luminance(ball)).isGreaterThan(30.0)
+        // The whole point of the shadow, and the thing most likely to break silently: the sweep
+        // direction is baked into generated path data, so a sign error would put it on the wrong
+        // side and nothing else would complain.
+        assertThat(luminance(lit) - luminance(shadowed)).isGreaterThan(15.0)
     }
 
     @Test
