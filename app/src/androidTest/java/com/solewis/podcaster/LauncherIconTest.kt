@@ -62,16 +62,21 @@ class LauncherIconTest {
     }
 
     @Test
-    fun the_background_covers_the_whole_icon() {
+    fun the_background_is_one_flat_colour_over_the_whole_icon() {
         val bitmap = render()
 
         // Every corner opaque. A background that does not bleed to the edges leaves the launcher's
         // mask cutting through transparency instead of through the artwork, which shows up as a
         // chipped edge on some masks and not others - and leaves the Play Store icon, which is not
         // masked at all, with see-through corners.
-        for ((x, y) in listOf(2 to 2, size - 3 to 2, 2 to size - 3, size - 3 to size - 3)) {
-            assertThat(Color.alpha(bitmap.getPixel(x, y))).isEqualTo(255)
-        }
+        val corners = listOf(2 to 2, size - 3 to 2, 2 to size - 3, size - 3 to size - 3)
+            .map { (x, y) -> bitmap.getPixel(x, y) }
+        corners.forEach { assertThat(Color.alpha(it)).isEqualTo(255) }
+
+        // And all the same colour. The background carried a long shadow and, before that, a
+        // sphere gradient; both are gone, and a stray one would show up here as corners that
+        // disagree.
+        assertThat(corners.toSet()).hasSize(1)
     }
 
     /** A point in viewport (108dp) coordinates, which is how the drawables are written. */
@@ -87,18 +92,6 @@ class LauncherIconTest {
 
         // A white glyph on a mid blue. If this ever narrows, the icon has become a flat disc.
         assertThat(luminance(capsule) - luminance(background)).isGreaterThan(90.0)
-    }
-
-    @Test
-    fun the_long_shadow_falls_to_the_lower_right() {
-        val bitmap = render()
-        val lit = bitmap.at(26.0, 26.0)
-        val shadowed = bitmap.at(86.0, 86.0)
-
-        // The whole point of the shadow, and the thing most likely to break silently: the sweep
-        // direction is baked into generated path data, so a sign error would put it on the wrong
-        // side and nothing else would complain.
-        assertThat(luminance(lit) - luminance(shadowed)).isGreaterThan(15.0)
     }
 
     @Test
@@ -146,7 +139,12 @@ class LauncherIconTest {
             }
         }
         val fraction = covered.toDouble() / ((size / 2) * (size / 2))
-        assertThat(fraction).isGreaterThan(0.08)
+        // Loose on purpose. These bounds catch a layer that is empty, nearly empty, or a solid
+        // block - the ways a monochrome layer is actually shipped broken. They are not a judgement
+        // on how big the glyph should be: the first version of this test set the floor at 0.08 by
+        // guesswork and then failed when the mic was deliberately made smaller, which is the test
+        // arguing with a design decision rather than checking anything.
+        assertThat(fraction).isGreaterThan(0.03)
         assertThat(fraction).isLessThan(0.45)
     }
 }

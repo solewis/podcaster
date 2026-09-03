@@ -1,56 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    The microphone, and the long shadow it casts.
+    The microphone: capsule, yoke with cross-bar tips, stem, base. Flat white, nothing else.
 
-    Both live on the foreground layer so they move together under a launcher's parallax - a shadow
-    that slid independently of the thing casting it would be worse than no shadow.
+    Two earlier versions tried to be a real microphone - a windscreen with a mesh over it, then a
+    condenser with metal shading - and both failed the same way. At 48px, the size that decides
+    whether an icon works, shading is mud and a woven grille is noise. A flat silhouette reads at
+    every size, which is why the whole category looks like this.
 
-    The shadow is generated rather than drawn by hand. Each part of the glyph is convex, and for a
-    convex shape the swept region along the light direction is exactly the hull of the shape and its
-    translate; the union of those sweeps is the union's sweep. Taking one hull around the whole
-    glyph instead would bridge the gap between the capsule and the yoke and cast shadow through a
-    hole the glyph does not block. The pieces overlap freely, which costs nothing at a single opaque
-    colour.
-
-    The yoke is one smooth outline here even though the shadow decomposes it into quads: drawing
-    those quads put visible facets and hairline seams along the arc.
-
-    Every part of the glyph sits within a radius of 33 from centre, inside the 66dp circle every
-    launcher mask keeps. The shadow deliberately runs past that and is clipped by the mask, which is
-    what makes it read as continuing off the edge.
+    It sits inside a radius of 28 from centre, comfortably within the 66dp circle every launcher
+    mask keeps, so no part of it is ever clipped. That is smaller than it needs to be for safety:
+    a glyph pushed out to the limit crowds the circle and leaves the icon looking like it is
+    straining against its own edge.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Long shadow, one swept region per convex piece of the glyph. -->
-    <path android:fillColor="#FF33436A" android:pathData="M43.00,34.00 L43.09,32.56 L43.38,31.15 L43.84,29.79 L44.47,28.50 L45.27,27.30 L46.22,26.22 L47.30,25.27 L48.50,24.47 L49.79,23.84 L51.15,23.38 L52.56,23.09 L54.00,23.00 L55.44,23.09 L56.85,23.38 L58.21,23.84 L59.50,24.47 L60.70,25.27 L61.78,26.22 L167.84,132.29 L168.79,133.37 L169.59,134.57 L170.23,135.86 L170.69,137.22 L170.97,138.63 L171.07,140.07 L171.07,156.07 L170.97,157.50 L170.69,158.91 L170.23,160.28 L169.59,161.57 L168.79,162.76 L167.84,163.84 L166.76,164.79 L165.57,165.59 L164.28,166.23 L162.91,166.69 L161.50,166.97 L160.07,167.07 L158.63,166.97 L157.22,166.69 L155.86,166.23 L154.57,165.59 L153.37,164.79 L152.29,163.84 L46.22,57.78 L45.27,56.70 L44.47,55.50 L43.84,54.21 L43.38,52.85 L43.09,51.44 L43.00,50.00 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M32.00,41.00 L42.00,41.00 L148.07,147.07 L148.07,150.57 L138.07,150.57 L32.00,44.50 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M66.00,41.00 L76.00,41.00 L182.07,147.07 L182.07,150.57 L172.07,150.57 L66.00,44.50 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M35.00,43.00 L39.00,43.00 L145.07,149.07 L145.07,158.07 L141.07,158.07 L35.00,52.00 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M69.00,43.00 L73.00,43.00 L179.07,149.07 L179.07,158.07 L175.07,158.07 L69.00,52.00 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M51.00,69.00 L57.00,69.00 L163.07,175.07 L163.07,186.07 L157.07,186.07 L51.00,80.00 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M41.00,79.00 L67.00,79.00 L173.07,185.07 L173.07,190.07 L147.07,190.07 L41.00,84.00 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M68.49,54.88 L69.00,51.00 L73.00,51.00 L179.07,157.07 L178.42,161.98 L174.56,160.95 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M66.99,58.50 L68.49,54.88 L72.35,55.92 L178.42,161.98 L176.52,166.57 L173.06,164.57 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M64.61,61.61 L66.99,58.50 L70.45,60.50 L176.52,166.57 L173.50,170.50 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M61.50,63.99 L64.61,61.61 L173.50,170.50 L169.57,173.52 L63.50,67.45 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M57.88,65.49 L61.50,63.99 L167.57,170.06 L169.57,173.52 L164.98,175.42 L58.92,69.35 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M54.00,66.00 L57.88,65.49 L163.95,171.56 L164.98,175.42 L160.07,176.07 L54.00,70.00 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M49.08,69.35 L50.12,65.49 L54.00,66.00 L160.07,172.07 L160.07,176.07 L155.15,175.42 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M44.50,67.45 L46.50,63.99 L50.12,65.49 L156.18,171.56 L155.15,175.42 L150.57,173.52 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M40.56,64.44 L43.39,61.61 L46.50,63.99 L152.57,170.06 L150.57,173.52 L146.63,170.50 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M37.55,60.50 L41.01,58.50 L147.08,164.57 L149.46,167.67 L146.63,170.50 L40.56,64.44 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M35.65,55.92 L39.51,54.88 L145.58,160.95 L147.08,164.57 L143.61,166.57 L37.55,60.50 Z" />
-    <path android:fillColor="#FF33436A" android:pathData="M35.00,51.00 L39.00,51.00 L145.07,157.07 L145.58,160.95 L141.71,161.98 L35.65,55.92 Z" />
-
-    <!-- The glyph itself, over its own shadow. -->
-    <path android:fillColor="#FFFFFFFF" android:pathData="M43.00,34.00 L43.09,32.56 L43.37,31.15 L43.84,29.79 L44.47,28.50 L45.27,27.30 L46.22,26.22 L47.30,25.27 L48.50,24.47 L49.79,23.84 L51.15,23.37 L52.56,23.09 L54.00,23.00 L55.44,23.09 L56.85,23.37 L58.21,23.84 L59.50,24.47 L60.70,25.27 L61.78,26.22 L62.73,27.30 L63.53,28.50 L64.16,29.79 L64.63,31.15 L64.91,32.56 L65.00,34.00 L65.00,50.00 L64.91,51.44 L64.63,52.85 L64.16,54.21 L63.53,55.50 L62.73,56.70 L61.78,57.78 L60.70,58.73 L59.50,59.53 L58.21,60.16 L56.85,60.63 L55.44,60.91 L54.00,61.00 L52.56,60.91 L51.15,60.63 L49.79,60.16 L48.50,59.53 L47.30,58.73 L46.22,57.78 L45.27,56.70 L44.47,55.50 L43.84,54.21 L43.37,52.85 L43.09,51.44 L43.00,50.00 Z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M32.00,41.00 L42.00,41.00 L42.00,44.50 L32.00,44.50 Z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M66.00,41.00 L76.00,41.00 L76.00,44.50 L66.00,44.50 Z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M51.00,69.00 L57.00,69.00 L57.00,80.00 L51.00,80.00 Z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M41.00,79.00 L67.00,79.00 L67.00,84.00 L41.00,84.00 Z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M35,43 L35,51 A19,19 0 0 0 73,51 L73,43 L69,43 L69,51 A15,15 0 0 1 39,51 L39,43 Z" />
+    <!-- Capsule. -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M44.65,37 A9.35,9.35 0 0 1 63.35,37 L63.35,50.6 A9.35,9.35 0 0 1 44.65,50.6 Z" />
+    <!-- Cross-bar tips, left and right, where the yoke meets the mount. -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M35.3,42.95 L43.8,42.95 L43.8,45.93 L35.3,45.93 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M64.2,42.95 L72.7,42.95 L72.7,45.93 L64.2,45.93 Z" />
+    <!-- Yoke: the arms and the sweep between them, outer radius 16.15 and inner 12.75 about (54,51.45). -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M37.85,44.65 L37.85,51.45 A16.15,16.15 0 0 0 70.15,51.45 L70.15,44.65 L66.75,44.65 L66.75,51.45 A12.75,12.75 0 0 1 41.25,51.45 L41.25,44.65 Z" />
+    <!-- Stem and base. -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M51.45,66.75 L56.55,66.75 L56.55,76.1 L51.45,76.1 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M42.95,75.25 L65.05,75.25 L65.05,79.5 L42.95,79.5 Z" />
 </vector>
