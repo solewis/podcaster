@@ -74,17 +74,40 @@ class LauncherIconTest {
         }
     }
 
+    /** A point in viewport (108dp) coordinates, which is how the drawables are written. */
+    private fun Bitmap.at(x: Double, y: Double) =
+        getPixel((x / 108.0 * size).toInt(), (y / 108.0 * size).toInt())
+
     @Test
     fun the_microphone_is_actually_there_and_lighter_than_the_ball() {
         val bitmap = render()
-        val centre = bitmap.getPixel(size / 2, size / 2)
+        // The body, not the centre of the icon - the centre is grille now, and grille is
+        // deliberately a step darker. Sampling it was this test's own bug, and it caught the
+        // change honestly by failing when the mic stopped being a flat light shape.
+        val body = bitmap.at(52.0, 72.0)
         // A point on the ball well clear of the mic, at about 4 o'clock.
-        val ball = bitmap.getPixel((size * 0.78).toInt(), (size * 0.62).toInt())
+        val ball = bitmap.at(84.0, 67.0)
 
         // The mic reads *through* the mesh rather than sitting on top of it, so it is deliberately
         // not white - but it still has to be clearly lighter than what surrounds it, or the icon is
         // a plain disc at launcher size.
-        assertThat(luminance(centre) - luminance(ball)).isGreaterThan(60.0)
+        assertThat(luminance(body) - luminance(ball)).isGreaterThan(60.0)
+    }
+
+    @Test
+    fun the_grille_is_a_step_darker_than_the_body_but_still_lighter_than_the_ball() {
+        val bitmap = render()
+        val grille = bitmap.at(52.0, 40.0)
+        val body = bitmap.at(52.0, 72.0)
+        val ball = bitmap.at(84.0, 67.0)
+
+        // Two finishes on one object. Darker than the body, or the basket reads as painted metal
+        // rather than as mesh...
+        assertThat(luminance(grille)).isLessThan(luminance(body))
+        // ...but still clearly lighter than the ball. Taken genuinely dark it stopped being metal
+        // and became a hole, and at 48px - where the weave has blurred away entirely - the icon
+        // was a black blob with a white foot.
+        assertThat(luminance(grille) - luminance(ball)).isGreaterThan(30.0)
     }
 
     @Test
@@ -112,4 +135,27 @@ class LauncherIconTest {
 
     private fun luminance(c: Int) =
         0.2126 * Color.red(c) + 0.7152 * Color.green(c) + 0.0722 * Color.blue(c)
+
+    @Test
+    fun the_themed_icon_is_a_recognisable_shape_and_not_a_solid_block() {
+        // Android 13+ tints the monochrome layer and drops everything else, so it is easy to ship
+        // one that is technically present and visually a blob. Rendered alone it has to be mostly
+        // empty (a shape, not a fill) but not nearly empty (a shape, not a speck).
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val layer = requireNotNull(
+            ResourcesCompat.getDrawable(context.resources, R.drawable.ic_launcher_monochrome, null)
+        )
+        layer.setBounds(0, 0, size, size)
+        layer.draw(Canvas(bitmap))
+
+        var covered = 0
+        for (y in 0 until size step 2) {
+            for (x in 0 until size step 2) {
+                if (Color.alpha(bitmap.getPixel(x, y)) > 128) covered++
+            }
+        }
+        val fraction = covered.toDouble() / ((size / 2) * (size / 2))
+        assertThat(fraction).isGreaterThan(0.08)
+        assertThat(fraction).isLessThan(0.45)
+    }
 }

@@ -1,30 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Themed icons (Android 13+) are re-coloured to a single tone on a single-tone background, so the
-    mesh and the sphere have nothing to say here - both are contrast, and there is no contrast left
-    to use. What survives is the shape that identifies the app, which is the microphone.
+    mesh, the metal and the sphere all have nothing to say here - every one of them is contrast, and
+    there is no contrast left to spend. What survives is the outline that identifies the app.
 
-    Drawn a little heavier than the colour version: a themed icon is one flat tone, so a stroke that
-    reads clearly against a shaded ball starts to look spindly on its own.
+    The same silhouette as the colour icon, one step larger. A themed icon is one flat shape with no
+    shading to give it weight, so the body that reads as substantial behind a windscreen looks thin
+    on its own. The two grooves are the seam and the machined ring, kept because they are the only
+    thing distinguishing a microphone from a pill at this level of abstraction.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Grooves cut out of the body rather than drawn over it - one path with evenOdd, so they
+         read as gaps whatever colour the launcher fills the shape with. -->
     <path
         android:fillColor="#000000"
-        android:pathData="M41,36 A13,13 0 0 1 67,36 L67,53 A13,13 0 0 1 41,53 Z" />
-    <path
-        android:strokeColor="#000000"
-        android:strokeWidth="6.5"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M35,55 C35,76 73,76 73,55" />
-    <path
-        android:strokeColor="#000000"
-        android:strokeWidth="6.5"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M54,70 L54,84" />
+        android:fillType="evenOdd"
+        android:pathData="M37,38 A17,17 0 0 1 71,38 L71,78 A7,7 0 0 1 64,85 L44,85 A7,7 0 0 1 37,78 Z M37,59 L71,59 L71,62 L37,62 Z M37,76 L71,76 L71,78 L37,78 Z" />
 </vector>

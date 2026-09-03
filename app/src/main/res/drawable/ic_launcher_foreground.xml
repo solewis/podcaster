@@ -2,71 +2,113 @@
 <!--
     The microphone, seen *through* the windscreen.
 
-    Order matters and is the whole trick: the mic is drawn first, the mesh over the top of it. That
-    is what puts the mic behind the screen rather than on it. The mic is also drawn slightly short
-    of white and slightly transparent, because something seen through a mesh loses a little
-    contrast - at full white it jumps forward and sits on the ball instead of inside it.
+    Order is the whole trick: the mic is drawn first and the windscreen's mesh over the top of it.
+    That is what puts the mic behind the screen rather than on it.
 
-    Everything lives inside a radius of about 30 from centre, comfortably within the 66dp circle
-    every launcher mask keeps, so no part of the mic is ever clipped. The mesh does not need that
-    protection - it is meant to run off the edge.
+    A large-diaphragm condenser rather than the usual capsule-on-a-stick pictogram - a mesh basket
+    above, a machined body below, a seam between them - because that is the shape a podcast
+    microphone actually has. What makes it read as metal rather than as a drawing is that every part
+    carries the *same* left-to-right gradient: dark at both edges, bright a third of the way in,
+    which is what a cylinder does under a light up and to the left. The ball behind it is lit from
+    the same corner, so the two agree.
+
+    The grille is that barrel one step darker and nothing else - same hue, same lighting. Painted
+    genuinely dark it stopped being metal and became a hole, and at 48px, where the weave has blurred
+    away entirely, the icon was a black blob with a white foot.
+
+    No shock mount, no yoke, no stand. Those are the details that say "microphone" at 512px and turn
+    into sub-pixel noise at 48px, which is the size that actually matters. For the same reason the
+    metal is carried by the gradients rather than by drawn highlights: a painted-on specular strip
+    is a hard-edged rectangle the moment you look at it large.
+
+    Everything sits within a radius of 30 from centre, inside the 66dp circle every launcher mask
+    keeps, so no part of the mic is ever clipped. The windscreen mesh needs no such protection - it
+    is meant to run off the edge.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <group android:name="microphone">
-        <!-- Capsule: a pill, 24 across and 40 tall, centred. -->
-        <path
-            android:fillColor="#E8EEFA"
-            android:fillAlpha="0.92"
-            android:pathData="M42,37 A12,12 0 0 1 66,37 L66,53 A12,12 0 0 1 42,53 Z" />
-        <!-- Cradle: the arc that makes a pill read as a microphone rather than a capsule. -->
-        <path
-            android:strokeColor="#E8EEFA"
-            android:strokeAlpha="0.92"
-            android:strokeWidth="5.5"
-            android:strokeLineCap="round"
-            android:fillColor="#00000000"
-            android:pathData="M37,55 C37,74 71,74 71,55" />
-        <!-- Stem. Stops short of the mask edge rather than running to it: a stem cut off by the
-             circle reads as a mistake at small sizes, where the cut is only a pixel or two. -->
-        <path
-            android:strokeColor="#E8EEFA"
-            android:strokeAlpha="0.92"
-            android:strokeWidth="5.5"
-            android:strokeLineCap="round"
-            android:fillColor="#00000000"
-            android:pathData="M54,69 L54,82" />
+    <!-- Body: the machined barrel below the grille. The dark edge stroke is what separates the mic
+         from a ball of similar value behind it - without it the two merge at small sizes. -->
+    <path
+        android:strokeColor="#1C2433"
+        android:strokeAlpha="0.38"
+        android:strokeWidth="1.4"
+        android:pathData="M39,39 A15,15 0 0 1 69,39 L69,78 A6,6 0 0 1 63,84 L45,84 A6,6 0 0 1 39,78 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="39" android:startY="0" android:endX="69" android:endY="0">
+                <item android:offset="0" android:color="#FF77869F" />
+                <item android:offset="0.18" android:color="#FFC8D3E6" />
+                <item android:offset="0.38" android:color="#FFEDF2FA" />
+                <item android:offset="0.66" android:color="#FFBBC7DC" />
+                <item android:offset="1" android:color="#FF6B7994" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Grille. -->
+    <path android:pathData="M39,39 A15,15 0 0 1 69,39 L69,60 L39,60 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="39" android:startY="0" android:endX="69" android:endY="0">
+                <item android:offset="0" android:color="#FF66748E" />
+                <item android:offset="0.18" android:color="#FFA9B6CB" />
+                <item android:offset="0.38" android:color="#FFC6D1E2" />
+                <item android:offset="0.66" android:color="#FF9CA9C0" />
+                <item android:offset="1" android:color="#FF5D6B85" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- The weave, clipped to the grille so it cannot spill onto the body. Shadow between the
+         wires, a cross-weave, then the wire itself catching the light. -->
+    <group>
+        <clip-path android:pathData="M39,39 A15,15 0 0 1 69,39 L69,60 L39,60 Z" />
+        <path android:strokeColor="#1F2634" android:strokeAlpha="0.34" android:strokeWidth="1.2"
+            android:fillColor="#00000000" android:pathData="M38,29 L70,29 M38,31.4 L70,31.4 M38,33.8 L70,33.8 M38,36.2 L70,36.2 M38,38.6 L70,38.6 M38,41 L70,41 M38,43.4 L70,43.4 M38,45.8 L70,45.8 M38,48.2 L70,48.2 M38,50.6 L70,50.6 M38,53 L70,53 M38,55.4 L70,55.4 M38,57.8 L70,57.8" />
+        <path android:strokeColor="#1F2634" android:strokeAlpha="0.18" android:strokeWidth="0.9"
+            android:fillColor="#00000000" android:pathData="M40,22 L40,61 M42.4,22 L42.4,61 M44.8,22 L44.8,61 M47.2,22 L47.2,61 M49.6,22 L49.6,61 M52,22 L52,61 M54.4,22 L54.4,61 M56.8,22 L56.8,61 M59.2,22 L59.2,61 M61.6,22 L61.6,61 M64,22 L64,61 M66.4,22 L66.4,61" />
+        <path android:strokeColor="#FFFFFF" android:strokeAlpha="0.26" android:strokeWidth="0.7"
+            android:fillColor="#00000000" android:pathData="M38,29 L70,29 M38,31.4 L70,31.4 M38,33.8 L70,33.8 M38,36.2 L70,36.2 M38,38.6 L70,38.6 M38,41 L70,41 M38,43.4 L70,43.4 M38,45.8 L70,45.8 M38,48.2 L70,48.2 M38,50.6 L70,50.6 M38,53 L70,53 M38,55.4 L70,55.4 M38,57.8 L70,57.8" />
+        <!-- The basket is a dome, not a tube: without this its top reads as flat. -->
+        <path android:pathData="M39,39 A15,15 0 0 1 69,39 L69,60 L39,60 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear"
+                    android:startX="0" android:startY="24" android:endX="0" android:endY="60">
+                    <item android:offset="0" android:color="#30161C28" />
+                    <item android:offset="0.5" android:color="#00161C28" />
+                    <item android:offset="1" android:color="#26161C28" />
+                </gradient>
+            </aapt:attr>
+        </path>
     </group>
 
-    <!-- The mesh. Two passes: a dark one to cut the shadow between the wires, a light one for the
-         wire itself, which is what makes it look woven rather than merely hatched. Kept faint on
-         purpose - at 48px this has to blur into texture, not turn into moire. -->
-    <path
-        android:strokeColor="#000000"
-        android:strokeAlpha="0.11"
-        android:strokeWidth="1.3"
-        android:fillColor="#00000000"
-        android:pathData="M0,6 L108,6 M0,12 L108,12 M0,18 L108,18 M0,24 L108,24 M0,30 L108,30 M0,36 L108,36 M0,42 L108,42 M0,48 L108,48 M0,54 L108,54 M0,60 L108,60 M0,66 L108,66 M0,72 L108,72 M0,78 L108,78 M0,84 L108,84 M0,90 L108,90 M0,96 L108,96 M0,102 L108,102" />
-    <path
-        android:strokeColor="#000000"
-        android:strokeAlpha="0.11"
-        android:strokeWidth="1.3"
-        android:fillColor="#00000000"
-        android:pathData="M6,0 L6,108 M12,0 L12,108 M18,0 L18,108 M24,0 L24,108 M30,0 L30,108 M36,0 L36,108 M42,0 L42,108 M48,0 L48,108 M54,0 L54,108 M60,0 L60,108 M66,0 L66,108 M72,0 L72,108 M78,0 L78,108 M84,0 L84,108 M90,0 L90,108 M96,0 L96,108 M102,0 L102,108" />
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeAlpha="0.14"
-        android:strokeWidth="0.8"
-        android:fillColor="#00000000"
-        android:pathData="M0,6 L108,6 M0,12 L108,12 M0,18 L108,18 M0,24 L108,24 M0,30 L108,30 M0,36 L108,36 M0,42 L108,42 M0,48 L108,48 M0,54 L108,54 M0,60 L108,60 M0,66 L108,66 M0,72 L108,72 M0,78 L108,78 M0,84 L108,84 M0,90 L108,90 M0,96 L108,96 M0,102 L108,102" />
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeAlpha="0.14"
-        android:strokeWidth="0.8"
-        android:fillColor="#00000000"
-        android:pathData="M6,0 L6,108 M12,0 L12,108 M18,0 L18,108 M24,0 L24,108 M30,0 L30,108 M36,0 L36,108 M42,0 L42,108 M48,0 L48,108 M54,0 L54,108 M60,0 L60,108 M66,0 L66,108 M72,0 L72,108 M78,0 L78,108 M84,0 L84,108 M90,0 L90,108 M96,0 L96,108 M102,0 L102,108" />
+    <!-- Seam between grille and body: a lit edge over a shadow, which is what a machined joint
+         looks like and what stops the two halves reading as one shape. -->
+    <path android:strokeColor="#FFFFFF" android:strokeAlpha="0.55" android:strokeWidth="1.5"
+        android:fillColor="#00000000" android:pathData="M39.5,60.6 L68.5,60.6" />
+    <path android:strokeColor="#141A28" android:strokeAlpha="0.34" android:strokeWidth="1.3"
+        android:fillColor="#00000000" android:pathData="M39.5,62.5 L68.5,62.5" />
+
+    <!-- A machined ring near the foot. Pure detail: it earns its keep at 512px and disappears
+         cleanly at 48, which is the right way round for a decoration. -->
+    <path android:strokeColor="#141A28" android:strokeAlpha="0.26" android:strokeWidth="1.1"
+        android:fillColor="#00000000" android:pathData="M40,76.5 L68,76.5" />
+    <path android:strokeColor="#FFFFFF" android:strokeAlpha="0.34" android:strokeWidth="1"
+        android:fillColor="#00000000" android:pathData="M40,78 L68,78" />
+
+    <!-- The windscreen's own mesh, over everything above. -->
+    <path android:strokeColor="#000000" android:strokeAlpha="0.11" android:strokeWidth="1.3"
+        android:fillColor="#00000000" android:pathData="M0,6 L108,6 M0,12 L108,12 M0,18 L108,18 M0,24 L108,24 M0,30 L108,30 M0,36 L108,36 M0,42 L108,42 M0,48 L108,48 M0,54 L108,54 M0,60 L108,60 M0,66 L108,66 M0,72 L108,72 M0,78 L108,78 M0,84 L108,84 M0,90 L108,90 M0,96 L108,96 M0,102 L108,102" />
+    <path android:strokeColor="#000000" android:strokeAlpha="0.11" android:strokeWidth="1.3"
+        android:fillColor="#00000000" android:pathData="M6,0 L6,108 M12,0 L12,108 M18,0 L18,108 M24,0 L24,108 M30,0 L30,108 M36,0 L36,108 M42,0 L42,108 M48,0 L48,108 M54,0 L54,108 M60,0 L60,108 M66,0 L66,108 M72,0 L72,108 M78,0 L78,108 M84,0 L84,108 M90,0 L90,108 M96,0 L96,108 M102,0 L102,108" />
+    <path android:strokeColor="#FFFFFF" android:strokeAlpha="0.14" android:strokeWidth="0.8"
+        android:fillColor="#00000000" android:pathData="M0,6 L108,6 M0,12 L108,12 M0,18 L108,18 M0,24 L108,24 M0,30 L108,30 M0,36 L108,36 M0,42 L108,42 M0,48 L108,48 M0,54 L108,54 M0,60 L108,60 M0,66 L108,66 M0,72 L108,72 M0,78 L108,78 M0,84 L108,84 M0,90 L108,90 M0,96 L108,96 M0,102 L108,102" />
+    <path android:strokeColor="#FFFFFF" android:strokeAlpha="0.14" android:strokeWidth="0.8"
+        android:fillColor="#00000000" android:pathData="M6,0 L6,108 M12,0 L12,108 M18,0 L18,108 M24,0 L24,108 M30,0 L30,108 M36,0 L36,108 M42,0 L42,108 M48,0 L48,108 M54,0 L54,108 M60,0 L60,108 M66,0 L66,108 M72,0 L72,108 M78,0 L78,108 M84,0 L84,108 M90,0 L90,108 M96,0 L96,108 M102,0 L102,108" />
 </vector>
