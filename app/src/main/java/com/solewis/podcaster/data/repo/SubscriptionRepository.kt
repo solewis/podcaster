@@ -9,7 +9,6 @@ import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.domain.EpisodeIdentity
 import com.solewis.podcaster.domain.FeedToEpisodesMapper
 import com.solewis.podcaster.domain.HtmlToText
-import android.util.Log
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -207,7 +206,10 @@ class SubscriptionRepository(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            Log.w(TAG, "Refreshing podcast $id failed unexpectedly", e)
+                            // Not logged via android.util.Log: `isReturnDefaultValues` is off and
+                            // eighteen test classes run without Robolectric, so a Log call here
+                            // would throw "not mocked" the first time one of them reached it. The
+                            // message travels in the result, which is where the UI reads it.
                             RefreshResult.Failure(e.message ?: "Refresh failed")
                         }
                     }
@@ -225,8 +227,6 @@ class SubscriptionRepository(
     }
 
     companion object {
-        private const val TAG = "SubscriptionRepo"
-
         /**
          * How long a subscription stays "fresh enough" for the automatic refreshes to skip it.
          *

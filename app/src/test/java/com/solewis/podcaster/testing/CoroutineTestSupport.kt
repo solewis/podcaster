@@ -39,21 +39,51 @@ class MainDispatcherRule(
     }
 
     override fun finished(description: Description) {
+        // Drain before resetting, or the suite fails somewhere else entirely.
+        //
+        // A `stateIn(viewModelScope, WhileSubscribed(5s))` sharing coroutine outlives the test
+        // body: `runTest` cancels the subscribers, `WhileSubscribed` then parks for five seconds
+        // of *virtual* time, and nothing is advancing the clock any more - so it is still alive
+        // when the ViewModel store is cleared in `@After`. Cancelling it is not synchronous, and
+        // its final dispatch goes to `Dispatchers.Main`, which by then has been reset. That throws
+        // `DispatchException: Coroutine dispatcher Dispatchers.Main threw` on a background thread,
+        // and the next test to call `runTest` is the one that reports it, as
+        // `UncaughtExceptionsBeforeTest`. The blame lands on whichever test happens to be next,
+        // which is why this looked like several unrelated flaky tests rather than one leak.
+        //
+        // Advancing to idle lets that parked delay expire and the coroutine finish here, while
+        // Main still exists.
+        dispatcher.scheduler.advanceUntilIdle()
         Dispatchers.resetMain()
     }
 }
 
 /**
- * Subscribes for the rest of the test, on a real dispatcher.
+ * Subscribes for the rest of the test, so a `stateIn(..., WhileSubscribed())` flow actually runs.
+ * Without it such a flow stays cold and pinned to its initial value, and every assertion reads a
+ * default `UiState`.
  *
- * Two reasons. A `stateIn(..., WhileSubscribed())` flow stays cold and pinned to its initial value
- * until something collects it, so without this every assertion reads a default `UiState`. And the
- * collector has to sit on a real thread: Room delivers its emissions from its own threads, so a
- * collector parked on the test dispatcher would only see them when the test happened to advance.
+ * On the test's own dispatcher, *not* `Dispatchers.Default`. It used to launch on Default, on the
+ * reasoning that Room delivers emissions from its own threads and a collector on the test
+ * dispatcher would only see them when the test advanced the clock. That reasoning does not hold
+ * for an `UnconfinedTestDispatcher`, which is unconfined: a continuation resumes immediately on
+ * whichever thread signalled it, Room's included. Nothing was waiting for the clock.
+ *
+ * What launching on Default did cause was the suite's flakiness. `WhileSubscribed` starts its
+ * sharing coroutine on the first subscriber, and under an unconfined Main that start happens
+ * inline on the subscriber's thread - so the `ProducerCoroutine` ended up living on a Default
+ * worker while carrying `Dispatchers.Main` in its context. Cancelling it at teardown then
+ * completed on that worker and dispatched to Main from there, racing [MainDispatcherRule]'s reset;
+ * lose the race and it threw `DispatchException: Coroutine dispatcher Dispatchers.Main threw` on a
+ * background thread, which the *next* test reported as `UncaughtExceptionsBeforeTest`. Measured at
+ * roughly one failed run in two, always blaming an innocent test.
+ *
+ * Keeping the collector on the test dispatcher keeps that whole lifecycle on the test thread,
+ * where the rule's drain can finish it deterministically.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 fun TestScope.keepHot(vararg flows: Flow<*>) {
-    flows.forEach { flow -> backgroundScope.launch(Dispatchers.Default) { flow.collect {} } }
+    flows.forEach { flow -> backgroundScope.launch { flow.collect {} } }
 }
 
 /**
@@ -101,6 +131,10 @@ private const val SETTLE_MILLIS = 150L
  * timeout - and when the next `Dispatchers.setMain`/`resetMain` runs, kotlinx-coroutines' guard
  * throws "Dispatchers.Main is used concurrently with setting it". That surfaces as an unrelated
  * test failing intermittently, which is the worst kind: it looks like the code under test.
+ *
+ * This alone was not enough, and for a while it looked as though it had been: clearing the store
+ * *cancels* those coroutines but does not wait for them, so their completion could still land
+ * after Main had been reset. See [keepHot] and [MainDispatcherRule] for the other two halves.
  *
  * `clear()` is the only public route to cancelling the scope - `ViewModel.clear()` itself is
  * internal to the library.
