@@ -9,6 +9,7 @@ import com.solewis.podcaster.testing.FeedHost
 import com.solewis.podcaster.testing.inMemoryDatabase
 import com.solewis.podcaster.testing.podcastRow
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -387,4 +388,100 @@ class SubscriptionRepositoryTest {
             <rss version="2.0"><channel><title>Rotating Token Show</title></channel></rss>
         """.trimIndent()
     }
+
+    // ---- no connection ----
+    //
+    // A host in the reserved .invalid TLD, which by RFC 2606 can never resolve, so this produces a
+    // real UnknownHostException through the real OkHttp stack rather than a stubbed one. That is
+    // the exception that actually crashed the app on a phone with no signal.
+    private fun unresolvableFeedUrl() = "http://podcaster-does-not-exist.invalid/feed.xml"
+
+    @Test
+    fun refreshing_with_no_connection_reports_a_failure_instead_of_throwing() = runTest {
+        val podcastId = db.podcastDao().insert(
+            podcastRow(feedUrl = unresolvableFeedUrl(), lastRefreshedAt = null)
+        )
+
+        val result = repository.refresh(podcastId)
+
+        // The crash was an UnknownHostException escaping this call. Reaching the assertion at all
+        // is most of what this test checks.
+        assertThat(result).isInstanceOf(RefreshResult.Failure::class.java)
+        assertThat((result as RefreshResult.Failure).message).isEqualTo("No connection")
+    }
+
+    @Test
+    fun the_automatic_refresh_with_no_connection_does_not_throw() = runTest {
+        // The exact path that killed the process: refreshStale runs from a Compose scope on every
+        // foreground, and an exception escaping it is a dead app rather than a failed refresh.
+        db.podcastDao().insert(podcastRow(feedUrl = unresolvableFeedUrl(), lastRefreshedAt = null))
+
+        val results = repository.refreshStale()
+
+        assertThat(results).hasSize(1)
+        assertThat(results.single()).isInstanceOf(RefreshResult.Failure::class.java)
+    }
+
+    @Test
+    fun one_unreachable_feed_does_not_stop_the_others_refreshing() = runTest {
+        // `coroutineScope` cancels its siblings when a child throws, so one dead feed used to
+        // abort the whole batch - the reason the crash report listed three different hosts as
+        // suppressed exceptions on one throw.
+        host.enqueueFeed("lex_fridman.xml")
+        db.podcastDao().insert(podcastRow(feedUrl = unresolvableFeedUrl(), lastRefreshedAt = null))
+        db.podcastDao().insert(podcastRow(feedUrl = host.feedUrl(), lastRefreshedAt = null))
+
+        val results = repository.refreshStale()
+
+        assertThat(results).hasSize(2)
+        assertThat(results.filterIsInstance<RefreshResult.Failure>()).hasSize(1)
+        assertThat(results.filterIsInstance<RefreshResult.Success>()).hasSize(1)
+    }
+
+    @Test
+    fun subscribing_with_no_connection_reports_a_failure_instead_of_throwing() = runTest {
+        val result = repository.subscribe(unresolvableFeedUrl())
+
+        assertThat(result).isInstanceOf(SubscribeResult.Failure::class.java)
+        assertThat((result as SubscribeResult.Failure).message).isEqualTo("No connection")
+    }
+
+    @Test
+    fun a_failed_refresh_is_recorded_against_the_show_so_it_is_retried_rather_than_marked_fresh() =
+        runTest {
+            val podcastId = db.podcastDao().insert(
+                podcastRow(feedUrl = unresolvableFeedUrl(), lastRefreshedAt = null)
+            )
+
+            repository.refresh(podcastId)
+
+            // lastRefreshedAt must stay unset: a failure that counted as a check would leave the
+            // show fresh for fifteen minutes and skip the retry once the connection came back.
+            assertThat(db.podcastDao().getById(podcastId)?.lastRefreshedAt).isNull()
+        }
+
+    @Test
+    fun a_refresh_that_fails_for_a_reason_that_is_not_the_network_still_reports_rather_than_throws() =
+        runTest {
+            // Not a bad connection - a bug. An OkHttp interceptor throwing a RuntimeException comes
+            // straight out of execute(), past every IOException catch, exactly as the
+            // UnknownHostException did. The automatic refresh runs from a Compose scope, so
+            // anything that escapes it kills the app rather than failing a refresh; this pins that
+            // the batch reports it instead.
+            val exploding = OkHttpClient.Builder()
+                .addInterceptor { error("the parser exploded") }
+                .build()
+            val repositoryWithBug = SubscriptionRepository(
+                podcastDao = db.podcastDao(),
+                episodeDao = db.episodeDao(),
+                feedFetcher = FeedFetcher(exploding),
+                now = { clock }
+            )
+            db.podcastDao().insert(podcastRow(feedUrl = host.feedUrl(), lastRefreshedAt = null))
+
+            val results = repositoryWithBug.refreshStale()
+
+            assertThat(results).hasSize(1)
+            assertThat(results.single()).isInstanceOf(RefreshResult.Failure::class.java)
+        }
 }
