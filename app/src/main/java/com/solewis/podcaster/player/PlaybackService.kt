@@ -54,6 +54,9 @@ class PlaybackService : MediaLibraryService() {
         // playback started from Android Auto or a media button as well as from the app's own UI.
         player.setPlaybackSpeed(container.settings.speed)
         player.addListener(SpeedPersister(container.settings))
+        // First, so the log records the player's own view of everything that follows.
+        player.addListener(PlaybackLogListener(player, container.playbackLog))
+        container.playbackLog.record("SERVICE_CREATE")
         // Only the session sees the wrapper - it exists purely to expose the 15s seeks as
         // next/previous for external controllers. ProgressWriter and AutoAdvancer below stay on
         // the real ExoPlayer, since they care about actual playlist and position semantics.
@@ -67,7 +70,8 @@ class PlaybackService : MediaLibraryService() {
             podcastRepository = container.podcastRepository,
             episodeRepository = container.episodeRepository,
             queueRepository = container.queueRepository,
-            scope = lifecycleScope
+            scope = lifecycleScope,
+            log = container.playbackLog
         )
         mediaSession = MediaLibrarySession.Builder(this, sessionPlayer, callback)
             .setSessionActivity(nowPlayingIntent())
@@ -88,12 +92,12 @@ class PlaybackService : MediaLibraryService() {
                 }
         }
 
-        seedLastPlayedEpisode(container.episodeRepository)
+        seedLastPlayedEpisode(container.episodeRepository, container.playbackLog)
 
         progressWriter = ProgressWriter(player, container.episodeRepository, lifecycleScope)
         player.addListener(progressWriter)
         player.addListener(
-            AutoAdvancer(player, container.queueRepository, lifecycleScope) {
+            AutoAdvancer(player, container.queueRepository, lifecycleScope, container.playbackLog) {
                 // The timer is consumed first and unconditionally, never short-circuited by the
                 // setting: an armed timer has to be disarmed by the episode it was set for, or
                 // turning auto-advance off would leave it armed for every episode after this one.
@@ -143,8 +147,8 @@ class PlaybackService : MediaLibraryService() {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    private fun seedLastPlayedEpisode(episodeRepository: EpisodeRepository) {
-        lifecycleScope.launch { SessionSeeder(episodeRepository).seed(player) }
+    private fun seedLastPlayedEpisode(episodeRepository: EpisodeRepository, log: PlaybackLog) {
+        lifecycleScope.launch { SessionSeeder(episodeRepository, log).seed(player) }
     }
 
     /**
@@ -190,6 +194,9 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        // Recorded because a service dying and restarting mid-episode is one of the ways the
+        // position could be reloaded from a stale row.
+        (application as PodcasterApp).container.playbackLog.record("SERVICE_DESTROY")
         isRunning = false
         progressWriter.flushBlocking()
         mediaSession.release()

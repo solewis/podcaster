@@ -33,10 +33,11 @@ class PodcastLibrarySessionCallback(
     podcastRepository: PodcastRepository,
     episodeRepository: EpisodeRepository,
     queueRepository: QueueRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    log: PlaybackLog? = null
 ) : MediaLibrarySession.Callback {
 
-    private val tree = PodcastLibraryTree(podcastRepository, episodeRepository, queueRepository)
+    private val tree = PodcastLibraryTree(podcastRepository, episodeRepository, queueRepository, log)
 
     override fun onGetLibraryRoot(
         session: MediaLibrarySession,

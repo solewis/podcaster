@@ -27,7 +27,8 @@ import kotlinx.coroutines.flow.first
 class PodcastLibraryTree(
     private val podcastRepository: PodcastRepository,
     private val episodeRepository: EpisodeRepository,
-    private val queueRepository: QueueRepository
+    private val queueRepository: QueueRepository,
+    private val log: PlaybackLog? = null
 ) {
     suspend fun rootChildren(): List<MediaItem> = listOf(
         MediaItemMapper.toBrowsableMediaItem(QUEUE_ID, "Up Next"),
@@ -83,6 +84,14 @@ class PodcastLibraryTree(
         } else {
             startPositionMs
         }
+        // Worth recording because this *overrides* the position the caller asked for, and it fires
+        // for every controller that sets an item, not only the car - so if the requested and
+        // resolved positions ever disagree during ordinary in-app playback, that shows up here.
+        log?.record(
+            "RESOLVE",
+            "items=${mediaItems.size} item=${mediaItems.firstOrNull()?.mediaId} " +
+                "requested=$startPositionMs resolved=$resolvedStartPositionMs"
+        )
         return MediaItemsWithStartPosition(resolved, startIndex, resolvedStartPositionMs)
     }
 

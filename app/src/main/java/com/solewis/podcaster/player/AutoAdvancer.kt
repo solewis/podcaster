@@ -16,6 +16,7 @@ class AutoAdvancer(
     private val player: ExoPlayer,
     private val queueRepository: QueueRepository,
     private val scope: CoroutineScope,
+    private val log: PlaybackLog? = null,
     /**
      * Consulted per ended episode rather than captured, so a decision taken while this episode was
      * still playing - switching auto-advance off, arming the sleep timer - applies to this ending.
@@ -35,6 +36,12 @@ class AutoAdvancer(
 
         scope.launch {
             val next = queueRepository.nextPlayable(endedEpisodeId) ?: return@launch
+            // `next` coming back as the episode that just ended would replay it, which is one
+            // shape the reported jump-back could take - so both ids go in the log, not just one.
+            log?.record(
+                "AUTO_ADVANCE",
+                "ended=$endedEpisodeId next=${next.episodeId} pos=${next.startPositionMillis}"
+            )
             player.setMediaItem(MediaItemMapper.toMediaItem(next), next.startPositionMillis)
             player.prepare()
             player.play()

@@ -22,6 +22,7 @@ import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.player.MediaStorage
 import com.solewis.podcaster.data.net.AndroidConnectivity
 import com.solewis.podcaster.data.net.Connectivity
+import com.solewis.podcaster.player.PlaybackLog
 import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayerConnection
@@ -78,6 +79,13 @@ class AppContainer(
 
     /** Not per-show state, so it has nowhere to live in [database] - see [SettingsStore]. */
     val settings = SettingsStore(appContext)
+
+    /**
+     * Shared by the playback service and the UI - one process, so one file. Lives in the app's own
+     * files directory, which survives an `adb install -r` and is readable via `run-as`, and is
+     * where the Settings screen reads it from to share.
+     */
+    val playbackLog = PlaybackLog.forApp(appContext)
 
     /**
      * All four live in [MediaStorage] rather than here: Media3 requires one cache instance per

@@ -18,8 +18,10 @@ import com.solewis.podcaster.testing.ViewModelHost
 import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.theme.PodcasterTheme
 import org.junit.After
+import com.solewis.podcaster.player.PlaybackLog
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 
 /**
@@ -34,6 +36,10 @@ class SettingsScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
+    /** Somewhere for the diagnostics log to live; these tests never read it. */
+    @get:Rule
+    val logFolder = TemporaryFolder()
+
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val store = SettingsStore(context)
     private val host = ViewModelHost()
@@ -42,7 +48,7 @@ class SettingsScreenTest {
     fun tearDown() = host.close()
 
     private fun launch() {
-        val viewModel = host.hosting(SettingsViewModel(store))
+        val viewModel = host.hosting(SettingsViewModel(store, PlaybackLog(logFolder.newFile())))
         compose.setContent { PodcasterTheme { SettingsScreen(viewModel = viewModel, onBack = {}) } }
     }
 

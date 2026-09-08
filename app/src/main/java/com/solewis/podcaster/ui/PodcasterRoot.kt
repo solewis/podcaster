@@ -257,7 +257,7 @@ fun PodcasterRoot(
             composable<Route.Settings> {
                 val viewModel: SettingsViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { SettingsViewModel(container.settings) }
+                        initializer { SettingsViewModel(container.settings, container.playbackLog) }
                     }
                 )
                 SettingsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })

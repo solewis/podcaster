@@ -1,5 +1,6 @@
 package com.solewis.podcaster.ui.settings
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,17 +13,20 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.settings.SkipAmount
@@ -35,6 +39,7 @@ import com.solewis.podcaster.ui.common.TestTags
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val settings by viewModel.settings.collectAsState()
+    val context = LocalContext.current
 
     Scaffold(
         modifier = Modifier.testTag(TestTags.SETTINGS_SCREEN),
@@ -88,6 +93,24 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 checked = settings.autoAdvance,
                 onCheckedChange = viewModel::setAutoAdvance,
                 testTag = TestTags.AUTO_ADVANCE_SWITCH
+            )
+            HorizontalDivider()
+            PlaybackLogSection(
+                onShare = {
+                    val text = viewModel.playbackLogText()
+                    if (text.isBlank()) return@PlaybackLogSection
+                    context.startActivity(
+                        Intent.createChooser(
+                            Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_SUBJECT, "Podcaster playback log")
+                                putExtra(Intent.EXTRA_TEXT, text)
+                            },
+                            "Share playback log"
+                        )
+                    )
+                },
+                onClear = viewModel::clearPlaybackLog
             )
         }
     }
@@ -178,4 +201,36 @@ private fun ThemeMode.label(): String = when (this) {
     ThemeMode.SYSTEM -> "System"
     ThemeMode.LIGHT -> "Light"
     ThemeMode.DARK -> "Dark"
+}
+
+/**
+ * A way to get the playback log off the phone.
+ *
+ * It exists for a bug that only happens occasionally, on a real device, away from a computer:
+ * resume an episode, listen for about a minute, and playback jumps back and replays that minute.
+ * Nothing reproduces it on demand, so the phone has to be able to say afterwards what it did - and
+ * the person holding the phone has to be able to send that without plugging it in. Hence a share
+ * sheet rather than a log this only `adb` can reach.
+ *
+ * Shared as text rather than as a file, which keeps a `FileProvider` and a granted URI out of the
+ * app for the sake of a few kilobytes of plain lines.
+ */
+@Composable
+private fun PlaybackLogSection(onShare: () -> Unit, onClear: () -> Unit) {
+    SettingSection("Diagnostics") {
+        Text(
+            "Records what moves playback - seeks, item changes, the player's own state. " +
+                "Share it after something goes wrong, with roughly the time it happened.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onShare, modifier = Modifier.testTag(TestTags.SHARE_PLAYBACK_LOG)) {
+                Text("Share playback log")
+            }
+            TextButton(onClick = onClear, modifier = Modifier.testTag(TestTags.CLEAR_PLAYBACK_LOG)) {
+                Text("Clear")
+            }
+        }
+    }
 }

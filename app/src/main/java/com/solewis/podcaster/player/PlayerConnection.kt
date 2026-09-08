@@ -41,7 +41,12 @@ import kotlinx.coroutines.launch
  */
 class PlayerConnection(
     private val context: Context,
-    private val settings: SettingsStore = SettingsStore(context)
+    private val settings: SettingsStore = SettingsStore(context),
+    /**
+     * Every command issued from here is recorded, so the log can tell an app-initiated jump from
+     * one the player made on its own - see [PlaybackLog].
+     */
+    private val log: PlaybackLog = PlaybackLog.forApp(context)
 ) : Playback {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -189,6 +194,11 @@ class PlayerConnection(
      */
     private fun adoptSessionState(mediaController: MediaController): Boolean {
         val item = mediaController.currentMediaItem ?: return false
+        log.record(
+            "ADOPT",
+            "item=${item.mediaId} pos=${mediaController.currentPosition} " +
+                "playing=${mediaController.isPlaying}"
+        )
         // The session is the authority now, so a pending restore must not be applied over it -
         // loadedController would otherwise reload this same episode at its Room position and
         // undo a seek made from the notification.
@@ -225,6 +235,7 @@ class PlayerConnection(
     }
 
     override suspend fun play(episode: PlayableEpisode) {
+        log.record("CMD_PLAY", "item=${episode.episodeId} startPos=${episode.startPositionMillis}")
         restored = null
         val mediaController = controller()
         mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
@@ -247,6 +258,7 @@ class PlayerConnection(
      * [PlaybackRestorer], which owns that decision.
      */
     override suspend fun restore(episode: PlayableEpisode) {
+        log.record("RESTORE", "item=${episode.episodeId} pos=${episode.startPositionMillis}")
         restored = episode
         _state.value = _state.value.copy(
             episodeId = episode.episodeId,
@@ -275,6 +287,13 @@ class PlayerConnection(
         // Guarded because the session may have acquired an item by another route since the
         // restore - Android Auto, or a media button resuming playback while the app sat idle.
         if (mediaController.currentMediaItem == null) {
+            // A prime suspect for the reported jump-back: `restored` is captured when the app
+            // starts, so if this fires *after* playback has been running the position it loads is
+            // stale by however long that is.
+            log.record(
+                "LOAD_RESTORED",
+                "item=${episode.episodeId} pos=${episode.startPositionMillis}"
+            )
             mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
             mediaController.prepare()
         }
@@ -293,14 +312,17 @@ class PlayerConnection(
     }
 
     override suspend fun seekTo(positionMillis: Long) {
+        log.record("CMD_SEEK", "to=$positionMillis")
         loadedController().seekTo(positionMillis)
     }
 
     override suspend fun skipForward() {
+        log.record("CMD_SKIP_FORWARD")
         loadedController().seekForward()
     }
 
     override suspend fun skipBack() {
+        log.record("CMD_SKIP_BACK")
         loadedController().seekBack()
     }
 

@@ -25,13 +25,24 @@ import com.solewis.podcaster.data.repo.EpisodeRepository
  * So the buffering is the price of a session that actually works. It is bounded by the load control
  * and only happens when a controller connects, which is to say when something already wants to play.
  */
-class SessionSeeder(private val episodeRepository: EpisodeRepository) {
+class SessionSeeder(
+    private val episodeRepository: EpisodeRepository,
+    private val log: PlaybackLog? = null
+) {
 
     suspend fun seed(player: Player) {
         val episode = episodeRepository.getLastPlayed() ?: return
         // Never over the top of a live playlist: the service outlives individual controllers, so by
         // the time the database answers something may already be loaded or playing.
-        if (player.currentMediaItem != null) return
+        //
+        // Logged either way, and the declined case is the interesting one: this reads the database
+        // asynchronously, so it can land after playback has already started. If it ever seeds over
+        // a live item the log will say so, and that would be the jump-back.
+        if (player.currentMediaItem != null) {
+            log?.record("SEED_DECLINED", "alreadyLoaded=${player.currentMediaItem?.mediaId}")
+            return
+        }
+        log?.record("SEED", "item=${episode.episodeId} pos=${episode.startPositionMillis}")
         player.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
         player.prepare()
     }
