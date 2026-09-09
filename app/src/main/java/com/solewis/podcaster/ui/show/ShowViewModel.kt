@@ -165,6 +165,14 @@ class ShowViewModel(
         viewModelScope.launch { podcastRepository.setSortOrder(podcastId, next) }
     }
 
+    /**
+     * Pauses or resumes whatever is loaded - for the row that is currently playing, which used to
+     * offer a play arrow that restarted it from its stored position instead.
+     */
+    fun togglePlayPause() {
+        viewModelScope.launch { playbackStarter.togglePlayPause() }
+    }
+
     fun play(episodeId: String) {
         val podcast = state.value.podcast ?: return
         viewModelScope.launch {

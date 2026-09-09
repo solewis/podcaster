@@ -4,9 +4,11 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.google.common.truth.Truth.assertThat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.solewis.podcaster.testing.TestGraph
 import com.solewis.podcaster.testing.awaitText
@@ -119,5 +121,52 @@ class ShowScreenTest {
 
         compose.awaitText("Ep 1")
         compose.onAllNodesWithText("Ep 1", useUnmergedTree = true).assertCountEquals(1)
+    }
+
+    @Test
+    fun the_row_for_the_playing_episode_offers_pause_rather_than_play() {
+        // Reported: an episode started from this list kept showing a play arrow, so the row that
+        // was making sound looked unplayed and its button could not stop it. These rows had no
+        // pause state at all - the Home feed's have always had one, and these were missed.
+        openShow()
+        compose.awaitText("Patient Zero")
+
+        graph.playback.emitPlaying("$podcastId:1")
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription("Pause Patient Zero", useUnmergedTree = true)
+            .assertExists()
+        compose.onAllNodesWithContentDescription("Play Patient Zero", useUnmergedTree = true)
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun that_pause_button_stops_playback_rather_than_restarting_the_episode() {
+        openShow()
+        compose.awaitText("Patient Zero")
+        graph.playback.emitPlaying("$podcastId:1")
+        compose.waitForIdle()
+
+        // The merged node, which is the IconButton carrying the click. Injecting on the unmerged
+        // Icon inside it does not reach the handler - the same trap `clickEpisodeRow` documents.
+        compose.onNodeWithContentDescription("Pause Patient Zero").performClick()
+        compose.waitForIdle()
+
+        // The old button always called play(), which restarted the episode from its stored
+        // position - the opposite of what a pause icon promises.
+        assertThat(graph.playback.togglePlayPauseCount).isEqualTo(1)
+        assertThat(graph.playback.played).isEmpty()
+    }
+
+    @Test
+    fun a_row_that_is_not_playing_still_offers_play() {
+        openShow()
+        compose.awaitText("Patient Zero")
+
+        graph.playback.emitPlaying("$podcastId:something-else")
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription("Play Patient Zero", useUnmergedTree = true)
+            .assertExists()
     }
 }

@@ -144,7 +144,20 @@ class PlayerConnection(
                     podcastTitle = mediaItem?.mediaMetadata?.artist?.toString(),
                     artworkUrl = mediaItem?.mediaMetadata?.artworkUri?.toString()
                 )
-                _progress.value = ProgressUiState()
+                // The *new* item's position, not zero. `currentPosition` already refers to the
+                // incoming item here - the trap documented on ProgressWriter, useful for once -
+                // and that is the resume point the episode is about to start from. Publishing an
+                // empty state instead made the bar snap to the beginning and then jump forward
+                // again a moment later, on every episode change.
+                //
+                // Not covered by a test, deliberately rather than by omission. The fault is a
+                // transient, and how long it lasts is the gap between this callback and the real
+                // position arriving - microscopic against a local file, long enough to see against
+                // a buffering network stream. An on-device sampler at 2ms did not catch it even
+                // with the old code, so a passing test would have been false assurance. The
+                // evidence for the change is the report plus a phone log showing no backwards seek
+                // anywhere near those moments, which rules out playback itself moving.
+                publishProgress(controller?.currentPosition ?: 0L)
             }
 
             override fun onPositionDiscontinuity(

@@ -206,4 +206,35 @@ class PlaybackStarterTest {
         // Refusing to *stop* audio because there is no connection would be absurd.
         awaitTrue("paused") { playback.togglePlayPauseCount == 1 }
     }
+
+    @Test
+    fun starting_a_second_episode_while_one_plays_keeps_its_spinner_up() =
+        runTest(mainDispatcher.dispatcher) {
+            // Reported from a show's episode list: one episode playing, tap play on the next, and
+            // nothing appeared to happen. Stopping the outgoing episode emits
+            // `onIsPlayingChanged(false)` *before* the item transition, so for a moment the state
+            // still names the old episode - and the guard against a stale spinner read that as
+            // "something else took over" and cancelled the new one before it was ever drawn.
+            val starter = starter()
+            playback.emitPlaying("ep-1")
+
+            starter.start(episode("ep-2"))
+            // The outgoing episode stopping, still named in the state.
+            playback.emitPaused("ep-1")
+
+            assertThat(starter.pendingEpisodeId.value).isEqualTo("ep-2")
+        }
+
+    @Test
+    fun the_spinner_still_comes_down_when_the_second_episode_becomes_audible() =
+        runTest(mainDispatcher.dispatcher) {
+            val starter = starter()
+            playback.emitPlaying("ep-1")
+            starter.start(episode("ep-2"))
+            playback.emitPaused("ep-1")
+
+            playback.emitPlaying("ep-2")
+
+            awaitTrue("the spinner came down") { starter.pendingEpisodeId.value == null }
+        }
 }

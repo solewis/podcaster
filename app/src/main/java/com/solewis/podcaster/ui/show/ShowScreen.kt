@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
@@ -251,9 +252,13 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                         isHighlighted = episode.id == highlightedEpisodeId,
                                         onClick = { onOpenEpisode(episode.id) },
                                         isStarting = episode.id == pendingEpisodeId,
+                                        isNowPlaying = episode.id == nowPlayingId,
                                         livePositionMillis = livePosition.takeIf { episode.id == nowPlayingId },
                                         liveDurationMillis = liveDuration.takeIf { episode.id == nowPlayingId },
-                                        onPlay = { viewModel.play(episode.id) },
+                                        onPlay = {
+                                            if (episode.id == nowPlayingId) viewModel.togglePlayPause()
+                                            else viewModel.play(episode.id)
+                                        },
                                         onEnqueue = { viewModel.enqueue(episode.id) },
                                         download = downloadStates[episode.id],
                                         onDownload = { viewModel.download(episode.id) },
@@ -349,6 +354,7 @@ private fun EpisodeRow(
     isStarting: Boolean,
     livePositionMillis: Long?,
     liveDurationMillis: Long?,
+    isNowPlaying: Boolean,
     onPlay: () -> Unit,
     onEnqueue: () -> Unit,
     download: EpisodeDownload?,
@@ -452,10 +458,16 @@ private fun EpisodeRow(
                 // the wait between tapping play and hearing anything is real (controller
                 // connection, then buffering) and used to look like nothing had happened.
                 IconButton(onClick = onPlay, enabled = !isStarting) {
-                    if (isStarting) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+                    when {
+                        isStarting ->
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        // This row had no pause state at all - it always drew a play arrow and
+                        // always started the episode from the top of `play()`, so the episode you
+                        // were listening to looked unplayed and the button could not stop it. The
+                        // Home feed's rows have always done this; these had been missed.
+                        isNowPlaying ->
+                            Icon(Icons.Default.Pause, contentDescription = "Pause ${episode.title}")
+                        else -> Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
                     }
                 }
                 EpisodeActionsMenu(

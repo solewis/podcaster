@@ -63,7 +63,8 @@ class PlaybackService : MediaLibraryService() {
         sessionPlayer = TimedSkipPlayer(
             player,
             skipBackMillis = { container.settings.skipBack.millis },
-            skipForwardMillis = { container.settings.skipForward.millis }
+            skipForwardMillis = { container.settings.skipForward.millis },
+            log = container.playbackLog
         )
 
         val callback = PodcastLibrarySessionCallback(

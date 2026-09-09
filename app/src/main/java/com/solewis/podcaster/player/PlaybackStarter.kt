@@ -48,12 +48,20 @@ class PlaybackStarter(
         // un-masked the stale id and put the spinner back on an episode that had long since
         // started. Also clears when some *other* episode takes over, so a tap that never produced
         // sound cannot leave a spinner stuck forever.
+        //
+        // That second condition used to be "the state names an episode other than the pending
+        // one", which cleared far too eagerly: starting a second episode while one plays stops the
+        // first, and `onIsPlayingChanged(false)` arrives *before* the item transition - so the
+        // state still named the outgoing episode and the spinner was cancelled before it ever
+        // appeared. Reported from a show's episode list: tapping play on the next episode looked
+        // like nothing had happened. It now waits for the other episode to actually be playing,
+        // which is the case the guard was written for and the only one it can distinguish.
         scope.launch {
             playback.state.collect { state ->
                 val pending = _pendingEpisodeId.value ?: return@collect
                 if (state.episodeId == pending && state.isPlaying) {
                     _pendingEpisodeId.value = null
-                } else if (state.episodeId != null && state.episodeId != pending) {
+                } else if (state.isPlaying && state.episodeId != pending) {
                     _pendingEpisodeId.value = null
                 }
             }
