@@ -32,12 +32,22 @@ class PlaybackLogListener(
         newPosition: Player.PositionInfo,
         reason: Int
     ) {
+        val oldId = oldPosition.mediaItem?.mediaId
+        val newId = newPosition.mediaItem?.mediaId
+        // A delta only when both positions are in the same episode. Across an item change it is a
+        // subtraction of two unrelated clocks, and printing it anyway was actively misleading: a
+        // fresh episode starting at 0 while the outgoing one sat at 101 minutes read as
+        // "delta=-6085617", which looks exactly like the bug being hunted and is not.
+        val movement = if (oldId == newId) {
+            "delta=${newPosition.positionMs - oldPosition.positionMs}"
+        } else {
+            "itemChanged"
+        }
         log.record(
             "DISCONTINUITY",
             "reason=${discontinuityReason(reason)} " +
-                "from=${oldPosition.positionMs} to=${newPosition.positionMs} " +
-                "delta=${newPosition.positionMs - oldPosition.positionMs} " +
-                "oldItem=${oldPosition.mediaItem?.mediaId} newItem=${newPosition.mediaItem?.mediaId}"
+                "from=${oldPosition.positionMs} to=${newPosition.positionMs} $movement " +
+                "oldItem=$oldId newItem=$newId"
         )
     }
 

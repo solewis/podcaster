@@ -56,6 +56,10 @@ class PlaybackService : MediaLibraryService() {
         player.addListener(SpeedPersister(container.settings))
         // First, so the log records the player's own view of everything that follows.
         player.addListener(PlaybackLogListener(player, container.playbackLog))
+        // The audio pipeline's own events, and a watch on the position itself - between them they
+        // cover the reported repeat, which leaves no trace in any Player.Listener callback.
+        player.addAnalyticsListener(AudioSinkLogListener(player, container.playbackLog))
+        player.addListener(PositionRegressionWatch(player, container.playbackLog, lifecycleScope))
         container.playbackLog.record("SERVICE_CREATE")
         // Only the session sees the wrapper - it exists purely to expose the 15s seeks as
         // next/previous for external controllers. ProgressWriter and AutoAdvancer below stay on
