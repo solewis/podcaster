@@ -24,23 +24,38 @@ ANDROID_SERIAL=emulator-5554 \
 
 CI runs both tiers in parallel on every PR (`.github/workflows/ci.yml`).
 
-### Known: an intermittent JVM-suite failure
+### Resolved: the intermittent JVM-suite failure
 
-Roughly one full run in four fails with `Dispatchers.Main is used concurrently with setting it`,
-followed by an unrelated-looking timeout in whatever test runs next. It is a coroutine outliving
-its test and colliding with the following test's `setMain`, and it has surfaced in at least five
-different classes — which class fails is essentially random, so a red run here is worth re-running
-before believing it.
-
-One real cause was found and fixed (`AppContainer` gave the sleep timer a `Dispatchers.Main` scope
-that nothing could cancel; `TestGraph` owns that lifetime now), but the flake outlived the fix, so
-something else is still leaking. Worth its own investigation rather than another guess.
+Used to fail roughly one full run in two, in a different test each time — `Dispatchers.Main is used
+concurrently with setting it`, or an unrelated-looking timeout in whatever ran next. Root cause: a
+`stateIn(viewModelScope, WhileSubscribed(5s))` sharing coroutine outliving its test, completing on a
+background thread, and dispatching that completion to a `Dispatchers.Main` that the next test had
+already reset — so the throw landed on whichever test called `runTest` next. Three changes fixed it:
+`keepHot`'s collector moved off `Dispatchers.Default` onto the test's own dispatcher, so the sharing
+coroutine can't end up living on a worker thread; `MainDispatcherRule` now drains the scheduler to
+idle before resetting Main, so a pending `WhileSubscribed` timeout finishes while Main still exists;
+and `ViewModelHost` (which already cancels each ViewModel's scope) has a comment now saying that
+cancelling is not the same as waiting. 35 consecutive clean runs after, confirmed the suite still
+observes real behaviour (mutation-tested, not just green) rather than passing quietly.
 
 The on-device tier is for what genuinely cannot run on the JVM: real ExoPlayer with real decoders,
 a real `MediaSession`, Room against real SQLite, and Android's own XML parser. When a feature's
 correctness depends on any of those, its test belongs there rather than behind a fake — the sleep
 timer's "end of episode" mode is the example, since it is implemented entirely as `AutoAdvancer`
 declining one real `STATE_ENDED`.
+
+### Known, open: the notification can disappear after a pause
+
+Reported from the phone: pause, wait ~30 minutes, and the media notification is gone from the
+pull-down shade — resuming requires reopening the app. The playback log explains the mechanism but
+the fix isn't built: pausing drops Media3's foreground-service status, which makes the process
+killable, and `SERVICE_DESTROY` never appears in the log while `SERVICE_CREATE` does — Android is
+killing the process outright rather than the service shutting down. The intended safety net is
+Android's own media-resumption widget (the session activity and `onPlaybackResumption` are already
+wired for it), but it did not appear for the user, and did not reliably appear on the emulator
+either when this was investigated. Worth its own session rather than another guess — start by
+confirming whether `qs_media_resumption` and a real SystemUI restart change anything on the actual
+phone, since the emulator may simply not be a faithful place to test this at all.
 
 ## Road to the Play Store
 
@@ -58,6 +73,12 @@ Play plus Auto-category review.
 - [x] Playback position and chosen speed survive the app being killed
 - [x] Refresh on foreground and on opening a show, plus a periodic worker
 - [x] Test suite across three tiers, and CI
+- [x] Tapping the media notification (or the car's "open app") opens Now Playing
+- [x] A feed refresh with no connection fails gracefully instead of crashing — the app's most
+      recent real crash, recovered from the phone's own `DropBoxManager` records and fixed the same
+      day. `FeedFetchException` now extends `IOException` (OkHttp throws `UnknownHostException` and
+      friends directly, and the three call sites were only catching the wrapper), and one dead feed
+      in a batch refresh no longer aborts every other feed in it.
 
 ### 1. Downloads
 
@@ -159,6 +180,27 @@ Two notes on the skip amounts, since both were assumptions that turned out to be
       the outcome would depend on registration order.
 - [ ] Offline and error states across every screen
 
+### Diagnostics
+
+There is no crash reporting in this app — see Release readiness. Until there is, `PlaybackLog` is
+the stopgap for the one class of bug that is worst without it: something wrong with playback itself,
+happening occasionally, on a real phone, hours before anyone can plug it into a computer.
+
+Every position-changing call the app issues (`CMD_PLAY`, `CMD_SEEK`, session-originated seeks from
+the notification or the car) and every event the player and the audio sink report on their own
+(`DISCONTINUITY` with its reason, `STATE`, `AUDIO_TRACK_INIT`/`RELEASED`, underruns) go to a rolling,
+capped file in the app's own storage — **Settings → Diagnostics → Share playback log** sends it as
+plain text, no cable required. The pairing is the point: a jump with an app command right before it
+is ours; one with nothing before it came from inside the player or the audio pipeline, and the
+reason code says which. `PositionRegressionWatch` additionally flags any backwards position move
+that no discontinuity explains at all — the one case a plain position log still couldn't see, since
+an `AudioTrack` reset can replay already-buffered audio with no `Player.Listener` callback firing.
+
+Left on indefinitely, including in release builds — capped at 192KB, trimmed by halves, and a
+failed write is swallowed rather than risking playback. This is not a substitute for real crash
+reporting; it only ever tells you about the position, never about a NullPointerException three
+screens away.
+
 ### 4. Import and export
 
 No accounts, and none needed. Two separate problems:
@@ -178,9 +220,23 @@ so this is a real limitation that probably never bites.
 
 ### 5. Release readiness
 
-- [ ] App icon — still the default Studio adaptive icon
-- [ ] A real name; `app_name` is currently the literal string "Podcaster"
+- [x] App icon — a flat microphone glyph on the app's own slate-blue, drawn as an adaptive icon
+      (separate background/foreground/monochrome layers, see `ic_launcher_*.xml`) rather than the
+      Studio default. `LauncherIconTest` renders it and checks what reading the XML can't: the
+      background bleeds to every corner, the glyph is meaningfully lighter than the background, and
+      nothing sits outside the 66dp circle every launcher mask keeps. `store-assets/` holds the
+      512px Play listing asset, generated from the same drawables so it cannot drift from the real
+      icon.
+- [ ] A real name; `app_name` is currently the literal string "Podcaster" — plausibly fine as-is,
+      worth a deliberate yes/no rather than leaving it a default
 - [ ] Release signing config, and Play App Signing. There is no signing config at all today.
+- [ ] Crash reporting / Android vitals. There is no visibility into a crash on a real user's device
+      beyond what `PlaybackLog` covers (see Diagnostics above), which is playback-position bugs
+      only — a crash anywhere else in the app would currently be invisible unless the user happens
+      to plug in and someone thinks to check `dumpsys dropbox`. Needs a decision before release:
+      Play Console's own Android vitals (free, zero code, but post-publish and delayed) versus
+      Firebase Crashlytics (real-time, needs a Firebase project) versus a local on-device crash log
+      in the same spirit as `PlaybackLog`.
 - [ ] Turn on R8. `isMinifyEnabled = false` for release right now — and enabling it invalidates the
       reason release unit tests are currently disabled in `app/build.gradle.kts` ("identical code,
       minify off"), so re-enable them at the same time.
