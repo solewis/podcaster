@@ -124,4 +124,24 @@ class StallThresholdTest {
         assertThat(seen).doesNotContain(true)
         job.cancel()
     }
+
+    @Test
+    fun a_stuck_reconnect_shows_the_same_spinner_a_buffer_would() = runTest {
+        // The whole point of folding this into the same predicate: a dropped connection being
+        // retried in the background should look exactly like an ordinary rebuffer to the person
+        // watching the screen, not like a different, scarier state.
+        val states = MutableStateFlow(settled())
+        val seen = mutableListOf<Boolean>()
+        val job = launch { states.stalledAfterWaiting().toList(seen) }
+
+        states.value = PlaybackUiState(
+            isBuffering = false,
+            hasRecoverableNetworkError = true,
+            playWhenReady = true
+        )
+        advanceTimeBy(STALL_VISIBLE_AFTER_MILLIS + 1)
+
+        assertThat(seen.last()).isTrue()
+        job.cancel()
+    }
 }

@@ -63,7 +63,9 @@ class AppContainer(
      */
     private val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
     /** Substituted in tests, since a JVM test cannot arrange for the network to be absent. */
-    private val connectivity: Connectivity = AndroidConnectivity(context)
+    /** Not private: [PlaybackService] needs it too, to decide whether a reconnect attempt is worth
+     * making rather than merely re-failing against a connection that is still down. */
+    val connectivity: Connectivity = AndroidConnectivity(context)
 ) {
 
     private val appContext = context.applicationContext

@@ -85,6 +85,19 @@ class PlayerConnection(
                 delay(millisUntilNextDisplayedSecond(position, _state.value.speed))
             }
         }
+
+        // The other half of [PlaybackErrorRetrier]: that class keeps trying in silence, and this
+        // is what notices if it never pays off. Fires once per error - clearing
+        // `hasRecoverableNetworkError` here is what stops the spinner along with the message,
+        // rather than leaving both the "still loading" and "gave up" stories on screen together.
+        scope.launch {
+            _state.networkErrorGivenUpAfterWaiting().collect { gaveUp ->
+                if (!gaveUp) return@collect
+                _errors.tryEmit("Couldn't reconnect - check your connection")
+                _state.value = _state.value.copy(hasRecoverableNetworkError = false)
+                controller?.pause()
+            }
+        }
     }
 
     /**
@@ -133,7 +146,12 @@ class PlayerConnection(
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 _state.value = _state.value.copy(
-                    isBuffering = playbackState == Player.STATE_BUFFERING
+                    isBuffering = playbackState == Player.STATE_BUFFERING,
+                    // Anything other than IDLE - buffering again, ready, ended - means whatever
+                    // was wrong has stopped being wrong, whether that was PlaybackErrorRetrier's
+                    // doing or the same recovery a real device showed once on its own.
+                    hasRecoverableNetworkError = _state.value.hasRecoverableNetworkError &&
+                        playbackState == Player.STATE_IDLE
                 )
             }
 
@@ -142,7 +160,11 @@ class PlayerConnection(
                     episodeId = mediaItem?.mediaId,
                     title = mediaItem?.mediaMetadata?.title?.toString(),
                     podcastTitle = mediaItem?.mediaMetadata?.artist?.toString(),
-                    artworkUrl = mediaItem?.mediaMetadata?.artworkUri?.toString()
+                    artworkUrl = mediaItem?.mediaMetadata?.artworkUri?.toString(),
+                    // Whatever was stuck belonged to the episode being left - carrying it onto a
+                    // new one would show a spinner for a problem that no longer has anything to
+                    // do with what's now loaded.
+                    hasRecoverableNetworkError = false
                 )
                 // The *new* item's position, not zero. `currentPosition` already refers to the
                 // incoming item here - the trap documented on ProgressWriter, useful for once -
@@ -173,17 +195,21 @@ class PlayerConnection(
 
             /**
              * The buffer running out with no network to refill it arrives here, which is what an
-             * episode stopping a minute after the signal went actually is. Reported rather than
-             * swallowed: silence with no explanation is indistinguishable from a crash.
+             * episode stopping a minute after the signal went actually is.
+             *
+             * A recoverable network error is not reported immediately any more - [PlaybackErrorRetrier]
+             * is about to try to recover it, and a message plus a spinner both appearing for the same
+             * problem, one of them permanent-looking and one not, is worse than either alone. The
+             * spinner comes from [hasRecoverableNetworkError] below; the message is deferred to
+             * [networkErrorGivenUpAfterWaiting], and fires only if retrying genuinely runs out. A
+             * broken or missing episode is not retryable at all, so that one is still reported at once.
              */
             override fun onPlayerError(error: PlaybackException) {
-                _errors.tryEmit(
-                    if (error.errorCode in NETWORK_ERROR_CODES) {
-                        "Playback stopped - no connection"
-                    } else {
-                        "Playback stopped - couldn't load this episode"
-                    }
-                )
+                if (error.isRecoverableNetworkError()) {
+                    _state.value = _state.value.copy(hasRecoverableNetworkError = true)
+                } else {
+                    _errors.tryEmit("Playback stopped - couldn't load this episode")
+                }
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
@@ -224,6 +250,12 @@ class PlayerConnection(
             isPlaying = mediaController.isPlaying,
             playWhenReady = mediaController.playWhenReady,
             isBuffering = mediaController.playbackState == Player.STATE_BUFFERING,
+            // Read honestly rather than defaulted to false: opening the app while
+            // PlaybackErrorRetrier is already mid-retry, on a session that started or dropped its
+            // connection without the app around to see it happen, should show the same spinner it
+            // would have shown if the app had been open the whole time.
+            hasRecoverableNetworkError = mediaController.playbackState == Player.STATE_IDLE &&
+                mediaController.playerError?.isRecoverableNetworkError() == true,
             speed = mediaController.playbackParameters.speed
         )
         publishProgress(mediaController.currentPosition)
@@ -295,19 +327,32 @@ class PlayerConnection(
      */
     private suspend fun loadedController(): MediaController {
         val mediaController = controller()
-        val episode = restored ?: return mediaController
-        restored = null
-        // Guarded because the session may have acquired an item by another route since the
-        // restore - Android Auto, or a media button resuming playback while the app sat idle.
-        if (mediaController.currentMediaItem == null) {
-            // A prime suspect for the reported jump-back: `restored` is captured when the app
-            // starts, so if this fires *after* playback has been running the position it loads is
-            // stale by however long that is.
-            log.record(
-                "LOAD_RESTORED",
-                "item=${episode.episodeId} pos=${episode.startPositionMillis}"
-            )
-            mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
+        val episode = restored
+        if (episode != null) {
+            restored = null
+            // Guarded because the session may have acquired an item by another route since the
+            // restore - Android Auto, or a media button resuming playback while the app sat idle.
+            if (mediaController.currentMediaItem == null) {
+                // A prime suspect for the reported jump-back: `restored` is captured when the app
+                // starts, so if this fires *after* playback has been running the position it
+                // loads is stale by however long that is.
+                log.record(
+                    "LOAD_RESTORED",
+                    "item=${episode.episodeId} pos=${episode.startPositionMillis}"
+                )
+                mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
+                mediaController.prepare()
+                return mediaController
+            }
+        }
+        // A lingering fatal error - PlaybackErrorRetrier gave up, or one arrived before anything
+        // was listening for it - would otherwise make every command below a silent no-op:
+        // `play()`, `seekTo()` and the skip commands do not clear or retry a player error on their
+        // own, only `prepare()` does. Confirmed by reproducing it: skipping forward and back on a
+        // stuck player accepted the taps and changed nothing. Whatever the user just asked for
+        // deserves a real attempt rather than silence.
+        if (mediaController.playerError != null) {
+            log.record("CLEAR_ERROR_AND_RETRY", "pos=${mediaController.currentPosition}")
             mediaController.prepare()
         }
         return mediaController
@@ -360,15 +405,6 @@ class PlayerConnection(
     private companion object {
         /** How often to look for playback having started, while nothing is playing. */
         const val IDLE_POLL_MILLIS = 500L
-
-        /** Worth telling apart, because "no connection" is actionable and "broken feed" is not. */
-        val NETWORK_ERROR_CODES = setOf(
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
-            PlaybackException.ERROR_CODE_IO_NO_PERMISSION,
-            PlaybackException.ERROR_CODE_IO_UNSPECIFIED
-        )
     }
 }
 
@@ -430,12 +466,33 @@ internal const val STALL_VISIBLE_AFTER_MILLIS = 1_000L
  */
 internal fun Flow<PlaybackUiState>.stalledAfterWaiting(
     afterMillis: Long = STALL_VISIBLE_AFTER_MILLIS
-): Flow<Boolean> = map { it.isBuffering && it.playWhenReady }
+): Flow<Boolean> = map { (it.isBuffering || it.hasRecoverableNetworkError) && it.playWhenReady }
     .distinctUntilChanged()
     // transformLatest, so a wait that ends before the delay elapses cancels its own pending
     // emission rather than announcing itself after the fact.
     .transformLatest { waiting ->
         if (!waiting) {
+            emit(false)
+        } else {
+            delay(afterMillis)
+            emit(true)
+        }
+    }
+    .distinctUntilChanged()
+
+/**
+ * True once a recoverable network error has been persisting - not recovered, not paused, no
+ * different episode taking over - for at least [afterMillis]. The same shape as
+ * [stalledAfterWaiting] at a much longer delay: a spinner is a fair thing to show for a few
+ * seconds, and stops being one once the wait has gone on long enough that it needs an explicit
+ * "this did not work" instead.
+ */
+internal fun Flow<PlaybackUiState>.networkErrorGivenUpAfterWaiting(
+    afterMillis: Long = ReconnectPolicy().giveUpAfterMillis
+): Flow<Boolean> = map { it.hasRecoverableNetworkError && it.playWhenReady }
+    .distinctUntilChanged()
+    .transformLatest { stillWaiting ->
+        if (!stillWaiting) {
             emit(false)
         } else {
             delay(afterMillis)

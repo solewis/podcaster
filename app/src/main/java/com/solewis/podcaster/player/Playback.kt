@@ -27,6 +27,14 @@ data class PlaybackUiState(
      * where a loading spinner would be a lie.
      */
     val isBuffering: Boolean = false,
+    /**
+     * Idle after a network error [PlaybackErrorRetrier] is still trying to recover from - still
+     * wanted, not yet given up on. Kept separate from [isBuffering] because it is a different
+     * player state (`STATE_IDLE`, not `STATE_BUFFERING`) with a different real-world duration: a
+     * scrub rebuffers in under a second, a dropped connection can last minutes, which is exactly
+     * why the two used to be conflated into "nothing shows a spinner for this at all."
+     */
+    val hasRecoverableNetworkError: Boolean = false,
     val speed: Float = 1f
 )
 

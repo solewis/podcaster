@@ -27,7 +27,16 @@ class ProgressWriter(
     private val episodeRepository: EpisodeRepository,
     /** Must be dispatched on the player's application thread - the ticker reads player state
      * directly, and ExoPlayer throws when touched from anywhere else. */
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    /**
+     * What actually gets persisted, and when - the gap this class used to leave in [PlaybackLog].
+     * Every other bug this app has chased through that log was visible in it already; a reported
+     * position regression was not, because nothing here said what was ever written to Room. Kept
+     * permanently rather than pulled out afterward: it only logs on events that are already rare
+     * (a tick every 5s while playing, a seek, a pause), so the cost is the same as everything else
+     * in the log, and the next time a save looks wrong there is finally something to read.
+     */
+    private val log: PlaybackLog? = null
 ) : Player.Listener {
 
     private data class Update(val episodeId: String, val positionMillis: Long, val durationMillis: Long?)
@@ -124,6 +133,7 @@ class ProgressWriter(
     }
 
     private fun enqueue(episodeId: String, positionMillis: Long) {
+        log?.record("PW_ENQUEUE", "item=$episodeId pos=$positionMillis")
         updates.trySend(Update(episodeId, positionMillis, durationFor(episodeId)))
     }
 
@@ -142,8 +152,10 @@ class ProgressWriter(
 
     private suspend fun write(update: Update) {
         if (CompletionRule.isComplete(update.positionMillis, update.durationMillis)) {
+            log?.record("PW_WRITE", "item=${update.episodeId} pos=0 (complete)")
             episodeRepository.setProgress(update.episodeId, positionMillis = 0L, isPlayed = true)
         } else {
+            log?.record("PW_WRITE", "item=${update.episodeId} pos=${update.positionMillis}")
             episodeRepository.setProgress(update.episodeId, update.positionMillis, isPlayed = false)
         }
     }
@@ -152,6 +164,7 @@ class ProgressWriter(
     fun flushBlocking() {
         val mediaId = player.currentMediaItem?.mediaId ?: return
         val update = Update(mediaId, player.currentPosition, durationFor(mediaId))
+        log?.record("PW_FLUSH_BLOCKING", "item=$mediaId pos=${update.positionMillis}")
         runBlocking { write(update) }
     }
 
