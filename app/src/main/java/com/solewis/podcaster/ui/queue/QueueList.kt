@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.QueueItem
+import com.solewis.podcaster.ui.common.EmptyState
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.formatDuration
 
@@ -38,13 +39,7 @@ fun QueueList(viewModel: QueueViewModel, modifier: Modifier = Modifier) {
     val items by viewModel.items.collectAsState()
 
     if (items.isEmpty()) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                "Your queue is empty - add episodes from a show's episode list.",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(horizontal = 32.dp)
-            )
-        }
+        EmptyState("Your queue is empty - add episodes from a show's episode list.", modifier)
     } else {
         LazyColumn(modifier = modifier, contentPadding = PaddingValues(vertical = 8.dp)) {
             itemsIndexed(items) { index, item ->

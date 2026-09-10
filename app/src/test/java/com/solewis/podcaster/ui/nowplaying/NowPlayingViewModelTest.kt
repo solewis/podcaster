@@ -3,6 +3,9 @@ package com.solewis.podcaster.ui.nowplaying
 import com.google.common.truth.Truth.assertThat
 import com.solewis.podcaster.data.settings.AppSettings
 import com.solewis.podcaster.data.settings.SkipAmount
+import com.solewis.podcaster.player.PlaybackStarter
+import com.solewis.podcaster.testing.FakeConnectivity
+import com.solewis.podcaster.testing.FakeDownloads
 import com.solewis.podcaster.testing.FakePlayback
 import com.solewis.podcaster.testing.MainDispatcherRule
 import com.solewis.podcaster.testing.ViewModelHost
@@ -47,7 +50,8 @@ class NowPlayingViewModelTest {
         NowPlayingViewModel(
             playback,
             settings,
-            SleepTimer(playback, backgroundScope, now = { testScheduler.currentTime })
+            SleepTimer(playback, backgroundScope, now = { testScheduler.currentTime }),
+            PlaybackStarter(playback, FakeDownloads(), FakeConnectivity(), backgroundScope)
         )
     )
 

@@ -4,10 +4,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,12 +32,18 @@ import androidx.compose.ui.platform.testTag
 fun MiniPlayer(
     playback: PlaybackUiState,
     progress: ProgressUiState,
+    /** Waiting on data for long enough to say so - see [com.solewis.podcaster.player.Playback.isStalled]. */
+    isStalled: Boolean,
     onTogglePlayPause: () -> Unit,
     onExpand: () -> Unit
 ) {
     if (playback.episodeId == null) return
 
-    Surface(tonalElevation = 3.dp) {
+    // A tint rather than tonalElevation: elevation blends surfaceTint into the surface, which over
+    // a warm cream background lands on a washed-out grey with barely any edge to it - about 1.06:1,
+    // effectively invisible. The primary container is the same accent the rest of the app uses and
+    // gives the bar a real boundary in both themes.
+    Surface(color = MaterialTheme.colorScheme.primaryContainer) {
         Column(
             modifier = Modifier
                 .testTag(TestTags.MINI_PLAYER)
@@ -55,10 +63,19 @@ fun MiniPlayer(
                     }
                 }
                 IconButton(onClick = onTogglePlayPause) {
-                    Icon(
-                        if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playback.isPlaying) "Pause" else "Play"
-                    )
+                    if (isStalled) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp).testTag(TestTags.MINI_PLAYER_SPINNER),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            // See NowPlayingScreen: intent rather than audibility, so a seek does
+                            // not flicker the icon.
+                            if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playback.playWhenReady) "Pause" else "Play"
+                        )
+                    }
                 }
             }
 

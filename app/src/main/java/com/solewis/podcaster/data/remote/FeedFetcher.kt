@@ -2,10 +2,22 @@ package com.solewis.podcaster.data.remote
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-class FeedFetchException(message: String, cause: Throwable? = null) : Exception(message, cause)
+/**
+ * A feed that could not be fetched or read.
+ *
+ * An [IOException], deliberately. Everything that goes wrong on this path is one: OkHttp's
+ * `execute()` throws `UnknownHostException`, `ConnectException`, `SocketTimeoutException` and
+ * friends directly, and callers that caught only this type let all of those straight through. With
+ * no connectivity that killed the process - see the tests in `SubscriptionRepositoryTest`. Sharing
+ * a supertype with the failures it sits alongside means one `catch (e: IOException)` covers the
+ * whole family, and a new transport failure cannot quietly escape a caller that was written before
+ * it existed.
+ */
+class FeedFetchException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 data class FeedFetchResult(
     val notModified: Boolean,

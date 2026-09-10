@@ -1,6 +1,6 @@
 package com.solewis.podcaster.data.repo
 
-import com.solewis.podcaster.data.remote.FeedFetchException
+import java.io.IOException
 import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.domain.FeedToEpisodesMapper
 import com.solewis.podcaster.domain.HtmlToText
@@ -28,7 +28,9 @@ class ShowPreviewRepository(private val feedFetcher: FeedFetcher = FeedFetcher()
     suspend fun load(feedUrl: String, seedTitle: String?): ShowPreview? {
         val result = try {
             feedFetcher.fetch(feedUrl, etag = null, lastModified = null)
-        } catch (e: FeedFetchException) {
+        } catch (e: IOException) {
+            // See SubscriptionRepository: OkHttp's transport failures are not FeedFetchException,
+            // and catching only that let them escape and kill the process.
             return null
         }
         val feed = result.feed ?: return null

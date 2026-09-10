@@ -1,6 +1,8 @@
 package com.solewis.podcaster.ui.common
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -29,7 +31,11 @@ class EpisodeActionsMenuTest {
     private var removed = 0
     private var toggledPlayed = 0
 
-    private fun render(isPlayed: Boolean = false, download: EpisodeDownload? = null) {
+    private fun render(
+        isPlayed: Boolean = false,
+        download: EpisodeDownload? = null,
+        includeDownload: Boolean = true
+    ) {
         compose.setContent {
             PodcasterTheme {
                 EpisodeActionsMenu(
@@ -39,7 +45,8 @@ class EpisodeActionsMenuTest {
                     onEnqueue = { enqueued++ },
                     onDownload = { downloaded++ },
                     onRemoveDownload = { removed++ },
-                    onTogglePlayed = { toggledPlayed++ }
+                    onTogglePlayed = { toggledPlayed++ },
+                    includeDownload = includeDownload
                 )
             }
         }
@@ -81,7 +88,7 @@ class EpisodeActionsMenuTest {
         render(isPlayed = false)
         openMenu()
 
-        compose.onNodeWithText("Mark as played").assertExists()
+        compose.onNodeWithText("Mark as finished").assertExists()
         compose.onNodeWithTag(TestTags.MENU_TOGGLE_PLAYED).performClick()
 
         assertThat(toggledPlayed).isEqualTo(1)
@@ -92,7 +99,7 @@ class EpisodeActionsMenuTest {
         render(isPlayed = true)
         openMenu()
 
-        compose.onNodeWithText("Mark as unplayed").assertExists()
+        compose.onNodeWithText("Mark as unfinished").assertExists()
     }
 
     @Test
@@ -119,13 +126,20 @@ class EpisodeActionsMenuTest {
     }
 
     @Test
-    fun a_finished_download_offers_to_delete_it() {
+    fun a_finished_download_names_the_action_and_confirms_it() {
         render(download = state(DownloadStatus.DOWNLOADED))
         openMenu()
 
+        // Labelled, rather than the bare check mark this replaced - which gave no indication that
+        // tapping it was the delete control at all.
         compose.onNodeWithText("Delete download").assertExists()
         compose.onNodeWithTag(TestTags.MENU_DOWNLOAD).performClick()
+        compose.waitForIdle()
 
+        assertThat(removed).isEqualTo(0)
+        compose.onNodeWithText("Delete download?").assertExists()
+        compose.onNodeWithText("Delete").performClick()
+        compose.waitForIdle()
         assertThat(removed).isEqualTo(1)
     }
 
@@ -160,5 +174,18 @@ class EpisodeActionsMenuTest {
         assertThat(downloadStatusLabel(state(DownloadStatus.DOWNLOADING, percent = 42.7f)))
             .isEqualTo("Downloading 42%")
         assertThat(downloadStatusLabel(state(DownloadStatus.FAILED))).isEqualTo("Download failed")
+    }
+
+    @Test
+    fun the_download_item_can_be_left_out_for_a_screen_that_already_offers_it() {
+        // The episode screen gives downloading a button of its own in the action row. Offering it
+        // again inside the overflow invites the reading that the two do different things.
+        render(includeDownload = false)
+        openMenu()
+
+        compose.onAllNodesWithTag(TestTags.MENU_DOWNLOAD).assertCountEquals(0)
+        // Everything that has no other home is still there.
+        compose.onNodeWithTag(TestTags.MENU_ENQUEUE).assertExists()
+        compose.onNodeWithTag(TestTags.MENU_TOGGLE_PLAYED).assertExists()
     }
 }

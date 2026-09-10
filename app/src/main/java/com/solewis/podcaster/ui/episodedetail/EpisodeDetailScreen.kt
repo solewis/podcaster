@@ -42,6 +42,7 @@ import com.solewis.podcaster.data.repo.EpisodeDownload
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.RemoveDone
 import com.solewis.podcaster.ui.common.DownloadButton
+import com.solewis.podcaster.ui.common.EpisodeActionsMenu
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.PodcastArtwork
@@ -73,6 +74,7 @@ fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
                 episode != null -> EpisodeDetailContent(
                     episode = episode,
                     isPlayingThis = state.isPlayingThis,
+                    isStarting = state.isStarting,
                     livePositionMillis = state.livePositionMillis,
                     liveDurationMillis = state.liveDurationMillis,
                     onTogglePlay = viewModel::togglePlay,
@@ -95,6 +97,7 @@ fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
 private fun EpisodeDetailContent(
     episode: EpisodeDetailItem,
     isPlayingThis: Boolean,
+    isStarting: Boolean,
     livePositionMillis: Long?,
     liveDurationMillis: Long?,
     onTogglePlay: () -> Unit,
@@ -163,39 +166,50 @@ private fun EpisodeDetailContent(
 
         Spacer(modifier = Modifier.height(20.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = onTogglePlay, modifier = Modifier.weight(1f)) {
-                Icon(
-                    if (isPlayingThis) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = null
-                )
+            Button(onClick = onTogglePlay, enabled = !isStarting, modifier = Modifier.weight(1f)) {
+                // The button keeps its label while starting rather than swapping to a bare spinner,
+                // so it does not change width and jump the row it sits in.
+                if (isStarting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(
+                        if (isPlayingThis) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null
+                    )
+                }
                 Text(
-                    playButtonLabel(isPlayingThis, progress.showBar, episode.isPlayed),
+                    if (isStarting) "Starting" else playButtonLabel(isPlayingThis, progress.showBar, episode.isPlayed),
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
-            OutlinedButton(onClick = onEnqueue) {
-                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add to queue")
-            }
-            Spacer(modifier = Modifier.width(4.dp))
+            // Outlined, so it reads as the second button in the row rather than as an icon
+            // decorating the first.
             DownloadButton(
+                episodeTitle = episode.title,
                 download = download,
                 onDownload = onDownload,
-                onRemove = onRemoveDownload
+                onRemove = onRemoveDownload,
+                outlined = true
             )
-        }
-
-        // On its own line rather than a fourth control in the row above: the row is already at the
-        // width it can carry, and this is a bookkeeping action rather than a transport one.
-        TextButton(onClick = onTogglePlayed, modifier = Modifier.testTag(TestTags.TOGGLE_PLAYED)) {
-            Icon(
-                if (episode.isPlayed) Icons.Default.RemoveDone else Icons.Default.DoneAll,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                if (episode.isPlayed) "Mark as unplayed" else "Mark as played",
-                modifier = Modifier.padding(start = 8.dp)
+            Spacer(modifier = Modifier.width(4.dp))
+            // Everything that is neither "play it" nor "keep it" goes behind the overflow, the
+            // same as on every episode row. Marking finished used to be a labelled text button
+            // sitting on its own line under Play, which read like a second primary action for
+            // something that is bookkeeping.
+            EpisodeActionsMenu(
+                episodeTitle = episode.title,
+                isPlayed = episode.isPlayed,
+                download = download,
+                onEnqueue = onEnqueue,
+                onDownload = onDownload,
+                onRemoveDownload = onRemoveDownload,
+                onTogglePlayed = onTogglePlayed,
+                includeDownload = false
             )
         }
 

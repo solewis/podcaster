@@ -33,7 +33,12 @@ fun htmlToAnnotatedString(html: String, linkColor: Color): AnnotatedString? {
     // One unescape first: feeds are frequently double-encoded, so this strips the extra layer
     // and leaves a single well-formed one for the parser below to read as actual markup.
     val prepared = HtmlToText.unescapeOnce(html)
-    val spanned = HtmlCompat.fromHtml(prepared, HtmlCompat.FROM_HTML_MODE_COMPACT)
+    // LEGACY, not COMPACT: the two differ only in how much space they leave between block
+    // elements, and COMPACT gives paragraphs a single newline - which renders as a plain line
+    // break, so a wall of show notes runs together with nothing marking where one paragraph ends
+    // and the next begins. LEGACY leaves a blank line, which is what a paragraph should look like.
+    // `<br>` is not a block element, so single line breaks stay single.
+    val spanned = HtmlCompat.fromHtml(prepared, HtmlCompat.FROM_HTML_MODE_LEGACY)
 
     val full = buildAnnotatedString {
         append(spanned.toString())

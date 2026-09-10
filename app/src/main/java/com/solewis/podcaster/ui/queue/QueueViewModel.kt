@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.db.model.QueueItem
 import com.solewis.podcaster.data.repo.QueueRepository
+import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -12,7 +13,8 @@ import kotlinx.coroutines.launch
 
 class QueueViewModel(
     private val queueRepository: QueueRepository,
-    private val playback: Playback
+    private val playback: Playback,
+    private val playbackStarter: PlaybackStarter
 ) : ViewModel() {
 
     val items: StateFlow<List<QueueItem>> = queueRepository.observeQueue()
@@ -35,7 +37,7 @@ class QueueViewModel(
         viewModelScope.launch {
             val playable = queueRepository.getPlayable(item.episodeId) ?: return@launch
             queueRepository.remove(item.queueId)
-            playback.play(playable)
+            playbackStarter.start(playable)
         }
     }
 }

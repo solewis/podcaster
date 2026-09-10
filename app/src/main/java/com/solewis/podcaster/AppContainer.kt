@@ -20,6 +20,10 @@ import com.solewis.podcaster.data.repo.ShowPreviewRepository
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.player.MediaStorage
+import com.solewis.podcaster.data.net.AndroidConnectivity
+import com.solewis.podcaster.data.net.Connectivity
+import com.solewis.podcaster.player.PlaybackLog
+import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayerConnection
 import com.solewis.podcaster.player.SleepTimer
@@ -50,7 +54,16 @@ class AppContainer(
      * `SimpleCache`s and Media3's `DownloadManager` - none of which exist on the JVM, and all of
      * which touch real directories. Null keeps the real graph.
      */
-    private val downloadsOverride: Downloads? = null
+    private val downloadsOverride: Downloads? = null,
+    /**
+     * For the graph's own long-lived coroutines. Injectable so a test can own its lifetime: an
+     * app-scoped scope that nothing can cancel is, in a test process, a scope that outlives the
+     * test - and a `Dispatchers.Main` one at that, which then collides with the next test's
+     * `setMain` as "Dispatchers.Main is used concurrently with setting it".
+     */
+    private val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+    /** Substituted in tests, since a JVM test cannot arrange for the network to be absent. */
+    private val connectivity: Connectivity = AndroidConnectivity(context)
 ) {
 
     private val appContext = context.applicationContext
@@ -66,6 +79,13 @@ class AppContainer(
 
     /** Not per-show state, so it has nowhere to live in [database] - see [SettingsStore]. */
     val settings = SettingsStore(appContext)
+
+    /**
+     * Shared by the playback service and the UI - one process, so one file. Lives in the app's own
+     * files directory, which survives an `adb install -r` and is readable via `run-as`, and is
+     * where the Settings screen reads it from to share.
+     */
+    val playbackLog = PlaybackLog.forApp(appContext)
 
     /**
      * All four live in [MediaStorage] rather than here: Media3 requires one cache instance per
@@ -89,8 +109,11 @@ class AppContainer(
      * App-scoped, so it keeps counting once Now Playing is gone and the phone is face-down - which
      * is the entire point of a sleep timer. Its scope is deliberately not a ViewModel's.
      */
-    val sleepTimer: SleepTimer by lazy {
-        SleepTimer(playback, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
+    val sleepTimer: SleepTimer by lazy { SleepTimer(playback, appScope) }
+
+    /** The one way an episode gets started - see [PlaybackStarter] for why that is worth centralising. */
+    val playbackStarter: PlaybackStarter by lazy {
+        PlaybackStarter(playback, downloads, connectivity, appScope)
     }
 
     companion object {

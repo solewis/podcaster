@@ -2,10 +2,13 @@ package com.solewis.podcaster.ui.show
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.google.common.truth.Truth.assertThat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.solewis.podcaster.testing.TestGraph
 import com.solewis.podcaster.testing.awaitText
@@ -86,12 +89,30 @@ class ShowScreenTest {
     }
 
     @Test
-    fun a_finished_episode_says_played_once_and_drops_the_timings() {
+    fun a_finished_episode_says_finished_once_and_drops_the_timings() {
         openShow(positionMillis = 51 * 60_000L, isPlayed = true)
 
-        compose.awaitText("Played")
-        compose.onAllNodesWithText("Played", substring = true, useUnmergedTree = true).assertCountEquals(1)
+        // Once, and inline in the metadata line. It used to say "Played" and to be accompanied by
+        // a separate tick icon adrift in the trailing controls, which read as a third button.
+        compose.awaitText("Finished", substring = true)
+        compose.onAllNodesWithText("Finished", substring = true, useUnmergedTree = true).assertCountEquals(1)
         compose.onAllNodesWithText("51m", substring = true, useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun the_finished_tick_is_not_a_control_of_its_own() {
+        openShow(positionMillis = 51 * 60_000L, isPlayed = true)
+        compose.awaitText("Finished", substring = true)
+
+        // The tick used to be a separately-labelled icon below the play button and the overflow
+        // menu, floating between them with nothing to attach it to - it read as a third thing to
+        // press. Inline after the word, it is punctuation, and it carries no label of its own
+        // because the word already says it (a screen reader would otherwise say "Finished,
+        // played").
+        compose.onAllNodesWithContentDescription("Played", useUnmergedTree = true)
+            .assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("Finished", useUnmergedTree = true)
+            .assertCountEquals(0)
     }
 
     @Test
@@ -100,5 +121,52 @@ class ShowScreenTest {
 
         compose.awaitText("Ep 1")
         compose.onAllNodesWithText("Ep 1", useUnmergedTree = true).assertCountEquals(1)
+    }
+
+    @Test
+    fun the_row_for_the_playing_episode_offers_pause_rather_than_play() {
+        // Reported: an episode started from this list kept showing a play arrow, so the row that
+        // was making sound looked unplayed and its button could not stop it. These rows had no
+        // pause state at all - the Home feed's have always had one, and these were missed.
+        openShow()
+        compose.awaitText("Patient Zero")
+
+        graph.playback.emitPlaying("$podcastId:1")
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription("Pause Patient Zero", useUnmergedTree = true)
+            .assertExists()
+        compose.onAllNodesWithContentDescription("Play Patient Zero", useUnmergedTree = true)
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun that_pause_button_stops_playback_rather_than_restarting_the_episode() {
+        openShow()
+        compose.awaitText("Patient Zero")
+        graph.playback.emitPlaying("$podcastId:1")
+        compose.waitForIdle()
+
+        // The merged node, which is the IconButton carrying the click. Injecting on the unmerged
+        // Icon inside it does not reach the handler - the same trap `clickEpisodeRow` documents.
+        compose.onNodeWithContentDescription("Pause Patient Zero").performClick()
+        compose.waitForIdle()
+
+        // The old button always called play(), which restarted the episode from its stored
+        // position - the opposite of what a pause icon promises.
+        assertThat(graph.playback.togglePlayPauseCount).isEqualTo(1)
+        assertThat(graph.playback.played).isEmpty()
+    }
+
+    @Test
+    fun a_row_that_is_not_playing_still_offers_play() {
+        openShow()
+        compose.awaitText("Patient Zero")
+
+        graph.playback.emitPlaying("$podcastId:something-else")
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription("Play Patient Zero", useUnmergedTree = true)
+            .assertExists()
     }
 }

@@ -29,12 +29,16 @@ object TestTags {
     const val SHOW_SCREEN = "showScreen"
     const val EPISODE_DETAIL_SCREEN = "episodeDetailScreen"
     const val MINI_PLAYER = "miniPlayer"
+
+    /** The spinner that replaces the mini player's play/pause once playback has stalled. */
+    const val MINI_PLAYER_SPINNER = "miniPlayerSpinner"
     const val RESUME_PILL = "resumePill"
     const val DOWNLOADS_LIST = "downloadsList"
     const val SETTINGS_SCREEN = "settingsScreen"
     const val SETTINGS_BUTTON = "settingsButton"
     const val AUTO_ADVANCE_SWITCH = "autoAdvanceSwitch"
-    const val TOGGLE_PLAYED = "togglePlayed"
+    const val SHARE_PLAYBACK_LOG = "sharePlaybackLog"
+    const val CLEAR_PLAYBACK_LOG = "clearPlaybackLog"
     const val SHOW_MENU = "showMenu"
     const val MARK_ALL_PLAYED = "markAllPlayed"
     const val MENU_ENQUEUE = "menuEnqueue"

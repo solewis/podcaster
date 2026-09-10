@@ -1,6 +1,7 @@
 package com.solewis.podcaster.player
 
 import com.solewis.podcaster.data.repo.PlayableEpisode
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 data class PlaybackUiState(
@@ -8,7 +9,24 @@ data class PlaybackUiState(
     val title: String? = null,
     val podcastTitle: String? = null,
     val artworkUrl: String? = null,
+    /** Actually making sound right now. What a spinner and the progress ticker care about. */
     val isPlaying: Boolean = false,
+    /**
+     * Playing *or* about to be, once buffering finishes - Media3's `playWhenReady`, and what every
+     * play/pause button should draw.
+     *
+     * The distinction is not academic. A seek drops a playing ExoPlayer into `STATE_BUFFERING`, so
+     * `isPlaying` goes false and comes back true a moment later while `playWhenReady` stays true
+     * throughout. Buttons bound to `isPlaying` therefore flicked from pause to play and back on
+     * every scrub, which read as playback having stopped and restarted itself.
+     */
+    val playWhenReady: Boolean = false,
+    /**
+     * The player is meant to be playing and is waiting on data. Distinct from `playWhenReady &&
+     * !isPlaying`, which is also true when playback is *suppressed* - during a phone call, say -
+     * where a loading spinner would be a lie.
+     */
+    val isBuffering: Boolean = false,
     val speed: Float = 1f
 )
 
@@ -36,7 +54,36 @@ interface Playback {
     /** Ticks while playing; also updated on any seek, from any source. */
     val progress: StateFlow<ProgressUiState>
 
+    /**
+     * Buffering for long enough to be worth saying so.
+     *
+     * Deliberately not the raw buffering flag. A scrub rebuffers in about 140-210ms on this
+     * device - measured, not guessed - so a spinner bound to the raw state would flash on every
+     * drag of the scrubber and be exactly the flicker that binding the icon to `isPlaying` used to
+     * cause, in a different glyph. Held back past that, it only appears when playback has genuinely
+     * stalled, which is the case that currently shows a steady pause icon over silence and no
+     * explanation at all.
+     */
+    val isStalled: StateFlow<Boolean>
+
+    /**
+     * Playback failing after it had started - most often a buffer running dry with no network left
+     * to refill it. Nothing surfaced these before, so an episode that stopped mid-sentence looked
+     * like the app had simply given up without saying anything.
+     */
+    val errors: SharedFlow<String>
+
     suspend fun play(episode: PlayableEpisode)
+
+    /**
+     * Adopts the playback service's own state, if a session is already alive, and reports whether
+     * there was one to adopt.
+     *
+     * Exists because playback can start without the app: the pull-down notification, Android Auto,
+     * a headset button. Nothing in here should start a service that is not already running - a
+     * launch where the user only wants to browse must stay as cheap as it was.
+     */
+    suspend fun syncWithSession(): Boolean
 
     /**
      * Puts [episode] back in front of the user after the app was killed - shown, paused, at its

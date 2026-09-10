@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Themed icons (Android 13+) are re-coloured to a single tone on a single-tone background, so the
+    colour has nothing to say here. The glyph is already flat, so this is the same shapes with the
+    fill swapped.
+
+    Identical geometry to the foreground on purpose: an earlier pair drifted apart, and a themed
+    icon that is a different microphone from the one on the home screen is worse than none.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Capsule. -->
+    <path android:fillColor="#FF000000" android:pathData="M44.65,37 A9.35,9.35 0 0 1 63.35,37 L63.35,50.6 A9.35,9.35 0 0 1 44.65,50.6 Z" />
+    <!-- Cross-bar tips, left and right, where the yoke meets the mount. -->
+    <path android:fillColor="#FF000000" android:pathData="M35.3,42.95 L43.8,42.95 L43.8,45.93 L35.3,45.93 Z" />
+    <path android:fillColor="#FF000000" android:pathData="M64.2,42.95 L72.7,42.95 L72.7,45.93 L64.2,45.93 Z" />
+    <!-- Yoke: the arms and the sweep between them, outer radius 16.15 and inner 12.75 about (54,51.45). -->
+    <path android:fillColor="#FF000000" android:pathData="M37.85,44.65 L37.85,51.45 A16.15,16.15 0 0 0 70.15,51.45 L70.15,44.65 L66.75,44.65 L66.75,51.45 A12.75,12.75 0 0 1 41.25,51.45 L41.25,44.65 Z" />
+    <!-- Stem and base. -->
+    <path android:fillColor="#FF000000" android:pathData="M51.45,66.75 L56.55,66.75 L56.55,76.1 L51.45,76.1 Z" />
+    <path android:fillColor="#FF000000" android:pathData="M42.95,75.25 L65.05,75.25 L65.05,79.5 L42.95,79.5 Z" />
+</vector>

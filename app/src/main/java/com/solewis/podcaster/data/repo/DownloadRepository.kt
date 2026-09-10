@@ -84,6 +84,10 @@ class DownloadRepository(
     /** Total bytes the downloads occupy on disk - the cache's own figure, not a sum of estimates. */
     override suspend fun downloadedBytes(): Long = withContext(Dispatchers.IO) { downloadCache.cacheSpace }
 
+    override suspend fun isDownloaded(episodeId: String): Boolean = withContext(Dispatchers.IO) {
+        downloadManager.downloadIndex.getDownload(episodeId)?.state == Download.STATE_COMPLETED
+    }
+
     override suspend fun download(episodeId: String) {
         val episode = episodeRepository.getPlayableById(episodeId) ?: return
         val request = DownloadRequest.Builder(episodeId, Uri.parse(episode.mediaUrl))

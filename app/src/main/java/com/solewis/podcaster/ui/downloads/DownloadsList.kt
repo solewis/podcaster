@@ -27,7 +27,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.repo.DownloadStatus
-import com.solewis.podcaster.ui.common.DownloadButton
+import com.solewis.podcaster.ui.common.EmptyState
+import com.solewis.podcaster.ui.common.EpisodeActionsMenu
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.TestTags
@@ -47,14 +48,9 @@ fun DownloadsList(
     val totalBytes by viewModel.totalBytes.collectAsState()
 
     if (rows.isEmpty()) {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                "Nothing downloaded yet - tap the download icon on an episode to keep it offline.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(32.dp)
-            )
-        }
+        // Names the menu, not an icon: downloading moved behind an episode row's overflow when the
+        // trailing controls ran out of room, so "tap the download icon" had stopped being true.
+        EmptyState("Nothing downloaded yet - use an episode's menu to keep it offline.", modifier)
         return
     }
 
@@ -107,12 +103,17 @@ fun DownloadsList(
                     IconButton(onClick = { viewModel.play(row.episode.id) }) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "Play ${row.episode.title}")
                     }
-                    DownloadButton(
+                    // The same menu the other lists use, rather than a bare icon. Removing a
+                    // download was previously a tap on an unlabelled check mark, which gave no clue
+                    // that it was the delete control at all.
+                    EpisodeActionsMenu(
+                        episodeTitle = row.episode.title,
+                        isPlayed = row.episode.isPlayed,
                         download = row.download,
-                        // Only ever reached from the failed state here: every row on this screen
-                        // has a download, so the button's "not downloaded" branch cannot fire.
+                        onEnqueue = { viewModel.enqueue(row.episode.id) },
                         onDownload = { viewModel.retry(row.episode.id) },
-                        onRemove = { viewModel.remove(row.episode.id) }
+                        onRemoveDownload = { viewModel.remove(row.episode.id) },
+                        onTogglePlayed = { viewModel.togglePlayed(row.episode) }
                     )
                 }
                 HorizontalDivider()

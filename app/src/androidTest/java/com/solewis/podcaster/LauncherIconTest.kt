@@ -1,0 +1,150 @@
+package com.solewis.podcaster
+
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import androidx.core.content.res.ResourcesCompat
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.io.File
+
+/**
+ * The launcher icon, rendered by the platform rather than inspected as XML.
+ *
+ * Two jobs. It checks the things that go silently wrong with an adaptive icon - a foreground that
+ * ends up empty, a background that ends up transparent, content that strays outside the circle
+ * every launcher mask keeps - none of which a build failure would ever catch, and all of which look
+ * fine in the XML.
+ *
+ * It also writes the Play Store's required 512px icon to the app's external files directory, from
+ * the same drawables the launcher uses, so that asset cannot drift away from the real icon:
+ *
+ *   ./gradlew :app:connectedDebugAndroidTest \
+ *     -Pandroid.testInstrumentationRunnerArguments.class=com.solewis.podcaster.LauncherIconTest
+ *   adb shell run-as com.solewis.podcaster cat files/play-store-icon-512.png > icon-512.png
+ */
+@RunWith(AndroidJUnit4::class)
+class LauncherIconTest {
+
+    private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+    /** 108dp of adaptive-icon viewport, at the 512px Play Store asks for. */
+    private val size = 512
+
+    /**
+     * The artwork, unmasked - both adaptive layers drawn full-bleed.
+     *
+     * Not `R.mipmap.ic_launcher`: an `AdaptiveIconDrawable` applies the device's own mask when it
+     * draws, so that route hands back a circle with transparent corners. That is right for a
+     * launcher and wrong for the Play Store, which wants a full square and rounds it itself.
+     */
+    private fun render(): Bitmap {
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        listOf(R.drawable.ic_launcher_background, R.drawable.ic_launcher_foreground).forEach { id ->
+            val layer = requireNotNull(ResourcesCompat.getDrawable(context.resources, id, null))
+            layer.setBounds(0, 0, size, size)
+            layer.draw(canvas)
+        }
+        return bitmap
+    }
+
+    @Test
+    fun the_icon_renders_and_writes_the_play_store_asset() {
+        val bitmap = render()
+        val out = File(context.filesDir, "play-store-icon-512.png")
+        out.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+
+        assertThat(out.length()).isGreaterThan(0L)
+    }
+
+    @Test
+    fun the_background_is_one_flat_colour_over_the_whole_icon() {
+        val bitmap = render()
+
+        // Every corner opaque. A background that does not bleed to the edges leaves the launcher's
+        // mask cutting through transparency instead of through the artwork, which shows up as a
+        // chipped edge on some masks and not others - and leaves the Play Store icon, which is not
+        // masked at all, with see-through corners.
+        val corners = listOf(2 to 2, size - 3 to 2, 2 to size - 3, size - 3 to size - 3)
+            .map { (x, y) -> bitmap.getPixel(x, y) }
+        corners.forEach { assertThat(Color.alpha(it)).isEqualTo(255) }
+
+        // And all the same colour. The background carried a long shadow and, before that, a
+        // sphere gradient; both are gone, and a stray one would show up here as corners that
+        // disagree.
+        assertThat(corners.toSet()).hasSize(1)
+    }
+
+    /** A point in viewport (108dp) coordinates, which is how the drawables are written. */
+    private fun Bitmap.at(x: Double, y: Double) =
+        getPixel((x / 108.0 * size).toInt(), (y / 108.0 * size).toInt())
+
+    @Test
+    fun the_microphone_is_actually_there_and_lighter_than_the_background() {
+        val bitmap = render()
+        val capsule = bitmap.at(54.0, 40.0)
+        // Flat background, up and left of the glyph and clear of its shadow.
+        val background = bitmap.at(24.0, 28.0)
+
+        // A white glyph on a mid blue. If this ever narrows, the icon has become a flat disc.
+        assertThat(luminance(capsule) - luminance(background)).isGreaterThan(90.0)
+    }
+
+    @Test
+    fun no_part_of_the_microphone_can_be_clipped_by_a_launcher_mask() {
+        val bitmap = render()
+        // Masks keep the central 66 of 108dp. Outside that radius there must be windscreen only:
+        // anything of the mic out there is liable to be sliced off, and on a round mask it would be.
+        val radius = size * (66.0 / 108.0) / 2
+        val centre = size / 2.0
+
+        var brightestOutside = 0.0
+        for (y in 0 until size step 3) {
+            for (x in 0 until size step 3) {
+                val dx = x - centre
+                val dy = y - centre
+                if (dx * dx + dy * dy < radius * radius) continue
+                brightestOutside = maxOf(brightestOutside, luminance(bitmap.getPixel(x, y)))
+            }
+        }
+
+        // The mic is near-white; the ball with its highlight never approaches that. Anything this
+        // bright out here would be the mic having escaped the safe area.
+        assertThat(brightestOutside).isLessThan(190.0)
+    }
+
+    private fun luminance(c: Int) =
+        0.2126 * Color.red(c) + 0.7152 * Color.green(c) + 0.0722 * Color.blue(c)
+
+    @Test
+    fun the_themed_icon_is_a_recognisable_shape_and_not_a_solid_block() {
+        // Android 13+ tints the monochrome layer and drops everything else, so it is easy to ship
+        // one that is technically present and visually a blob. Rendered alone it has to be mostly
+        // empty (a shape, not a fill) but not nearly empty (a shape, not a speck).
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val layer = requireNotNull(
+            ResourcesCompat.getDrawable(context.resources, R.drawable.ic_launcher_monochrome, null)
+        )
+        layer.setBounds(0, 0, size, size)
+        layer.draw(Canvas(bitmap))
+
+        var covered = 0
+        for (y in 0 until size step 2) {
+            for (x in 0 until size step 2) {
+                if (Color.alpha(bitmap.getPixel(x, y)) > 128) covered++
+            }
+        }
+        val fraction = covered.toDouble() / ((size / 2) * (size / 2))
+        // Loose on purpose. These bounds catch a layer that is empty, nearly empty, or a solid
+        // block - the ways a monochrome layer is actually shipped broken. They are not a judgement
+        // on how big the glyph should be: the first version of this test set the floor at 0.08 by
+        // guesswork and then failed when the mic was deliberately made smaller, which is the test
+        // arguing with a design decision rather than checking anything.
+        assertThat(fraction).isGreaterThan(0.03)
+        assertThat(fraction).isLessThan(0.45)
+    }
+}

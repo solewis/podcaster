@@ -62,6 +62,56 @@ class PlaybackRestorerTest {
     }
 
     @Test
+    fun playback_started_from_the_notification_is_adopted_rather_than_overwritten() = runTest {
+        // Reported: play from the pull-down notification while the app is closed, tap it to open
+        // the app, and the app showed the episode paused while it was audibly playing. Room holds
+        // where playback *was*, so restoring from it silently contradicted a live session.
+        graph.insertEpisodes(
+            episodeRow(podcastId, "1", positionMillis = 90_000, lastPlayedAt = 5_000)
+        )
+        graph.playback.liveSessionEpisodeId = "$podcastId:1"
+
+        restorer().restore()
+
+        assertThat(graph.playback.state.value.isPlaying).isTrue()
+        // Nothing was restored from Room: the session already had the episode, at a position newer
+        // than anything written to the database.
+        assertThat(graph.playback.restored).isEmpty()
+    }
+
+    @Test
+    fun a_live_session_playing_something_else_wins_over_the_last_played_row() = runTest {
+        // The notification can be showing an episode that is not the most recently played one -
+        // auto-advance moves on without writing a lastPlayedAt for the incoming episode until it
+        // has actually run for a while.
+        graph.insertEpisodes(
+            episodeRow(podcastId, "1", positionMillis = 90_000, lastPlayedAt = 5_000),
+            episodeRow(podcastId, "2")
+        )
+        graph.playback.liveSessionEpisodeId = "$podcastId:2"
+
+        restorer().restore()
+
+        assertThat(graph.playback.state.value.episodeId).isEqualTo("$podcastId:2")
+        assertThat(graph.playback.restored).isEmpty()
+    }
+
+    @Test
+    fun the_session_is_asked_before_the_database_is_read() = runTest {
+        graph.insertEpisodes(
+            episodeRow(podcastId, "1", positionMillis = 90_000, lastPlayedAt = 5_000)
+        )
+
+        restorer().restore()
+
+        // Asked even when nothing is running - it is the cheap check, and it is what makes the
+        // Room read a fallback rather than the first source of truth.
+        assertThat(graph.playback.syncWithSessionCount).isEqualTo(1)
+        // ...and with no session, the saved position is still what comes back.
+        assertThat(graph.playback.restored).hasSize(1)
+    }
+
+    @Test
     fun an_episode_started_while_the_database_was_being_read_is_not_replaced() = runTest {
         graph.insertEpisodes(episodeRow(podcastId, "1", positionMillis = 90_000, lastPlayedAt = 5_000))
         // Startup races the first frame: by the time the read comes back the user may already have

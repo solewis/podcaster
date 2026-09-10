@@ -18,8 +18,19 @@ import androidx.compose.ui.test.onAllNodesWithText
  * showed up on device as a test that passed alone and failed in the full suite - so these waits are
  * here even where the tests currently pass.
  */
-fun ComposeTestRule.awaitText(text: String, timeoutMillis: Long = TIMEOUT_MILLIS) {
-    waitUntil(timeoutMillis) { onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+/**
+ * [substring] is needed wherever the text carries inline content: `appendInlineContent` puts an
+ * object-replacement character into the string, so a line rendered as "Finished" plus a tick is
+ * not equal to "Finished" and only matches as a substring.
+ */
+fun ComposeTestRule.awaitText(
+    text: String,
+    timeoutMillis: Long = TIMEOUT_MILLIS,
+    substring: Boolean = false
+) {
+    waitUntil(timeoutMillis) {
+        onAllNodesWithText(text, substring = substring).fetchSemanticsNodes().isNotEmpty()
+    }
 }
 
 fun ComposeTestRule.awaitTag(tag: String, timeoutMillis: Long = TIMEOUT_MILLIS) {

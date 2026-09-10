@@ -13,6 +13,7 @@ import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.data.repo.RefreshResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.domain.JumpTargetResolver
+import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayedMarker
 import com.solewis.podcaster.ui.common.formatDuration
@@ -31,7 +32,8 @@ class ShowViewModel(
     private val subscriptionRepository: SubscriptionRepository,
     private val queueRepository: QueueRepository,
     private val playback: Playback,
-    private val downloads: Downloads
+    private val downloads: Downloads,
+    private val playbackStarter: PlaybackStarter
 ) : ViewModel() {
 
     private val playedMarker = PlayedMarker(episodeRepository, playback)
@@ -49,6 +51,26 @@ class ShowViewModel(
     ) { podcast, episodes ->
         buildUiState(podcast, episodes)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
+
+    /** Whatever is currently audible, so the row for it can move rather than step every 5s. */
+    data class NowPlaying(
+        val episodeId: String? = null,
+        val positionMillis: Long = 0,
+        val durationMillis: Long? = null
+    )
+
+    val nowPlaying: StateFlow<NowPlaying> = combine(playback.state, playback.progress) { state, progress ->
+        NowPlaying(
+            // See HomeViewModel: intent rather than audibility, so a seek does not flicker the
+            // row's icon or detach it from the live position.
+            episodeId = state.episodeId.takeIf { state.playWhenReady },
+            positionMillis = progress.positionMillis,
+            durationMillis = progress.durationMillis
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NowPlaying())
+
+    /** The episode waiting to become audible, so a tapped row can show it - see [PlaybackStarter]. */
+    val pendingEpisodeId: StateFlow<String?> = playbackStarter.pendingEpisodeId
 
     /** Separate from [state] so a download progress tick doesn't recompose the whole episode list. */
     val downloadStates: StateFlow<Map<String, EpisodeDownload>> = downloads.observe()
@@ -143,11 +165,19 @@ class ShowViewModel(
         viewModelScope.launch { podcastRepository.setSortOrder(podcastId, next) }
     }
 
+    /**
+     * Pauses or resumes whatever is loaded - for the row that is currently playing, which used to
+     * offer a play arrow that restarted it from its stored position instead.
+     */
+    fun togglePlayPause() {
+        viewModelScope.launch { playbackStarter.togglePlayPause() }
+    }
+
     fun play(episodeId: String) {
         val podcast = state.value.podcast ?: return
         viewModelScope.launch {
             val playable = episodeRepository.getPlayable(episodeId, podcast.title, podcast.artworkUrl) ?: return@launch
-            playback.play(playable)
+            playbackStarter.start(playable)
         }
     }
 

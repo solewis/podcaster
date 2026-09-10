@@ -24,6 +24,18 @@ ANDROID_SERIAL=emulator-5554 \
 
 CI runs both tiers in parallel on every PR (`.github/workflows/ci.yml`).
 
+### Known: an intermittent JVM-suite failure
+
+Roughly one full run in four fails with `Dispatchers.Main is used concurrently with setting it`,
+followed by an unrelated-looking timeout in whatever test runs next. It is a coroutine outliving
+its test and colliding with the following test's `setMain`, and it has surfaced in at least five
+different classes — which class fails is essentially random, so a red run here is worth re-running
+before believing it.
+
+One real cause was found and fixed (`AppContainer` gave the sleep timer a `Dispatchers.Main` scope
+that nothing could cancel; `TestGraph` owns that lifetime now), but the flake outlived the fix, so
+something else is still leaking. Worth its own investigation rather than another guess.
+
 The on-device tier is for what genuinely cannot run on the JVM: real ExoPlayer with real decoders,
 a real `MediaSession`, Room against real SQLite, and Android's own XML parser. When a feature's
 correctness depends on any of those, its test belongs there rather than behind a fake — the sleep
@@ -54,6 +66,12 @@ Built on Media3's `DownloadManager`/`DownloadService`. There are deliberately **
 Sharing one would mean an episode you downloaded for a flight getting evicted to make room for
 something streamed. `PlayerFactory` nests them so the download cache is read first and never
 written — see its doc for why read-only matters.
+
+`SessionSeeder` loads the last-played episode into the session as the service starts, **and
+prepares it**. Not preparing was tried and broke the car: an idle player has no timeline, so
+`COMMAND_SEEK_BACK`/`FORWARD` are unavailable, and Media3 disables a `CommandButton` bound to an
+unavailable command — the skip buttons were dead while the session looked perfectly controllable.
+Auto-play on connect is Android Auto's own behaviour and is deliberately not reimplemented here.
 
 Both caches and the download manager live in `MediaStorage` at **process** scope, not in
 `AppContainer`. Media3 allows one `SimpleCache` per directory per process, while `AppContainer` is

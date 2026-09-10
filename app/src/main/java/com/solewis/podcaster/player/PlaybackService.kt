@@ -1,5 +1,6 @@
 package com.solewis.podcaster.player
 
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.Player
@@ -10,7 +11,9 @@ import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import com.solewis.podcaster.MainActivity
 import com.solewis.podcaster.PodcasterApp
+import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.settings.AppSettings
 import com.solewis.podcaster.data.settings.SkipAmount
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -51,22 +54,32 @@ class PlaybackService : MediaLibraryService() {
         // playback started from Android Auto or a media button as well as from the app's own UI.
         player.setPlaybackSpeed(container.settings.speed)
         player.addListener(SpeedPersister(container.settings))
+        // First, so the log records the player's own view of everything that follows.
+        player.addListener(PlaybackLogListener(player, container.playbackLog))
+        // The audio pipeline's own events, and a watch on the position itself - between them they
+        // cover the reported repeat, which leaves no trace in any Player.Listener callback.
+        player.addAnalyticsListener(AudioSinkLogListener(player, container.playbackLog))
+        player.addListener(PositionRegressionWatch(player, container.playbackLog, lifecycleScope))
+        container.playbackLog.record("SERVICE_CREATE")
         // Only the session sees the wrapper - it exists purely to expose the 15s seeks as
         // next/previous for external controllers. ProgressWriter and AutoAdvancer below stay on
         // the real ExoPlayer, since they care about actual playlist and position semantics.
         sessionPlayer = TimedSkipPlayer(
             player,
             skipBackMillis = { container.settings.skipBack.millis },
-            skipForwardMillis = { container.settings.skipForward.millis }
+            skipForwardMillis = { container.settings.skipForward.millis },
+            log = container.playbackLog
         )
 
         val callback = PodcastLibrarySessionCallback(
             podcastRepository = container.podcastRepository,
             episodeRepository = container.episodeRepository,
             queueRepository = container.queueRepository,
-            scope = lifecycleScope
+            scope = lifecycleScope,
+            log = container.playbackLog
         )
         mediaSession = MediaLibrarySession.Builder(this, sessionPlayer, callback)
+            .setSessionActivity(nowPlayingIntent())
             .setBitmapLoader(CacheBitmapLoader(DataSourceBitmapLoader.Builder(this).build()))
             .setMediaButtonPreferences(
                 skipButtonPreferences(container.settings.skipBack, container.settings.skipForward)
@@ -84,10 +97,12 @@ class PlaybackService : MediaLibraryService() {
                 }
         }
 
+        seedLastPlayedEpisode(container.episodeRepository, container.playbackLog)
+
         progressWriter = ProgressWriter(player, container.episodeRepository, lifecycleScope)
         player.addListener(progressWriter)
         player.addListener(
-            AutoAdvancer(player, container.queueRepository, lifecycleScope) {
+            AutoAdvancer(player, container.queueRepository, lifecycleScope, container.playbackLog) {
                 // The timer is consumed first and unconditionally, never short-circuited by the
                 // setting: an armed timer has to be disarmed by the episode it was set for, or
                 // turning auto-advance off would leave it armed for every episode after this one.
@@ -95,9 +110,51 @@ class PlaybackService : MediaLibraryService() {
                 container.settings.autoAdvance && !stoppingForSleep
             }
         )
+        // Last, so the flag is only true once there is a session for a controller to adopt.
+        isRunning = true
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = mediaSession
+
+    /**
+     * Where tapping the notification - or the car's "open app" - lands.
+     *
+     * Without a session activity the notification has no content intent at all, so tapping it did
+     * nothing: the transport buttons worked while the notification itself was inert. Media3's
+     * default notification provider takes the content intent from here and nowhere else.
+     *
+     * Aimed at Now Playing rather than wherever the app was last left, because the notification is
+     * *about* the thing playing - being dropped onto a search screen after tapping it would be a
+     * non-sequitur.
+     */
+    companion object {
+        /**
+         * Whether a session exists for a controller to adopt state from, answerable without
+         * binding anything.
+         *
+         * Binding is what makes this worth knowing: building a `MediaController` *starts* this
+         * service, so the app cannot ask "is something playing?" by connecting - on the many
+         * launches where the user only wants to browse, that would spin up a player and an
+         * `ExoPlayer` for nothing. The service and the UI share one process (no `android:process`
+         * on the manifest entry), so a plain flag is an honest answer rather than a guess.
+         */
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+    }
+
+    private fun nowPlayingIntent(): PendingIntent = PendingIntent.getActivity(
+        this,
+        /* requestCode = */ 0,
+        Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN_NOW_PLAYING, true),
+        // Immutable because nothing outside the app has any business rewriting it, and mutability
+        // must be stated explicitly from Android 12 onwards.
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    private fun seedLastPlayedEpisode(episodeRepository: EpisodeRepository, log: PlaybackLog) {
+        lifecycleScope.launch { SessionSeeder(episodeRepository, log).seed(player) }
+    }
 
     /**
      * Without this, the system notification and Android Auto fall back to their own default
@@ -142,6 +199,10 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        // Recorded because a service dying and restarting mid-episode is one of the ways the
+        // position could be reloaded from a stale row.
+        (application as PodcasterApp).container.playbackLog.record("SERVICE_DESTROY")
+        isRunning = false
         progressWriter.flushBlocking()
         mediaSession.release()
         // Releases the wrapped ExoPlayer too, and detaches the listener the wrapper holds on it.

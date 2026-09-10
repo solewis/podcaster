@@ -9,6 +9,7 @@ import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.QueueRepository
+import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayedMarker
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +30,8 @@ class HomeViewModel(
     private val episodeRepository: EpisodeRepository,
     private val queueRepository: QueueRepository,
     private val playback: Playback,
-    private val downloads: Downloads
+    private val downloads: Downloads,
+    private val playbackStarter: PlaybackStarter
 ) : ViewModel() {
 
     private val playedMarker = PlayedMarker(episodeRepository, playback)
@@ -46,66 +48,46 @@ class HomeViewModel(
          * would flash the empty-state message on every launch before the real data loads in. */
         val isLoading: Boolean = true,
         /** Set the instant a row's play button is tapped, cleared once that episode is actually
-         * audible - see [play]. Covers the real dead time (controller connection, network
-         * buffering) between tap and sound, which a play button alone gives no feedback for. */
+         * audible - owned by [com.solewis.podcaster.player.PlaybackStarter], which also owns the
+         * rule for clearing it, so every screen shows the same wait rather than only this one. */
         val loadingEpisodeId: String? = null,
         val nowPlayingEpisodeId: String? = null,
         val nowPlayingPositionMillis: Long = 0,
         val nowPlayingDurationMillis: Long? = null
     )
 
-    private val loadingEpisodeId = MutableStateFlow<String?>(null)
-
-    init {
-        // Genuinely clears the pending tap rather than merely hiding it while `isPlaying` holds.
-        // Masking it in the combine instead looked identical at first - until you paused, which
-        // un-masked the stale id and put the spinner back on an episode that had long since
-        // started. Also clears when some *other* episode takes over, so a tap that never
-        // produced sound can't leave a spinner stuck forever.
-        viewModelScope.launch {
-            playback.state.collect { playback ->
-                val pending = loadingEpisodeId.value ?: return@collect
-                if (playback.episodeId == pending && playback.isPlaying) {
-                    loadingEpisodeId.value = null
-                } else if (playback.episodeId != null && playback.episodeId != pending) {
-                    loadingEpisodeId.value = null
-                }
-            }
-        }
-    }
-
     val state: StateFlow<UiState> = combine(
         podcastRepository.observeHomeOrder(),
         episodeRepository.observeAllEpisodes(),
         playback.state,
         playback.progress,
-        loadingEpisodeId
+        playbackStarter.pendingEpisodeId
     ) { subscriptions, episodes, playback, progress, loading ->
         UiState(
             subscriptions = subscriptions,
             episodes = episodes,
             isLoading = false,
             loadingEpisodeId = loading,
-            nowPlayingEpisodeId = playback.episodeId.takeIf { playback.isPlaying },
+            // playWhenReady, not isPlaying: this drives the row's pause icon *and* whether the
+            // row follows the live position, and a scrub briefly makes isPlaying false - which
+            // flicked the icon and dropped the row back to its stored position mid-drag.
+            nowPlayingEpisodeId = playback.episodeId.takeIf { playback.playWhenReady },
             nowPlayingPositionMillis = progress.positionMillis,
             nowPlayingDurationMillis = progress.durationMillis
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
     fun play(episode: EpisodeFeedItem) {
-        loadingEpisodeId.value = episode.id
         viewModelScope.launch {
-            val playable = episodeRepository.getPlayable(episode.id, episode.podcastTitle, episode.podcastArtworkUrl)
-            if (playable == null) {
-                loadingEpisodeId.value = null
-                return@launch
-            }
-            playback.play(playable)
+            val playable = episodeRepository
+                .getPlayable(episode.id, episode.podcastTitle, episode.podcastArtworkUrl)
+                ?: return@launch
+            playbackStarter.start(playable)
         }
     }
 
     fun togglePlayPause() {
-        viewModelScope.launch { playback.togglePlayPause() }
+        viewModelScope.launch { playbackStarter.togglePlayPause() }
     }
 
     fun enqueue(episode: EpisodeFeedItem) {

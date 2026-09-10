@@ -1,0 +1,10 @@
+<resources>
+    <!-- Dark parent as well as a dark background: the light parent also sets light defaults for
+         the window's own text and system-bar icon treatment, so switching only the colour left a
+         light-themed window frame around a dark app. -->
+    <style name="Theme.Podcaster" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>

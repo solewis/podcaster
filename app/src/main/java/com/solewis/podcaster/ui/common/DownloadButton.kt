@@ -10,8 +10,13 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -30,24 +35,43 @@ import com.solewis.podcaster.data.repo.EpisodeDownload
  */
 @Composable
 fun DownloadButton(
+    episodeTitle: String,
     download: EpisodeDownload?,
     onDownload: () -> Unit,
     onRemove: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Draws a container around the icon. On a list row the icon sits among other icons and reads as
+     * tappable from the company it keeps; on the episode screen it stands beside a filled Play
+     * button, where a bare icon reads as decoration rather than as the second control in a row.
+     */
+    outlined: Boolean = false
 ) {
     val status = download?.status
-    IconButton(
-        onClick = {
-            when (status) {
-                null, DownloadStatus.FAILED -> onDownload()
-                // Cancelling an in-flight download and deleting a finished one are the same call:
-                // Media3 removes the partial data either way.
-                else -> onRemove()
-            }
-        },
-        enabled = status != DownloadStatus.REMOVING,
-        modifier = modifier.testTag(TestTags.downloadButton(status))
-    ) {
+    var confirmingDelete by remember { mutableStateOf(false) }
+
+    if (confirmingDelete) {
+        DeleteDownloadDialog(
+            episodeTitle = episodeTitle,
+            onConfirm = { confirmingDelete = false; onRemove() },
+            onDismiss = { confirmingDelete = false }
+        )
+    }
+
+    val onClick = {
+        when (status) {
+            null, DownloadStatus.FAILED -> onDownload()
+            // An unlabelled icon that silently discards tens of megabytes is not an obvious
+            // enough affordance for what it does - so a finished download is confirmed first.
+            DownloadStatus.DOWNLOADED -> confirmingDelete = true
+            // Cancelling an in-flight download needs no ceremony; Media3 drops the partial
+            // data either way.
+            else -> onRemove()
+        }
+    }
+    val enabled = status != DownloadStatus.REMOVING
+    val buttonModifier = modifier.testTag(TestTags.downloadButton(status))
+    val content: @Composable () -> Unit = {
         when (status) {
             null -> Icon(
                 Icons.Default.Download,
@@ -90,5 +114,11 @@ fun DownloadButton(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+
+    if (outlined) {
+        OutlinedIconButton(onClick = onClick, enabled = enabled, modifier = buttonModifier) { content() }
+    } else {
+        IconButton(onClick = onClick, enabled = enabled, modifier = buttonModifier) { content() }
     }
 }

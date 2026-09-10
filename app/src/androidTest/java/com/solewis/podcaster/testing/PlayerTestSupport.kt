@@ -47,3 +47,141 @@ fun silenceSource(mediaId: String, durationMillis: Long): SilenceMediaSource =
     SilenceMediaSource(durationMillis * 1_000).apply {
         updateMediaItem(MediaItem.Builder().setMediaId(mediaId).build())
     }
+
+/**
+ * Serves [seconds] of silent WAV over real HTTP, so a `MediaController` has something playable to
+ * point at.
+ *
+ * HTTP rather than a `file://` URI in the cache directory, which would be simpler: the player's
+ * data source chain is `CacheDataSource` over `DefaultHttpDataSource` (see `PlayerFactory`), with
+ * no `DefaultDataSource` in it, so a file URI reaches an HTTP source and dies with a
+ * `ClassCastException` rather than playing. Production only ever holds `http(s)` enclosure URLs -
+ * downloads are served from the cache keyed by that same URL - so nothing is being worked around
+ * here beyond the test's own convenience.
+ */
+class AudioHost : java.io.Closeable {
+
+    private val server = okhttp3.mockwebserver.MockWebServer()
+
+    /**
+     * A URL that streams [seconds] of silence, with byte-range support. Safe to request more than
+     * once.
+     *
+     * The ranges are not optional detail. Without them a forward seek makes ExoPlayer refetch from
+     * byte zero, and a rebuffer that takes ~200ms against a real host took long enough here to fail
+     * a test about *short* rebuffers - on the fixture rather than on the code. Every real podcast
+     * host serves ranges; a test host that does not is simply wrong.
+     */
+    fun url(seconds: Int): String {
+        val body = silentWav(seconds)
+        val rangeHeader = Regex("bytes=([0-9]+)-([0-9]*)")
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(
+                request: okhttp3.mockwebserver.RecordedRequest
+            ): okhttp3.mockwebserver.MockResponse {
+                val match = request.getHeader("Range")?.let { rangeHeader.find(it) }
+                    ?: return okhttp3.mockwebserver.MockResponse()
+                        .setResponseCode(200)
+                        .setHeader("Content-Type", "audio/wav")
+                        .setHeader("Accept-Ranges", "bytes")
+                        .setBody(okio.Buffer().write(body))
+
+                val start = match.groupValues[1].toInt().coerceIn(0, body.size - 1)
+                val end = match.groupValues[2].toIntOrNull()?.coerceIn(start, body.size - 1)
+                    ?: (body.size - 1)
+                val slice = body.copyOfRange(start, end + 1)
+                return okhttp3.mockwebserver.MockResponse()
+                    .setResponseCode(206)
+                    .setHeader("Content-Type", "audio/wav")
+                    .setHeader("Accept-Ranges", "bytes")
+                    .setHeader("Content-Range", "bytes $start-$end/" + body.size)
+                    .setBody(okio.Buffer().write(slice))
+            }
+        }
+        return server.url("/silence-${seconds}s.wav").toString()
+    }
+
+    override fun close() = server.shutdown()
+}
+
+/**
+ * A real, decodable WAV of [seconds] of silence.
+ *
+ * [silenceSource] cannot serve the tests that go through a `MediaController`: a controller carries
+ * a `MediaItem` with a URI across a binder, not a `MediaSource` object, so those tests need real
+ * bytes. Hand-built rather than a checked-in asset - the header is nine fields and the body is
+ * zeros, which is less to explain than an opaque binary in the repo.
+ */
+fun silentWav(seconds: Int): ByteArray {
+    val sampleRate = 44_100
+    val bytesPerSample = 2
+    val dataBytes = seconds * sampleRate * bytesPerSample
+
+    val header = java.nio.ByteBuffer.allocate(44).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+    header.put("RIFF".toByteArray())
+    header.putInt(36 + dataBytes)
+    header.put("WAVE".toByteArray())
+    header.put("fmt ".toByteArray())
+    header.putInt(16)                              // PCM header size
+    header.putShort(1)                             // PCM, uncompressed
+    header.putShort(1)                             // mono
+    header.putInt(sampleRate)
+    header.putInt(sampleRate * bytesPerSample)     // byte rate
+    header.putShort(bytesPerSample.toShort())      // block align
+    header.putShort(16)                            // bits per sample
+    header.put("data".toByteArray())
+    header.putInt(dataBytes)
+
+    // Body is zeros: silence in signed 16-bit PCM, and nothing for a decoder to object to.
+    return header.array() + ByteArray(dataBytes)
+}
+
+/**
+ * A [com.solewis.podcaster.player.Playback] that drives a real [androidx.media3.exoplayer.ExoPlayer]
+ * directly, for the on-device tests that need [com.solewis.podcaster.player.PlayedMarker]'s seek to
+ * actually happen.
+ *
+ * The production implementation talks to the playback service over a `MediaController`, which these
+ * tests have no reason to stand up - they own the player. The point is only that `seekTo` moves a
+ * real player, so `ProgressWriter` sees the discontinuity a real seek produces. Everything else
+ * throws rather than quietly doing nothing, so a test that starts depending on more than this says
+ * so instead of passing for the wrong reason.
+ */
+class PlayerBackedPlayback(private val player: androidx.media3.exoplayer.ExoPlayer) :
+    com.solewis.podcaster.player.Playback {
+
+    override val state = kotlinx.coroutines.flow.MutableStateFlow(
+        com.solewis.podcaster.player.PlaybackUiState(
+            episodeId = onMain { player.currentMediaItem?.mediaId }
+        )
+    )
+
+    override val progress = kotlinx.coroutines.flow.MutableStateFlow(
+        com.solewis.podcaster.player.ProgressUiState(
+            durationMillis = onMain {
+                player.duration.takeIf { it != androidx.media3.common.C.TIME_UNSET }
+            }
+        )
+    )
+
+    override val errors = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+
+    /** Never stalls: these tests are about what gets written, not about loading indicators. */
+    override val isStalled = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    override suspend fun seekTo(positionMillis: Long) {
+        onMain { player.seekTo(positionMillis) }
+    }
+
+    override suspend fun play(episode: com.solewis.podcaster.data.repo.PlayableEpisode) = unsupported()
+    override suspend fun syncWithSession(): Boolean = unsupported()
+    override suspend fun restore(episode: com.solewis.podcaster.data.repo.PlayableEpisode) = unsupported()
+    override suspend fun togglePlayPause() = unsupported()
+    override suspend fun pause() = unsupported()
+    override suspend fun skipForward() = unsupported()
+    override suspend fun skipBack() = unsupported()
+    override suspend fun setSpeed(speed: Float) = unsupported()
+
+    private fun unsupported(): Nothing =
+        throw UnsupportedOperationException("PlayerBackedPlayback only implements seekTo")
+}

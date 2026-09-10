@@ -26,6 +26,9 @@ class FakeDownloads : Downloads {
 
     override suspend fun downloadedBytes(): Long = bytesOnDisk
 
+    override suspend fun isDownloaded(episodeId: String): Boolean =
+        _states.value[episodeId]?.status == DownloadStatus.DOWNLOADED
+
     override suspend fun download(episodeId: String) {
         requested += episodeId
     }

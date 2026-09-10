@@ -10,13 +10,25 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.solewis.podcaster.data.repo.PlayableEpisode
 import com.solewis.podcaster.data.settings.SettingsStore
+import kotlin.math.ceil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import androidx.media3.common.PlaybackException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformLatest
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 
@@ -29,7 +41,12 @@ import kotlinx.coroutines.launch
  */
 class PlayerConnection(
     private val context: Context,
-    private val settings: SettingsStore = SettingsStore(context)
+    private val settings: SettingsStore = SettingsStore(context),
+    /**
+     * Every command issued from here is recorded, so the log can tell an app-initiated jump from
+     * one the player made on its own - see [PlaybackLog].
+     */
+    private val log: PlaybackLog = PlaybackLog.forApp(context)
 ) : Playback {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -49,14 +66,23 @@ class PlayerConnection(
     private val _progress = MutableStateFlow(ProgressUiState())
     override val progress: StateFlow<ProgressUiState> = _progress.asStateFlow()
 
+    private val _errors = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    override val errors: SharedFlow<String> = _errors.asSharedFlow()
+
+    override val isStalled: StateFlow<Boolean> =
+        _state.stalledAfterWaiting().stateIn(scope, SharingStarted.Eagerly, false)
+
     init {
         scope.launch {
             while (true) {
-                delay(PROGRESS_TICK_MILLIS)
                 val mediaController = controller
-                if (mediaController != null && _state.value.isPlaying) {
-                    publishProgress(mediaController.currentPosition)
+                if (mediaController == null || !_state.value.isPlaying) {
+                    delay(IDLE_POLL_MILLIS)
+                    continue
                 }
+                val position = mediaController.currentPosition
+                publishProgress(position)
+                delay(millisUntilNextDisplayedSecond(position, _state.value.speed))
             }
         }
     }
@@ -97,6 +123,20 @@ class PlayerConnection(
                 _state.value = _state.value.copy(isPlaying = isPlaying)
             }
 
+            /**
+             * Separate from [onIsPlayingChanged] because they genuinely disagree during a seek,
+             * which is the whole reason `playWhenReady` is carried - see [PlaybackUiState].
+             */
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                _state.value = _state.value.copy(playWhenReady = playWhenReady)
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                _state.value = _state.value.copy(
+                    isBuffering = playbackState == Player.STATE_BUFFERING
+                )
+            }
+
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 _state.value = _state.value.copy(
                     episodeId = mediaItem?.mediaId,
@@ -104,7 +144,20 @@ class PlayerConnection(
                     podcastTitle = mediaItem?.mediaMetadata?.artist?.toString(),
                     artworkUrl = mediaItem?.mediaMetadata?.artworkUri?.toString()
                 )
-                _progress.value = ProgressUiState()
+                // The *new* item's position, not zero. `currentPosition` already refers to the
+                // incoming item here - the trap documented on ProgressWriter, useful for once -
+                // and that is the resume point the episode is about to start from. Publishing an
+                // empty state instead made the bar snap to the beginning and then jump forward
+                // again a moment later, on every episode change.
+                //
+                // Not covered by a test, deliberately rather than by omission. The fault is a
+                // transient, and how long it lasts is the gap between this callback and the real
+                // position arriving - microscopic against a local file, long enough to see against
+                // a buffering network stream. An on-device sampler at 2ms did not catch it even
+                // with the old code, so a passing test would have been false assurance. The
+                // evidence for the change is the report plus a phone log showing no backwards seek
+                // anywhere near those moments, which rules out playback itself moving.
+                publishProgress(controller?.currentPosition ?: 0L)
             }
 
             override fun onPositionDiscontinuity(
@@ -118,15 +171,84 @@ class PlayerConnection(
                 publishProgress(newPosition.positionMs)
             }
 
+            /**
+             * The buffer running out with no network to refill it arrives here, which is what an
+             * episode stopping a minute after the signal went actually is. Reported rather than
+             * swallowed: silence with no explanation is indistinguishable from a crash.
+             */
+            override fun onPlayerError(error: PlaybackException) {
+                _errors.tryEmit(
+                    if (error.errorCode in NETWORK_ERROR_CODES) {
+                        "Playback stopped - no connection"
+                    } else {
+                        "Playback stopped - couldn't load this episode"
+                    }
+                )
+            }
+
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
                 _state.value = _state.value.copy(speed = playbackParameters.speed)
             }
         })
         controller = newController
+        // The listener above only ever hears about *changes*. Connecting to a session that is
+        // already playing - started from the notification, the car, or a headset button - fires
+        // nothing at all, so without this the UI would sit on its default paused state while
+        // audio came out of the speaker. Read the truth once, up front.
+        adoptSessionState(newController)
         return newController
     }
 
+    /**
+     * Replaces the UI's playback state with whatever the session actually holds.
+     *
+     * Returns false when the session has no episode loaded, which is the caller's cue that there
+     * is nothing to adopt and the saved position in Room is still the best thing to show.
+     */
+    private fun adoptSessionState(mediaController: MediaController): Boolean {
+        val item = mediaController.currentMediaItem ?: return false
+        log.record(
+            "ADOPT",
+            "item=${item.mediaId} pos=${mediaController.currentPosition} " +
+                "playing=${mediaController.isPlaying}"
+        )
+        // The session is the authority now, so a pending restore must not be applied over it -
+        // loadedController would otherwise reload this same episode at its Room position and
+        // undo a seek made from the notification.
+        restored = null
+        _state.value = PlaybackUiState(
+            episodeId = item.mediaId,
+            title = item.mediaMetadata.title?.toString(),
+            podcastTitle = item.mediaMetadata.artist?.toString(),
+            artworkUrl = item.mediaMetadata.artworkUri?.toString(),
+            isPlaying = mediaController.isPlaying,
+            playWhenReady = mediaController.playWhenReady,
+            isBuffering = mediaController.playbackState == Player.STATE_BUFFERING,
+            speed = mediaController.playbackParameters.speed
+        )
+        publishProgress(mediaController.currentPosition)
+        return true
+    }
+
+    /**
+     * Picks up playback that was started or changed outside the app, without starting a service
+     * that isn't already there.
+     *
+     * The reported bug: play from the pull-down notification while the app is closed, then tap the
+     * notification to open it, and the app showed the episode paused while it was audibly playing.
+     * The controller is built lazily, on the first command the user issues - so on a launch where
+     * they issue none, nothing ever connected, and nothing ever contradicted the paused state
+     * [restore] had put up from Room.
+     */
+    override suspend fun syncWithSession(): Boolean {
+        // Nothing running means nothing to adopt, and asking by connecting would start the very
+        // service whose absence is the answer - see PlaybackService.isRunning.
+        if (controller == null && !PlaybackService.isRunning) return false
+        return adoptSessionState(controller())
+    }
+
     override suspend fun play(episode: PlayableEpisode) {
+        log.record("CMD_PLAY", "item=${episode.episodeId} startPos=${episode.startPositionMillis}")
         restored = null
         val mediaController = controller()
         mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
@@ -149,13 +271,15 @@ class PlayerConnection(
      * [PlaybackRestorer], which owns that decision.
      */
     override suspend fun restore(episode: PlayableEpisode) {
+        log.record("RESTORE", "item=${episode.episodeId} pos=${episode.startPositionMillis}")
         restored = episode
         _state.value = _state.value.copy(
             episodeId = episode.episodeId,
             title = episode.title,
             podcastTitle = episode.podcastTitle,
             artworkUrl = episode.artworkUrl,
-            isPlaying = false
+            isPlaying = false,
+            playWhenReady = false
         )
         _progress.value = ProgressUiState(
             positionMillis = episode.startPositionMillis,
@@ -176,6 +300,13 @@ class PlayerConnection(
         // Guarded because the session may have acquired an item by another route since the
         // restore - Android Auto, or a media button resuming playback while the app sat idle.
         if (mediaController.currentMediaItem == null) {
+            // A prime suspect for the reported jump-back: `restored` is captured when the app
+            // starts, so if this fires *after* playback has been running the position it loads is
+            // stale by however long that is.
+            log.record(
+                "LOAD_RESTORED",
+                "item=${episode.episodeId} pos=${episode.startPositionMillis}"
+            )
             mediaController.setMediaItem(MediaItemMapper.toMediaItem(episode), episode.startPositionMillis)
             mediaController.prepare()
         }
@@ -194,14 +325,17 @@ class PlayerConnection(
     }
 
     override suspend fun seekTo(positionMillis: Long) {
+        log.record("CMD_SEEK", "to=$positionMillis")
         loadedController().seekTo(positionMillis)
     }
 
     override suspend fun skipForward() {
+        log.record("CMD_SKIP_FORWARD")
         loadedController().seekForward()
     }
 
     override suspend fun skipBack() {
+        log.record("CMD_SKIP_BACK")
         loadedController().seekBack()
     }
 
@@ -209,7 +343,103 @@ class PlayerConnection(
         controller().setPlaybackSpeed(speed)
     }
 
+    /**
+     * Drops the controller and stops the progress ticker.
+     *
+     * Nothing in the app calls this - the connection is app-scoped and outlives every screen on
+     * purpose. It exists so a test can stand up more than one of these in a process without the
+     * discarded ones keeping a binder connection and a coroutine alive to interfere with the next.
+     */
+    @androidx.annotation.VisibleForTesting
+    fun release() {
+        controller?.release()
+        controller = null
+        scope.cancel()
+    }
+
     private companion object {
-        const val PROGRESS_TICK_MILLIS = 500L
+        /** How often to look for playback having started, while nothing is playing. */
+        const val IDLE_POLL_MILLIS = 500L
+
+        /** Worth telling apart, because "no connection" is actionable and "broken feed" is not. */
+        val NETWORK_ERROR_CODES = setOf(
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+            PlaybackException.ERROR_CODE_IO_NO_PERMISSION,
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+        )
     }
 }
+
+/**
+ * How long to wait before the on-screen clock should change, given where playback is and how fast
+ * it is going.
+ *
+ * The ticker used to sample every 500ms of *wall* time and then floor the result to whole seconds,
+ * which is fine only when those two rates line up. At 1.75x each sample advances 875ms of media,
+ * and since 875 does not divide 1000, one displayed second in every seven gets two samples instead
+ * of one - so that second sits on screen for twice as long as its neighbours. Roughly one visible
+ * hitch every four seconds, and the reason it was never noticed at 1x or 2x, where the rates divide
+ * evenly and every second gets the same number of samples.
+ *
+ * Waiting for the *next second boundary in media time* removes the aliasing rather than reducing
+ * it: the display advances exactly once per displayed second at any speed. It is also fewer
+ * wakeups than before at normal speed.
+ */
+internal fun millisUntilNextDisplayedSecond(positionMillis: Long, speed: Float): Long {
+    val untilNextSecond = 1_000L - (positionMillis % 1_000L)
+    val wallMillis = untilNextSecond / speed.coerceAtLeast(MIN_SPEED)
+    // Rounded *up*, so the wait lands on or a hair past the boundary. Flooring undershoots it by
+    // a fraction of a millisecond every single time, which costs a second wakeup to cover the
+    // remainder - and that wakeup lands inside the next second, making the displayed seconds
+    // uneven again in exactly the way this exists to prevent. Overshooting by under a millisecond
+    // of media is free, since the display floors to whole seconds anyway.
+    return ceil(wallMillis).toLong().coerceIn(MIN_TICK_MILLIS, MAX_TICK_MILLIS)
+}
+
+/** Guards against a nonsensical or zero speed turning the delay into an infinity. */
+private const val MIN_SPEED = 0.1f
+
+/** Never busier than 20 wakeups a second, however close to a boundary a seek happens to land. */
+private const val MIN_TICK_MILLIS = 50L
+
+/** At the slowest speed a second of media still takes at most this long to arrive. */
+private const val MAX_TICK_MILLIS = 1_000L
+
+/**
+ * How long playback has to be waiting on data before the UI says so.
+ *
+ * A seek rebuffers in 100-250ms in the good case, measured on device - so this is not trying to be
+ * longer than any seek, which is unachievable anyway: the same seek was seen taking over 500ms on a
+ * loaded emulator. It sits where a wait stops being invisible and starts reading as a hang, the
+ * usual one-second mark. Below it the control holds still; above it a seek genuinely *is* a wait
+ * worth showing, and a spinner is the honest answer rather than a flicker.
+ */
+internal const val STALL_VISIBLE_AFTER_MILLIS = 1_000L
+
+/**
+ * Turns "waiting on data" into "waiting long enough to say so".
+ *
+ * Extracted as a plain flow operator, the way [millisUntilNextDisplayedSecond] is, because the rule
+ * is a timing rule and nothing else - and testing it against a real player turned out to measure
+ * how fast the emulator felt that minute rather than whether the rule holds.
+ *
+ * Waiting means buffering *and* meant to be playing. Not merely "not making sound": playback is
+ * also silent while suppressed - during a phone call, say - and a spinner there would be a lie.
+ */
+internal fun Flow<PlaybackUiState>.stalledAfterWaiting(
+    afterMillis: Long = STALL_VISIBLE_AFTER_MILLIS
+): Flow<Boolean> = map { it.isBuffering && it.playWhenReady }
+    .distinctUntilChanged()
+    // transformLatest, so a wait that ends before the delay elapses cancels its own pending
+    // emission rather than announcing itself after the fact.
+    .transformLatest { waiting ->
+        if (!waiting) {
+            emit(false)
+        } else {
+            delay(afterMillis)
+            emit(true)
+        }
+    }
+    .distinctUntilChanged()

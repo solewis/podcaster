@@ -14,6 +14,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,10 +63,17 @@ import com.solewis.podcaster.ui.show.ShowViewModel
 import com.solewis.podcaster.ui.showpreview.ShowPreviewScreen
 import com.solewis.podcaster.ui.showpreview.ShowPreviewViewModel
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
 @Composable
-fun PodcasterRoot(container: AppContainer) {
+fun PodcasterRoot(
+    container: AppContainer,
+    /** Bumped when the notification or the car asks for Now Playing; see `MainActivity`. */
+    openNowPlayingRequests: StateFlow<Int> = MutableStateFlow(0)
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -72,6 +81,7 @@ fun PodcasterRoot(container: AppContainer) {
 
     val playback by container.playback.state.collectAsState()
     val playbackProgress by container.playback.progress.collectAsState()
+    val isStalled by container.playback.isStalled.collectAsState()
 
     // Keeps the library current without anyone having to ask for it. The periodic worker runs only
     // every six hours - and later than that whenever Doze defers it - so before this, opening the
@@ -81,6 +91,12 @@ fun PodcasterRoot(container: AppContainer) {
     // refreshStale skips anything checked recently; see its own doc for the reasoning.
     LifecycleEventEffect(Lifecycle.Event.ON_START) {
         scope.launch { container.subscriptionRepository.refreshStale() }
+        // Coming back to a session that moved on without us. Startup adopts it once, but playback
+        // can be started or paused from the notification at any point while the app sits in the
+        // background - and if no controller has been built yet there is no listener to hear it,
+        // so the app would come forward still showing whatever it last knew. Costs nothing when
+        // no session is running; see Playback.syncWithSession.
+        scope.launch { container.playback.syncWithSession() }
     }
 
     val topLevelRoutes = listOf(
@@ -105,7 +121,25 @@ fun PodcasterRoot(container: AppContainer) {
     val isNowPlaying = currentDestination?.hasRoute(Route.NowPlaying::class) == true ||
         currentDestination?.hasRoute(Route.Settings::class) == true
 
+    // One host for playback messages rather than one per screen: an episode can be started from six
+    // places, and a failure that only some of them could report would be silent from the others.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) {
+        merge(container.playbackStarter.messages, container.playback.errors)
+            .collect { snackbarHostState.showSnackbar(it) }
+    }
+
+    val nowPlayingRequest by openNowPlayingRequests.collectAsState()
+    LaunchedEffect(nowPlayingRequest) {
+        // Guarded rather than fired blindly: this re-runs on a fresh composition after a rotation,
+        // and navigating to a screen you are already on would stack a second copy of it.
+        if (nowPlayingRequest > 0 && currentDestination?.hasRoute(Route.NowPlaying::class) != true) {
+            navController.navigate(Route.NowPlaying)
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         // Leaves the status bar inset for each screen to handle itself (most via ScreenTitle/
         // BackButtonRow's own windowInsetsPadding) rather than reserving it here too - every
         // screen nests its own Scaffold below this one, and each of those defaults to reserving
@@ -116,9 +150,10 @@ fun PodcasterRoot(container: AppContainer) {
             if (!isNowPlaying) {
                 Column {
                     MiniPlayer(
+                        isStalled = isStalled,
                         playback = playback,
                         progress = playbackProgress,
-                        onTogglePlayPause = { scope.launch { container.playback.togglePlayPause() } },
+                        onTogglePlayPause = { scope.launch { container.playbackStarter.togglePlayPause() } },
                         onExpand = { navController.navigate(Route.NowPlaying) }
                     )
                     // Same base color as the screen behind it (background == surface in this
@@ -174,7 +209,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 container.episodeRepository,
                                 container.queueRepository,
                                 container.playback,
-                                container.downloads
+                                container.downloads,
+                                container.playbackStarter
                             )
                         }
                     }
@@ -189,7 +225,7 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.Activity> {
                 val queueViewModel: QueueViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { QueueViewModel(container.queueRepository, container.playback) }
+                        initializer { QueueViewModel(container.queueRepository, container.playback, container.playbackStarter) }
                     }
                 )
                 val subscriptionsViewModel: SubscriptionsViewModel = viewModel(
@@ -203,7 +239,9 @@ fun PodcasterRoot(container: AppContainer) {
                             DownloadsViewModel(
                                 container.episodeRepository,
                                 container.downloads,
-                                container.playback
+                                container.playback,
+                                container.playbackStarter,
+                                container.queueRepository
                             )
                         }
                     }
@@ -219,7 +257,7 @@ fun PodcasterRoot(container: AppContainer) {
             composable<Route.Settings> {
                 val viewModel: SettingsViewModel = viewModel(
                     factory = viewModelFactory {
-                        initializer { SettingsViewModel(container.settings) }
+                        initializer { SettingsViewModel(container.settings, container.playbackLog) }
                     }
                 )
                 SettingsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
@@ -264,7 +302,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 showPreviewRepository = container.showPreviewRepository,
                                 subscriptionRepository = container.subscriptionRepository,
                                 podcastRepository = container.podcastRepository,
-                                playback = container.playback
+                                playback = container.playback,
+                                playbackStarter = container.playbackStarter
                             )
                         }
                     }
@@ -291,7 +330,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 container.subscriptionRepository,
                                 container.queueRepository,
                                 container.playback,
-                                container.downloads
+                                container.downloads,
+                                container.playbackStarter
                             )
                         }
                     }
@@ -312,7 +352,8 @@ fun PodcasterRoot(container: AppContainer) {
                                 episodeRepository = container.episodeRepository,
                                 queueRepository = container.queueRepository,
                                 playback = container.playback,
-                                downloads = container.downloads
+                                downloads = container.downloads,
+                                playbackStarter = container.playbackStarter
                             )
                         }
                     }
@@ -326,7 +367,8 @@ fun PodcasterRoot(container: AppContainer) {
                             NowPlayingViewModel(
                                 container.playback,
                                 container.settings.observe(),
-                                container.sleepTimer
+                                container.sleepTimer,
+                                container.playbackStarter
                             )
                         }
                     }

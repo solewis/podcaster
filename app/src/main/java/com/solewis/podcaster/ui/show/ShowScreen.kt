@@ -24,8 +24,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
@@ -77,6 +77,7 @@ import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.SubscribeButton
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
+import com.solewis.podcaster.ui.common.EpisodeMetaLine
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 import kotlinx.coroutines.delay
@@ -92,6 +93,11 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val refreshError by viewModel.refreshError.collectAsState()
     val downloadStates by viewModel.downloadStates.collectAsState()
+    val pendingEpisodeId by viewModel.pendingEpisodeId.collectAsState()
+    val nowPlaying by viewModel.nowPlaying.collectAsState()
+    val nowPlayingId = nowPlaying.episodeId
+    val livePosition = nowPlaying.positionMillis
+    val liveDuration = nowPlaying.durationMillis
     val didUnsubscribe by viewModel.didUnsubscribe.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -245,7 +251,14 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                         podcastArtworkUrl = podcast.artworkUrl,
                                         isHighlighted = episode.id == highlightedEpisodeId,
                                         onClick = { onOpenEpisode(episode.id) },
-                                        onPlay = { viewModel.play(episode.id) },
+                                        isStarting = episode.id == pendingEpisodeId,
+                                        isNowPlaying = episode.id == nowPlayingId,
+                                        livePositionMillis = livePosition.takeIf { episode.id == nowPlayingId },
+                                        liveDurationMillis = liveDuration.takeIf { episode.id == nowPlayingId },
+                                        onPlay = {
+                                            if (episode.id == nowPlayingId) viewModel.togglePlayPause()
+                                            else viewModel.play(episode.id)
+                                        },
                                         onEnqueue = { viewModel.enqueue(episode.id) },
                                         download = downloadStates[episode.id],
                                         onDownload = { viewModel.download(episode.id) },
@@ -338,6 +351,10 @@ private fun EpisodeRow(
     podcastArtworkUrl: String?,
     isHighlighted: Boolean,
     onClick: () -> Unit,
+    isStarting: Boolean,
+    livePositionMillis: Long?,
+    liveDurationMillis: Long?,
+    isNowPlaying: Boolean,
     onPlay: () -> Unit,
     onEnqueue: () -> Unit,
     download: EpisodeDownload?,
@@ -401,22 +418,31 @@ private fun EpisodeRow(
             )
 
             // Null date on purpose: this row already prints it in the header above, and passing
-            // it again would repeat it. Everything else - "20m left" vs "51m" vs "Played", and
+            // it again would repeat it. Everything else - "20m left" vs "51m" vs "Finished", and
             // whether a bar is drawn at all - is the same rule the Home feed and the detail
             // screen use, so an episode reads identically wherever you meet it.
             val progress = episodeProgressUi(
                 pubDateMillis = null,
                 durationMillis = episode.durationMillis,
                 positionMillis = episode.positionMillis,
-                isPlayed = episode.isPlayed
+                isPlayed = episode.isPlayed,
+                // Home passes these and this list did not, so the row you were actually listening
+                // to advanced in the ~5s steps of the persisted position rather than moving.
+                livePositionMillis = livePositionMillis,
+                liveDurationMillis = liveDurationMillis
             )
             val label = listOfNotNull(
                 progress.label.takeIf { it.isNotEmpty() },
                 downloadStatusLabel(download)
             ).joinToString(" · ")
-            if (label.isNotEmpty()) {
-                Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
-            }
+            EpisodeMetaLine(
+                label = label,
+                isPlayed = episode.isPlayed,
+                modifier = Modifier.padding(top = 2.dp),
+                // This list keeps the default onSurface rather than the muted variant the Home
+                // feed uses, so the tick's own line stays as legible as the titles above it.
+                color = MaterialTheme.colorScheme.onSurface
+            )
             if (progress.showBar) {
                 EpisodeProgressBar(
                     positionMillis = progress.positionMillis!!,
@@ -428,8 +454,21 @@ private fun EpisodeRow(
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Row {
-                IconButton(onClick = onPlay) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+                // A spinner in the button's place, not beside it, so the row does not reflow -
+                // the wait between tapping play and hearing anything is real (controller
+                // connection, then buffering) and used to look like nothing had happened.
+                IconButton(onClick = onPlay, enabled = !isStarting) {
+                    when {
+                        isStarting ->
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        // This row had no pause state at all - it always drew a play arrow and
+                        // always started the episode from the top of `play()`, so the episode you
+                        // were listening to looked unplayed and the button could not stop it. The
+                        // Home feed's rows have always done this; these had been missed.
+                        isNowPlaying ->
+                            Icon(Icons.Default.Pause, contentDescription = "Pause ${episode.title}")
+                        else -> Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+                    }
                 }
                 EpisodeActionsMenu(
                     episodeTitle = episode.title,
@@ -439,13 +478,6 @@ private fun EpisodeRow(
                     onDownload = onDownload,
                     onRemoveDownload = onRemoveDownload,
                     onTogglePlayed = onTogglePlayed
-                )
-            }
-            if (episode.isPlayed) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = "Played",
-                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }

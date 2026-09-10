@@ -50,7 +50,15 @@ import com.google.common.util.concurrent.ListenableFuture
 class TimedSkipPlayer(
     player: Player,
     private val skipBackMillis: () -> Long = { DEFAULT_SKIP_MILLIS },
-    private val skipForwardMillis: () -> Long = { DEFAULT_SKIP_MILLIS }
+    private val skipForwardMillis: () -> Long = { DEFAULT_SKIP_MILLIS },
+    /**
+     * Every seek reaching the session passes through here, whoever asked for it - the app, the
+     * notification, the lock screen, the car, a headset button. That makes this the only place a
+     * seek from *outside* the app can be recorded: the first log pulled off a phone showed
+     * 15-second jumps with no command beside them, because notification skips never touch
+     * [PlayerConnection].
+     */
+    private val log: PlaybackLog? = null
 ) : ForwardingSimpleBasePlayer(player) {
 
     override fun getState(): State {
@@ -84,12 +92,25 @@ class TimedSkipPlayer(
         mediaItemIndex: Int,
         positionMs: Long,
         seekCommand: Int
-    ): ListenableFuture<*> = when (seekCommand) {
-        Player.COMMAND_SEEK_FORWARD, Player.COMMAND_SEEK_TO_NEXT ->
-            seekBy(mediaItemIndex, skipForwardMillis())
-        Player.COMMAND_SEEK_BACK, Player.COMMAND_SEEK_TO_PREVIOUS ->
-            seekBy(mediaItemIndex, -skipBackMillis())
-        else -> super.handleSeek(mediaItemIndex, positionMs, seekCommand)
+    ): ListenableFuture<*> {
+        log?.record("SESSION_SEEK", "command=${seekCommandName(seekCommand)} to=$positionMs")
+        return when (seekCommand) {
+            Player.COMMAND_SEEK_FORWARD, Player.COMMAND_SEEK_TO_NEXT ->
+                seekBy(mediaItemIndex, skipForwardMillis())
+            Player.COMMAND_SEEK_BACK, Player.COMMAND_SEEK_TO_PREVIOUS ->
+                seekBy(mediaItemIndex, -skipBackMillis())
+            else -> super.handleSeek(mediaItemIndex, positionMs, seekCommand)
+        }
+    }
+
+    private fun seekCommandName(command: Int) = when (command) {
+        Player.COMMAND_SEEK_FORWARD -> "SEEK_FORWARD"
+        Player.COMMAND_SEEK_BACK -> "SEEK_BACK"
+        Player.COMMAND_SEEK_TO_NEXT -> "SEEK_TO_NEXT"
+        Player.COMMAND_SEEK_TO_PREVIOUS -> "SEEK_TO_PREVIOUS"
+        Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM -> "SEEK_IN_ITEM"
+        Player.COMMAND_SEEK_TO_DEFAULT_POSITION -> "SEEK_TO_DEFAULT"
+        else -> "OTHER($command)"
     }
 
     private fun seekBy(mediaItemIndex: Int, offsetMillis: Long): ListenableFuture<*> {

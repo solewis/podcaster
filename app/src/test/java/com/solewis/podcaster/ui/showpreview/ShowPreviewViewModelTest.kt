@@ -51,7 +51,8 @@ class ShowPreviewViewModelTest {
         showPreviewRepository = ShowPreviewRepository(FeedFetcher()),
         subscriptionRepository = graph.subscriptionRepository,
         podcastRepository = graph.podcastRepository,
-        playback = graph.playback
+        playback = graph.playback,
+        playbackStarter = graph.playbackStarter
         )
     )
 
