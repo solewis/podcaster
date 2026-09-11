@@ -49,9 +49,16 @@ object TestTags {
     const val SLEEP_TIMER_EXTEND = "sleepTimerExtend"
     const val SLEEP_TIMER_OFF = "sleepTimerOff"
     const val SLEEP_TIMER_END_OF_EPISODE = "sleepTimerEndOfEpisode"
+    const val NOW_PLAYING_INFO = "nowPlayingInfo"
     const val PREFETCH_WIFI_ONLY_SWITCH = "prefetchWifiOnlySwitch"
     const val CLEAR_STREAM_CACHE = "clearStreamCache"
     const val REMOVE_ALL_DOWNLOADS = "removeAllDownloads"
+    const val VIEW_CACHED_EPISODES = "viewCachedEpisodes"
+    const val STREAM_CACHE_SCREEN = "streamCacheScreen"
+    const val CLEAR_ALL_CACHED_EPISODES = "clearAllCachedEpisodes"
+
+    /** Per-entry, since a list has one of these per cached episode. */
+    fun removeCachedEpisode(episodeId: String) = "removeCachedEpisode:$episodeId"
 
     /** Per-episode, since a list has one of these per row and a test has to open a specific one. */
     fun episodeMenu(episodeTitle: String) = "episodeMenu:$episodeTitle"

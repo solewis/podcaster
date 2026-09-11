@@ -58,6 +58,8 @@ import com.solewis.podcaster.ui.search.SearchScreen
 import com.solewis.podcaster.ui.search.SearchViewModel
 import com.solewis.podcaster.ui.settings.SettingsScreen
 import com.solewis.podcaster.ui.settings.SettingsViewModel
+import com.solewis.podcaster.ui.streamcache.StreamCacheScreen
+import com.solewis.podcaster.ui.streamcache.StreamCacheViewModel
 import com.solewis.podcaster.ui.show.ShowScreen
 import com.solewis.podcaster.ui.show.ShowViewModel
 import com.solewis.podcaster.ui.showpreview.ShowPreviewScreen
@@ -267,7 +269,23 @@ fun PodcasterRoot(
                         }
                     }
                 )
-                SettingsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+                SettingsScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenStreamCache = { navController.navigate(Route.StreamCache) }
+                )
+            }
+            composable<Route.StreamCache> {
+                val viewModel: StreamCacheViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { StreamCacheViewModel(container.episodeRepository, container.streamCacheInfo) }
+                    }
+                )
+                StreamCacheScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenEpisode = { episodeId -> navController.navigate(Route.EpisodeDetail(episodeId)) }
+                )
             }
             composable<Route.Search> {
                 val viewModel: SearchViewModel = viewModel(
@@ -380,7 +398,11 @@ fun PodcasterRoot(
                         }
                     }
                 )
-                NowPlayingScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+                NowPlayingScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenEpisode = { episodeId -> navController.navigate(Route.EpisodeDetail(episodeId)) }
+                )
             }
         }
     }

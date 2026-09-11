@@ -53,11 +53,22 @@ class SettingsScreenTest {
     @After
     fun tearDown() = host.close()
 
+    var openedStreamCache = false
+        private set
+
     private fun launch() {
         val viewModel = host.hosting(
             SettingsViewModel(store, PlaybackLog(logFolder.newFile()), streamCache, downloads)
         )
-        compose.setContent { PodcasterTheme { SettingsScreen(viewModel = viewModel, onBack = {}) } }
+        compose.setContent {
+            PodcasterTheme {
+                SettingsScreen(
+                    viewModel = viewModel,
+                    onBack = {},
+                    onOpenStreamCache = { openedStreamCache = true }
+                )
+            }
+        }
     }
 
     @Test
@@ -162,7 +173,7 @@ class SettingsScreenTest {
 
     @Test
     fun the_streaming_cache_size_is_shown_and_clearing_it_calls_through() {
-        streamCache.bytes = 42L * 1024 * 1024
+        streamCache.seed("ep-1", 42L * 1024 * 1024)
         launch()
 
         compose.onNodeWithText("42 MB").assertExists()
@@ -170,6 +181,15 @@ class SettingsScreenTest {
         compose.waitForIdle()
 
         assertThat(streamCache.cleared).isTrue()
+    }
+
+    @Test
+    fun viewing_cached_episodes_navigates_out() {
+        launch()
+
+        compose.onNodeWithTag(TestTags.VIEW_CACHED_EPISODES).performScrollTo().performClick()
+
+        assertThat(openedStreamCache).isTrue()
     }
 
     @Test

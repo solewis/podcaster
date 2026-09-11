@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
@@ -75,7 +76,7 @@ private const val EXTEND_MINUTES = 5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
+fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit, onOpenEpisode: (String) -> Unit) {
     val playback by viewModel.playbackState.collectAsState()
     val progress by viewModel.progress.collectAsState()
     val settings by viewModel.settings.collectAsState()
@@ -255,6 +256,19 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                     onExtend = { viewModel.extendSleepTimer(EXTEND_MINUTES) },
                     onCancel = viewModel::cancelSleepTimer
                 )
+                // Nothing else on this screen shows what the episode is actually about - the
+                // title is truncated above the artwork, and reading the description has always
+                // meant leaving this screen anyway. Placed here rather than nearer the title so it
+                // reads as one more control among the others, not as a fifth thing competing with
+                // the artwork for attention.
+                playback.episodeId?.let { episodeId ->
+                    IconButton(
+                        onClick = { onOpenEpisode(episodeId) },
+                        modifier = Modifier.testTag(TestTags.NOW_PLAYING_INFO)
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = "Episode details")
+                    }
+                }
             }
         }
     }

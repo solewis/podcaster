@@ -39,7 +39,7 @@ import com.solewis.podcaster.ui.common.SkipIcon
 import com.solewis.podcaster.ui.common.TestTags
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
+fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, onOpenStreamCache: () -> Unit) {
     val settings by viewModel.settings.collectAsState()
     val streamCacheBytes by viewModel.streamCacheBytes.collectAsState()
     val downloadBytes by viewModel.downloadBytes.collectAsState()
@@ -133,12 +133,15 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             StorageSection(
                 title = "Streaming cache",
                 description = "Episodes you stream, kept so replaying or resuming doesn't " +
-                    "re-download them. Bounded on its own - clearing it just means the next " +
-                    "listen refetches from the start.",
+                    "re-download them. Bounded by size and dropped after a month of not being " +
+                    "touched - clearing it just means the next listen refetches from the start.",
                 sizeLabel = formatBytes(streamCacheBytes),
                 actionLabel = "Clear cache",
                 onAction = viewModel::clearStreamCache,
-                testTag = TestTags.CLEAR_STREAM_CACHE
+                testTag = TestTags.CLEAR_STREAM_CACHE,
+                secondaryLabel = "View cached episodes",
+                onSecondaryAction = onOpenStreamCache,
+                secondaryTestTag = TestTags.VIEW_CACHED_EPISODES
             )
             HorizontalDivider()
             StorageSection(
@@ -272,7 +275,10 @@ private fun StorageSection(
     sizeLabel: String,
     actionLabel: String,
     onAction: () -> Unit,
-    testTag: String
+    testTag: String,
+    secondaryLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
+    secondaryTestTag: String? = null
 ) {
     SettingSection(title) {
         Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -282,8 +288,18 @@ private fun StorageSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(sizeLabel, style = MaterialTheme.typography.titleMedium)
-            TextButton(onClick = onAction, modifier = Modifier.testTag(testTag)) {
-                Text(actionLabel)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (secondaryLabel != null && onSecondaryAction != null) {
+                    TextButton(
+                        onClick = onSecondaryAction,
+                        modifier = secondaryTestTag?.let { Modifier.testTag(it) } ?: Modifier
+                    ) {
+                        Text(secondaryLabel)
+                    }
+                }
+                TextButton(onClick = onAction, modifier = Modifier.testTag(testTag)) {
+                    Text(actionLabel)
+                }
             }
         }
     }
