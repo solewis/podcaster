@@ -27,3 +27,14 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_queue_position` ON `queue` (`position`)")
     }
 }
+
+/** Adds the short, precomputed description preview column - see
+ * [com.solewis.podcaster.data.db.entity.EpisodeEntity.descriptionPreview]. A plain `ADD COLUMN`
+ * rather than a table rebuild: SQLite supports adding a nullable column with no default data
+ * migration needed, and every existing row simply reads back null until the next feed refresh
+ * fills it in. */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `episodes` ADD COLUMN `descriptionPreview` TEXT DEFAULT NULL")
+    }
+}

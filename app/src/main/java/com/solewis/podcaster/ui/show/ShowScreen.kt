@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,10 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,14 +68,14 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import com.solewis.podcaster.ui.common.EpisodeActionsMenu
-import com.solewis.podcaster.ui.common.EpisodeProgressBar
+import com.solewis.podcaster.ui.common.EpisodeActionRow
+import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
+import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.SubscribeButton
 import com.solewis.podcaster.ui.common.UnsubscribeConfirmDialog
-import com.solewis.podcaster.ui.common.EpisodeMetaLine
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.formatEpisodeDate
 import kotlinx.coroutines.delay
@@ -368,7 +366,7 @@ private fun EpisodeRow(
         label = "episodeHighlight"
     )
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(backgroundColor)
@@ -377,109 +375,93 @@ private fun EpisodeRow(
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.Top
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (isHighlighted) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(48.dp)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-        }
-
-        // Falls back to the show's own art, since most feeds only set per-episode artwork
-        // occasionally - same expression the Home feed uses, so a given episode looks the same
-        // in both lists rather than showing art in one place and a bare row in the other.
-        PodcastArtwork(
-            artworkUrl = episode.artworkUrl ?: podcastArtworkUrl,
-            modifier = Modifier.size(EpisodeArtworkSize)
-        )
-
-        Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-            val numberLabel = episode.displayNumber?.let { "Ep $it" }
-                ?: episode.episodeType.takeIf { it != "full" }?.replaceFirstChar(Char::uppercase)
-            Row {
-                numberLabel?.let {
-                    Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    Text("  ", style = MaterialTheme.typography.labelMedium)
-                }
-                formatEpisodeDate(episode.pubDateMillis)?.let {
-                    Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            Text(
-                episode.title,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-
-            // Null date on purpose: this row already prints it in the header above, and passing
-            // it again would repeat it. Everything else - "20m left" vs "51m" vs "Finished", and
-            // whether a bar is drawn at all - is the same rule the Home feed and the detail
-            // screen use, so an episode reads identically wherever you meet it.
-            val progress = episodeProgressUi(
-                pubDateMillis = null,
-                durationMillis = episode.durationMillis,
-                positionMillis = episode.positionMillis,
-                isPlayed = episode.isPlayed,
-                // Home passes these and this list did not, so the row you were actually listening
-                // to advanced in the ~5s steps of the persisted position rather than moving.
-                livePositionMillis = livePositionMillis,
-                liveDurationMillis = liveDurationMillis
-            )
-            val label = listOfNotNull(
-                progress.label.takeIf { it.isNotEmpty() },
-                downloadStatusLabel(download)
-            ).joinToString(" · ")
-            EpisodeMetaLine(
-                label = label,
-                isPlayed = episode.isPlayed,
-                modifier = Modifier.padding(top = 2.dp),
-                // This list keeps the default onSurface rather than the muted variant the Home
-                // feed uses, so the tick's own line stays as legible as the titles above it.
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            if (progress.showBar) {
-                EpisodeProgressBar(
-                    positionMillis = progress.positionMillis!!,
-                    durationMillis = progress.durationMillis!!,
-                    modifier = Modifier.padding(top = 6.dp, end = 8.dp)
+        Row {
+            if (isHighlighted) {
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(48.dp)
+                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
                 )
+                Spacer(modifier = Modifier.width(8.dp))
             }
-        }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row {
-                // A spinner in the button's place, not beside it, so the row does not reflow -
-                // the wait between tapping play and hearing anything is real (controller
-                // connection, then buffering) and used to look like nothing had happened.
-                IconButton(onClick = onPlay, enabled = !isStarting) {
-                    when {
-                        isStarting ->
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        // This row had no pause state at all - it always drew a play arrow and
-                        // always started the episode from the top of `play()`, so the episode you
-                        // were listening to looked unplayed and the button could not stop it. The
-                        // Home feed's rows have always done this; these had been missed.
-                        isNowPlaying ->
-                            Icon(Icons.Default.Pause, contentDescription = "Pause ${episode.title}")
-                        else -> Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
+            // Falls back to the show's own art, since most feeds only set per-episode artwork
+            // occasionally - same expression the Home feed uses, so a given episode looks the same
+            // in both lists rather than showing art in one place and a bare row in the other.
+            PodcastArtwork(
+                artworkUrl = episode.artworkUrl ?: podcastArtworkUrl,
+                modifier = Modifier.size(EpisodeArtworkSize)
+            )
+
+            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                val numberLabel = episode.displayNumber?.let { "Ep $it" }
+                    ?: episode.episodeType.takeIf { it != "full" }?.replaceFirstChar(Char::uppercase)
+                Row {
+                    numberLabel?.let {
+                        Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text("  ", style = MaterialTheme.typography.labelMedium)
+                    }
+                    formatEpisodeDate(episode.pubDateMillis)?.let {
+                        Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                EpisodeActionsMenu(
-                    episodeTitle = episode.title,
-                    isPlayed = episode.isPlayed,
-                    download = download,
-                    onEnqueue = onEnqueue,
-                    onDownload = onDownload,
-                    onRemoveDownload = onRemoveDownload,
-                    onTogglePlayed = onTogglePlayed
+                Text(
+                    episode.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
         }
+
+        EpisodeDescriptionPreview(episode.descriptionPreview, modifier = Modifier.padding(start = EpisodeArtworkSize + 12.dp))
+
+        // Null date on purpose: this row already prints it in the header above, and passing
+        // it again would repeat it. Everything else - "20m left" vs "51m" vs "Finished", and
+        // whether a bar is drawn at all - is the same rule the Home feed and the detail
+        // screen use, so an episode reads identically wherever you meet it.
+        val progress = episodeProgressUi(
+            pubDateMillis = null,
+            durationMillis = episode.durationMillis,
+            positionMillis = episode.positionMillis,
+            isPlayed = episode.isPlayed,
+            // Home passes these and this list did not, so the row you were actually listening
+            // to advanced in the ~5s steps of the persisted position rather than moving.
+            livePositionMillis = livePositionMillis,
+            liveDurationMillis = liveDurationMillis
+        )
+        val label = listOfNotNull(
+            progress.label.takeIf { it.isNotEmpty() },
+            downloadStatusLabel(download)
+        ).joinToString(" · ")
+        EpisodeMetaAndProgressRow(
+            progress = progress.copy(label = label),
+            isPlayed = episode.isPlayed,
+            // This list keeps the default onSurface rather than the muted variant the Home feed
+            // uses, so the tick's own line stays as legible as the titles above it.
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = EpisodeArtworkSize + 12.dp)
+        )
+
+        // This row had no pause state at all before this - it always drew a play arrow and always
+        // started the episode from the top of `play()`, so the episode you were listening to
+        // looked unplayed and the button could not stop it. The Home feed's rows have always done
+        // this; these had been missed.
+        EpisodeActionRow(
+            episodeTitle = episode.title,
+            isPlaying = isNowPlaying,
+            isLoading = isStarting,
+            onPlayOrToggle = onPlay,
+            onEnqueue = onEnqueue,
+            download = download,
+            onDownload = onDownload,
+            onRemoveDownload = onRemoveDownload,
+            isPlayed = episode.isPlayed,
+            onTogglePlayed = onTogglePlayed
+        )
     }
 }

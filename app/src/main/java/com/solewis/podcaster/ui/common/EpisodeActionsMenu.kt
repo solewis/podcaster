@@ -56,7 +56,10 @@ fun EpisodeActionsMenu(
      * button in the action row, and offering it twice on one screen invites the reading that the
      * two do different things.
      */
-    includeDownload: Boolean = true
+    includeDownload: Boolean = true,
+    /** Same reasoning as [includeDownload], for a row that already has its own standalone
+     * add-to-queue button. */
+    includeEnqueue: Boolean = true
 ) {
     var open by remember { mutableStateOf(false) }
     var confirmingDelete by remember { mutableStateOf(false) }
@@ -77,7 +80,7 @@ fun EpisodeActionsMenu(
             Icon(Icons.Default.MoreVert, contentDescription = "More actions for $episodeTitle")
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            MenuItem(
+            if (includeEnqueue) MenuItem(
                 text = "Add to queue",
                 icon = Icons.AutoMirrored.Filled.PlaylistAdd,
                 tag = TestTags.MENU_ENQUEUE

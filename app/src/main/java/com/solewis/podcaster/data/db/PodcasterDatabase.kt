@@ -9,7 +9,7 @@ import com.solewis.podcaster.data.db.entity.QueueEntity
 
 @Database(
     entities = [PodcastEntity::class, EpisodeEntity::class, QueueEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

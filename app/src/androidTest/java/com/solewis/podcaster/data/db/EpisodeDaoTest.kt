@@ -70,7 +70,7 @@ class EpisodeDaoTest {
         // Arrange: an episode with real listening history, as if the user had played it.
         episodeDao.insertNew(listOf(episode(id = "ep1", feedPosition = 0)))
         episodeDao.updateMetadata(
-            id = "ep1", title = "Episode 0", descriptionHtml = null, pubDateMillis = null,
+            id = "ep1", title = "Episode 0", descriptionHtml = null, descriptionPreview = null, pubDateMillis = null,
             enclosureUrl = "https://example.com/ep1.mp3", enclosureBytes = null, enclosureMimeType = null,
             artworkUrl = null, itunesEpisodeNumber = null, itunesSeason = null, episodeType = "full",
             webPageUrl = null, feedPosition = 0, chronoIndex = 1, displayNumber = 1, durationMillis = 1_000_000L
@@ -88,7 +88,7 @@ class EpisodeDaoTest {
         val insertedRowIds = episodeDao.insertNew(listOf(episode(id = "ep1", feedPosition = 0)))
         episodeDao.updateMetadata(
             id = "ep1", title = "Episode 0 (updated title)", descriptionHtml = "<p>New notes</p>",
-            pubDateMillis = 2000L, enclosureUrl = "https://example.com/ep1-v2.mp3", enclosureBytes = 999L,
+            descriptionPreview = "New notes", pubDateMillis = 2000L, enclosureUrl = "https://example.com/ep1-v2.mp3", enclosureBytes = 999L,
             enclosureMimeType = "audio/mpeg", artworkUrl = "https://example.com/art.jpg",
             itunesEpisodeNumber = null, itunesSeason = null, episodeType = "full", webPageUrl = null,
             feedPosition = 0, chronoIndex = 1, displayNumber = 1, durationMillis = 1_500_000L
@@ -118,7 +118,7 @@ class EpisodeDaoTest {
 
         // A refresh brings a DIFFERENT (e.g. wrong/lying) duration from the feed.
         episodeDao.updateMetadata(
-            id = "ep1", title = "Episode 0", descriptionHtml = null, pubDateMillis = null,
+            id = "ep1", title = "Episode 0", descriptionHtml = null, descriptionPreview = null, pubDateMillis = null,
             enclosureUrl = "https://example.com/ep1.mp3", enclosureBytes = null, enclosureMimeType = null,
             artworkUrl = null, itunesEpisodeNumber = null, itunesSeason = null, episodeType = "full",
             webPageUrl = null, feedPosition = 0, chronoIndex = 1, displayNumber = 1, durationMillis = 999L
@@ -132,7 +132,7 @@ class EpisodeDaoTest {
         episodeDao.insertNew(listOf(episode(id = "ep1", feedPosition = 0)))
 
         episodeDao.updateMetadata(
-            id = "ep1", title = "Episode 0", descriptionHtml = null, pubDateMillis = null,
+            id = "ep1", title = "Episode 0", descriptionHtml = null, descriptionPreview = null, pubDateMillis = null,
             enclosureUrl = "https://example.com/ep1.mp3", enclosureBytes = null, enclosureMimeType = null,
             artworkUrl = null, itunesEpisodeNumber = null, itunesSeason = null, episodeType = "full",
             webPageUrl = null, feedPosition = 0, chronoIndex = 1, displayNumber = 1, durationMillis = 42_000L

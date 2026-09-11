@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.google.common.truth.Truth.assertThat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.solewis.podcaster.testing.TestGraph
@@ -47,13 +48,14 @@ class ShowScreenTest {
     @After
     fun tearDown() = graph.close()
 
-    private fun openShow(positionMillis: Long = 0, isPlayed: Boolean = false) {
+    private fun openShow(positionMillis: Long = 0, isPlayed: Boolean = false, descriptionPreview: String? = null) {
         runBlocking {
             podcastId = graph.insertShow(title = "Radiolab")
             graph.insertEpisodes(
                 episodeRow(
                     podcastId, "1", title = "Patient Zero",
-                    durationMillis = 51 * 60_000L, positionMillis = positionMillis, isPlayed = isPlayed
+                    durationMillis = 51 * 60_000L, positionMillis = positionMillis, isPlayed = isPlayed,
+                    descriptionPreview = descriptionPreview
                 )
             )
         }
@@ -64,6 +66,13 @@ class ShowScreenTest {
         compose.awaitText("Radiolab")
         compose.onNodeWithText("Radiolab").performClick()
         compose.waitForIdle()
+    }
+
+    @Test
+    fun a_description_preview_is_shown_under_the_title() {
+        openShow(descriptionPreview = "Real show notes go here.")
+
+        compose.onNodeWithText("Real show notes go here.").assertExists()
     }
 
     @Test
@@ -149,7 +158,7 @@ class ShowScreenTest {
 
         // The merged node, which is the IconButton carrying the click. Injecting on the unmerged
         // Icon inside it does not reach the handler - the same trap `clickEpisodeRow` documents.
-        compose.onNodeWithContentDescription("Pause Patient Zero").performClick()
+        compose.onNodeWithContentDescription("Pause Patient Zero").performScrollTo().performClick()
         compose.waitForIdle()
 
         // The old button always called play(), which restarted the episode from its stored

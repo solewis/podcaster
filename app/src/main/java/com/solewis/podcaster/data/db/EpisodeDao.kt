@@ -38,6 +38,7 @@ interface EpisodeDao {
         UPDATE episodes SET
             title = :title,
             descriptionHtml = :descriptionHtml,
+            descriptionPreview = :descriptionPreview,
             pubDateMillis = :pubDateMillis,
             enclosureUrl = :enclosureUrl,
             enclosureBytes = :enclosureBytes,
@@ -58,6 +59,7 @@ interface EpisodeDao {
         id: String,
         title: String,
         descriptionHtml: String?,
+        descriptionPreview: String?,
         pubDateMillis: Long?,
         enclosureUrl: String,
         enclosureBytes: Long?,
@@ -115,7 +117,7 @@ interface EpisodeDao {
 
     @Query(
         """
-        SELECT id, podcastId, title, pubDateMillis, durationMillis, displayNumber, chronoIndex,
+        SELECT id, podcastId, title, descriptionPreview, pubDateMillis, durationMillis, displayNumber, chronoIndex,
                episodeType, artworkUrl, positionMillis, isPlayed, lastPlayedAt
         FROM episodes
         WHERE podcastId = :podcastId
@@ -161,7 +163,7 @@ interface EpisodeDao {
      */
     @Query(
         """
-        SELECT id, podcastId, title, pubDateMillis, durationMillis, displayNumber, chronoIndex,
+        SELECT id, podcastId, title, descriptionPreview, pubDateMillis, durationMillis, displayNumber, chronoIndex,
                episodeType, artworkUrl, positionMillis, isPlayed, lastPlayedAt
         FROM episodes
         WHERE podcastId = :podcastId AND lastPlayedAt IS NOT NULL
@@ -276,7 +278,7 @@ interface EpisodeDao {
     @Query(
         """
         SELECT e.id, e.podcastId, p.title AS podcastTitle, p.artworkUrl AS podcastArtworkUrl,
-               e.title, e.pubDateMillis, e.durationMillis, e.displayNumber, e.episodeType,
+               e.title, e.descriptionPreview, e.pubDateMillis, e.durationMillis, e.displayNumber, e.episodeType,
                e.artworkUrl, e.positionMillis, e.isPlayed, e.lastPlayedAt
         FROM episodes e
         JOIN podcasts p ON p.id = e.podcastId

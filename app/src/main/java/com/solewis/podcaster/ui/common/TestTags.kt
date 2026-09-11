@@ -63,6 +63,10 @@ object TestTags {
     /** Per-episode, since a list has one of these per row and a test has to open a specific one. */
     fun episodeMenu(episodeTitle: String) = "episodeMenu:$episodeTitle"
 
+    /** The standalone add-to-queue button in an episode row's action row - distinct from
+     * [MENU_ENQUEUE], which is the same action from inside the `⋮` menu on a screen still using it. */
+    fun enqueueButton(episodeTitle: String) = "enqueueButton:$episodeTitle"
+
     /** Direction included: the two rows are identical apart from it, which is the bug worth catching. */
     fun skipChoice(forward: Boolean, amount: SkipAmount) =
         "skipChoice:${if (forward) "forward" else "back"}:${amount.seconds}"
