@@ -29,8 +29,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.solewis.podcaster.data.settings.PrefetchMode
 import com.solewis.podcaster.data.settings.SkipAmount
 import com.solewis.podcaster.data.settings.ThemeMode
+import com.solewis.podcaster.ui.common.formatBytes
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.SkipIcon
@@ -39,6 +41,8 @@ import com.solewis.podcaster.ui.common.TestTags
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val settings by viewModel.settings.collectAsState()
+    val streamCacheBytes by viewModel.streamCacheBytes.collectAsState()
+    val downloadBytes by viewModel.downloadBytes.collectAsState()
     val context = LocalContext.current
 
     Scaffold(
@@ -93,6 +97,58 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 checked = settings.autoAdvance,
                 onCheckedChange = viewModel::setAutoAdvance,
                 testTag = TestTags.AUTO_ADVANCE_SWITCH
+            )
+            HorizontalDivider()
+            SettingSection("Downloading while you listen") {
+                Text(
+                    "Full episode pulls the rest of an episode in as soon as it starts, so a " +
+                        "dropped connection later has nothing left to fetch. Conservative only " +
+                        "downloads a little ahead at a time, using less data for episodes you " +
+                        "don't finish.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PrefetchMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = settings.prefetchMode == mode,
+                            onClick = { viewModel.setPrefetchMode(mode) },
+                            label = { Text(mode.label()) },
+                            colors = accentChipColors(),
+                            modifier = Modifier.testTag(TestTags.prefetchChoice(mode))
+                        )
+                    }
+                }
+            }
+            if (settings.prefetchMode == PrefetchMode.FULL_EPISODE) {
+                ToggleRow(
+                    title = "Only on wifi",
+                    subtitle = "Wait for wifi before pulling in the rest of an episode, rather than using cellular data.",
+                    checked = settings.prefetchWifiOnly,
+                    onCheckedChange = viewModel::setPrefetchWifiOnly,
+                    testTag = TestTags.PREFETCH_WIFI_ONLY_SWITCH
+                )
+            }
+            HorizontalDivider()
+            StorageSection(
+                title = "Streaming cache",
+                description = "Episodes you stream, kept so replaying or resuming doesn't " +
+                    "re-download them. Bounded on its own - clearing it just means the next " +
+                    "listen refetches from the start.",
+                sizeLabel = formatBytes(streamCacheBytes),
+                actionLabel = "Clear cache",
+                onAction = viewModel::clearStreamCache,
+                testTag = TestTags.CLEAR_STREAM_CACHE
+            )
+            HorizontalDivider()
+            StorageSection(
+                title = "Downloads",
+                description = "Episodes you chose to keep offline. Manage them one at a time " +
+                    "from Downloads, or clear all of them here.",
+                sizeLabel = formatBytes(downloadBytes),
+                actionLabel = "Remove all downloads",
+                onAction = viewModel::removeAllDownloads,
+                testTag = TestTags.REMOVE_ALL_DOWNLOADS
             )
             HorizontalDivider()
             PlaybackLogSection(
@@ -201,6 +257,36 @@ private fun ThemeMode.label(): String = when (this) {
     ThemeMode.SYSTEM -> "System"
     ThemeMode.LIGHT -> "Light"
     ThemeMode.DARK -> "Dark"
+}
+
+private fun PrefetchMode.label(): String = when (this) {
+    PrefetchMode.FULL_EPISODE -> "Full episode"
+    PrefetchMode.CONSERVATIVE -> "Conservative"
+}
+
+/** Shared shape for the two "how much is on disk, and how do I get rid of it" sections. */
+@Composable
+private fun StorageSection(
+    title: String,
+    description: String,
+    sizeLabel: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    testTag: String
+) {
+    SettingSection(title) {
+        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(sizeLabel, style = MaterialTheme.typography.titleMedium)
+            TextButton(onClick = onAction, modifier = Modifier.testTag(testTag)) {
+                Text(actionLabel)
+            }
+        }
+    }
 }
 
 /**

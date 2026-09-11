@@ -49,6 +49,7 @@ class PlaybackErrorRetrierTest {
     private val serverOnline = AtomicBoolean(true)
     private val alwaysOnline = object : Connectivity {
         override fun isOnline() = true
+        override fun isOnWifi() = true
     }
 
     @Before

@@ -108,6 +108,7 @@ class LoadedControllerErrorRecoveryTest {
                 database = database,
                 connectivity = object : Connectivity {
                     override fun isOnline() = false
+                    override fun isOnWifi() = false
                 }
             )
         )

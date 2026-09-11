@@ -22,12 +22,28 @@ enum class SkipAmount(val seconds: Int) {
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/**
+ * How much of an episode gets pulled onto the device as soon as it starts, before you've listened
+ * far enough to need it.
+ *
+ * [FULL_EPISODE] exists because of a reported bug: a dropped connection deep into an episode forced
+ * a fresh, independent request to resume, and that request's own ad-insertion decision - unrelated
+ * to the one the original request got - got written into the stream cache and played back forever
+ * on every later listen. A dropped connection cannot force a reconnect over ground that is already
+ * fully downloaded, so most episodes finish start to finish on one continuous fetch instead of
+ * however many a connection happens to drop and pick back up.
+ */
+enum class PrefetchMode { FULL_EPISODE, CONSERVATIVE }
+
 /** Everything the settings screen owns, as one snapshot. */
 data class AppSettings(
     val skipBack: SkipAmount = SkipAmount.FIFTEEN,
     val skipForward: SkipAmount = SkipAmount.FIFTEEN,
     val theme: ThemeMode = ThemeMode.SYSTEM,
-    val autoAdvance: Boolean = true
+    val autoAdvance: Boolean = true,
+    val prefetchMode: PrefetchMode = PrefetchMode.FULL_EPISODE,
+    /** Only meaningful when [prefetchMode] is [PrefetchMode.FULL_EPISODE]. */
+    val prefetchWifiOnly: Boolean = false
 )
 
 /**
@@ -88,11 +104,23 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean(KEY_AUTO_ADVANCE, true)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_ADVANCE, value).apply()
 
+    var prefetchMode: PrefetchMode
+        get() = prefs.getString(KEY_PREFETCH_MODE, null)?.let { name ->
+            PrefetchMode.entries.firstOrNull { it.name == name }
+        } ?: PrefetchMode.FULL_EPISODE
+        set(value) = prefs.edit().putString(KEY_PREFETCH_MODE, value.name).apply()
+
+    var prefetchWifiOnly: Boolean
+        get() = prefs.getBoolean(KEY_PREFETCH_WIFI_ONLY, false)
+        set(value) = prefs.edit().putBoolean(KEY_PREFETCH_WIFI_ONLY, value).apply()
+
     fun snapshot() = AppSettings(
         skipBack = skipBack,
         skipForward = skipForward,
         theme = theme,
-        autoAdvance = autoAdvance
+        autoAdvance = autoAdvance,
+        prefetchMode = prefetchMode,
+        prefetchWifiOnly = prefetchWifiOnly
     )
 
     /**
@@ -125,5 +153,7 @@ class SettingsStore(context: Context) {
         const val KEY_SKIP_FORWARD = "skipForwardSeconds"
         const val KEY_THEME = "theme"
         const val KEY_AUTO_ADVANCE = "autoAdvance"
+        const val KEY_PREFETCH_MODE = "prefetchMode"
+        const val KEY_PREFETCH_WIFI_ONLY = "prefetchWifiOnly"
     }
 }

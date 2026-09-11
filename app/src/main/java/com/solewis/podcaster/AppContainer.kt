@@ -15,18 +15,23 @@ import com.solewis.podcaster.data.remote.ItunesSearchApi
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.QueueRepository
+import com.solewis.podcaster.data.repo.MediaStreamCache
 import com.solewis.podcaster.data.repo.SearchRepository
 import com.solewis.podcaster.data.repo.ShowPreviewRepository
+import com.solewis.podcaster.data.repo.StreamCache
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.player.MediaStorage
 import com.solewis.podcaster.data.net.AndroidConnectivity
 import com.solewis.podcaster.data.net.Connectivity
+import com.solewis.podcaster.player.CacheEpisodePrefetcher
+import com.solewis.podcaster.player.EpisodePrefetcher
 import com.solewis.podcaster.player.PlaybackLog
 import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayerConnection
 import com.solewis.podcaster.player.SleepTimer
+import androidx.media3.datasource.DefaultHttpDataSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -99,6 +104,9 @@ class AppContainer(
     val downloadCache: SimpleCache get() = MediaStorage.downloadCache(appContext)
     private val downloadManager: DownloadManager get() = MediaStorage.downloadManager(appContext)
 
+    /** The settings screen's view of [streamCache] - see [StreamCache] for why it isn't the raw cache. */
+    val streamCacheInfo: StreamCache by lazy { MediaStreamCache(streamCache) }
+
     /** Lazy for the same reason [playback] is: a screen test that never downloads opens no caches. */
     val downloads: Downloads by lazy {
         downloadsOverride ?: DownloadRepository(appContext, downloadManager, downloadCache, episodeRepository)
@@ -113,9 +121,21 @@ class AppContainer(
      */
     val sleepTimer: SleepTimer by lazy { SleepTimer(playback, appScope) }
 
+    /** Lazy for the same reason [streamCacheInfo] touches the cache lazily - a test that never plays
+     * anything should never open it. */
+    private val episodePrefetcher: EpisodePrefetcher by lazy {
+        CacheEpisodePrefetcher(
+            streamCache,
+            DefaultHttpDataSource.Factory().setUserAgent(PlayerFactory.USER_AGENT),
+            settings,
+            connectivity,
+            appScope
+        )
+    }
+
     /** The one way an episode gets started - see [PlaybackStarter] for why that is worth centralising. */
     val playbackStarter: PlaybackStarter by lazy {
-        PlaybackStarter(playback, downloads, connectivity, appScope)
+        PlaybackStarter(playback, downloads, connectivity, appScope, episodePrefetcher)
     }
 
     companion object {

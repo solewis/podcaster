@@ -6,6 +6,7 @@ import com.solewis.podcaster.data.repo.DownloadStatus
 import com.solewis.podcaster.data.repo.PlayableEpisode
 import com.solewis.podcaster.testing.FakeConnectivity
 import com.solewis.podcaster.testing.FakeDownloads
+import com.solewis.podcaster.testing.FakeEpisodePrefetcher
 import com.solewis.podcaster.testing.FakePlayback
 import com.solewis.podcaster.testing.MainDispatcherRule
 import com.solewis.podcaster.testing.awaitTrue
@@ -35,9 +36,10 @@ class PlaybackStarterTest {
     private val playback = FakePlayback()
     private val downloads = FakeDownloads()
     private val connectivity = FakeConnectivity()
+    private val prefetcher = FakeEpisodePrefetcher()
 
     private fun TestScope.starter() =
-        PlaybackStarter(playback, downloads, connectivity, backgroundScope)
+        PlaybackStarter(playback, downloads, connectivity, backgroundScope, prefetcher)
 
     private fun episode(id: String = "ep-1") = PlayableEpisode(
         episodeId = id,
@@ -56,6 +58,28 @@ class PlaybackStarterTest {
 
         assertThat(playback.played.single().episodeId).isEqualTo("ep-1")
     }
+
+    @Test
+    fun starting_an_episode_prefetches_it() = runTest(mainDispatcher.dispatcher) {
+        val starter = starter()
+
+        starter.start(episode())
+
+        assertThat(prefetcher.requested).containsExactly("ep-1")
+    }
+
+    @Test
+    fun a_downloaded_episode_is_not_prefetched_into_the_streaming_cache() =
+        runTest(mainDispatcher.dispatcher) {
+            // Already fully on disk in a separate store - prefetching it too would just spend data
+            // and space duplicating it.
+            downloads.emit("ep-1", DownloadStatus.DOWNLOADED)
+            val starter = starter()
+
+            starter.start(episode())
+
+            assertThat(prefetcher.requested).isEmpty()
+        }
 
     @Test
     fun with_no_connection_it_refuses_rather_than_hanging() = runTest(mainDispatcher.dispatcher) {
