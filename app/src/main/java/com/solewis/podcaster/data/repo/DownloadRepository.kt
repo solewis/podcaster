@@ -103,6 +103,17 @@ class DownloadRepository(
         DownloadService.sendRemoveDownload(context, PodcastDownloadService::class.java, episodeId, true)
     }
 
+    override suspend fun removeAll() {
+        val ids = withContext(Dispatchers.IO) {
+            buildList {
+                downloadManager.downloadIndex.getDownloads().use { cursor ->
+                    while (cursor.moveToNext()) add(cursor.download.request.id)
+                }
+            }
+        }
+        ids.forEach { remove(it) }
+    }
+
     private suspend fun snapshot(): Map<String, EpisodeDownload> {
         val fromIndex = withContext(Dispatchers.IO) {
             buildMap {

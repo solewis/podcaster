@@ -47,4 +47,7 @@ interface Downloads {
     suspend fun download(episodeId: String)
 
     suspend fun remove(episodeId: String)
+
+    /** Everything currently downloaded or in progress - the bulk version of [remove]. */
+    suspend fun removeAll()
 }

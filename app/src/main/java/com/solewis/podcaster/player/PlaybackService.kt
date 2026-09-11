@@ -60,6 +60,11 @@ class PlaybackService : MediaLibraryService() {
         // cover the reported repeat, which leaves no trace in any Player.Listener callback.
         player.addAnalyticsListener(AudioSinkLogListener(player, container.playbackLog))
         player.addListener(PositionRegressionWatch(player, container.playbackLog, lifecycleScope))
+        // Makes a dropped connection something playback recovers from. Confirmed by reproducing
+        // it first: without this, a fatal network error left the player permanently idle, with
+        // playWhenReady still reporting true, forever - skipping, waiting, and reconnecting the
+        // network again all did nothing, because nothing was calling prepare() to find out.
+        player.addListener(PlaybackErrorRetrier(player, container.connectivity, lifecycleScope, container.playbackLog))
         container.playbackLog.record("SERVICE_CREATE")
         // Only the session sees the wrapper - it exists purely to expose the 15s seeks as
         // next/previous for external controllers. ProgressWriter and AutoAdvancer below stay on
@@ -99,7 +104,7 @@ class PlaybackService : MediaLibraryService() {
 
         seedLastPlayedEpisode(container.episodeRepository, container.playbackLog)
 
-        progressWriter = ProgressWriter(player, container.episodeRepository, lifecycleScope)
+        progressWriter = ProgressWriter(player, container.episodeRepository, lifecycleScope, container.playbackLog)
         player.addListener(progressWriter)
         player.addListener(
             AutoAdvancer(player, container.queueRepository, lifecycleScope, container.playbackLog) {

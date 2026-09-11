@@ -12,6 +12,13 @@ import android.net.NetworkCapabilities
  */
 interface Connectivity {
     fun isOnline(): Boolean
+
+    /**
+     * Specifically wifi, not merely online - what a "only on wifi" setting means. A metered
+     * hotspot reported as wifi by the OS still counts: the distinction users mean by "wifi only" is
+     * the transport, not the billing plan.
+     */
+    fun isOnWifi(): Boolean
 }
 
 class AndroidConnectivity(context: Context) : Connectivity {
@@ -25,11 +32,13 @@ class AndroidConnectivity(context: Context) : Connectivity {
      * into, or a carrier connection that has dropped, both still report `INTERNET` - and treating
      * those as online is precisely how a tap on play turns into a hang.
      */
-    override fun isOnline(): Boolean {
-        val capabilities = connectivityManager
-            ?.getNetworkCapabilities(connectivityManager.activeNetwork)
-            ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-    }
+    override fun isOnline(): Boolean = capabilities()?.let {
+        it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            it.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    } ?: false
+
+    override fun isOnWifi(): Boolean = capabilities()?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ?: false
+
+    private fun capabilities(): NetworkCapabilities? =
+        connectivityManager?.getNetworkCapabilities(connectivityManager.activeNetwork)
 }

@@ -6,14 +6,18 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.solewis.podcaster.data.settings.PrefetchMode
 import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.data.settings.SkipAmount
 import com.solewis.podcaster.data.settings.ThemeMode
+import com.solewis.podcaster.testing.FakeDownloads
+import com.solewis.podcaster.testing.FakeStreamCache
 import com.solewis.podcaster.testing.ViewModelHost
 import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.theme.PodcasterTheme
@@ -43,12 +47,16 @@ class SettingsScreenTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val store = SettingsStore(context)
     private val host = ViewModelHost()
+    private val streamCache = FakeStreamCache()
+    private val downloads = FakeDownloads()
 
     @After
     fun tearDown() = host.close()
 
     private fun launch() {
-        val viewModel = host.hosting(SettingsViewModel(store, PlaybackLog(logFolder.newFile())))
+        val viewModel = host.hosting(
+            SettingsViewModel(store, PlaybackLog(logFolder.newFile()), streamCache, downloads)
+        )
         compose.setContent { PodcasterTheme { SettingsScreen(viewModel = viewModel, onBack = {}) } }
     }
 
@@ -122,4 +130,58 @@ class SettingsScreenTest {
         compose.onNodeWithTag(TestTags.AUTO_ADVANCE_SWITCH).assertIsOff()
     }
 
+    @Test
+    fun full_episode_prefetch_is_selected_by_default() {
+        launch()
+
+        compose.onNodeWithTag(TestTags.prefetchChoice(PrefetchMode.FULL_EPISODE)).assertIsSelected()
+        // Only meaningful for full-episode prefetch, so it has nothing to show otherwise.
+        compose.onNodeWithTag(TestTags.PREFETCH_WIFI_ONLY_SWITCH).performScrollTo().assertIsOff()
+    }
+
+    @Test
+    fun switching_to_conservative_hides_the_wifi_only_toggle() {
+        launch()
+
+        compose.onNodeWithTag(TestTags.prefetchChoice(PrefetchMode.CONSERVATIVE)).performScrollTo().performClick()
+        compose.waitForIdle()
+
+        assertThat(store.prefetchMode).isEqualTo(PrefetchMode.CONSERVATIVE)
+        compose.onNodeWithTag(TestTags.PREFETCH_WIFI_ONLY_SWITCH).assertDoesNotExist()
+    }
+
+    @Test
+    fun turning_on_wifi_only_stores_it() {
+        launch()
+
+        compose.onNodeWithTag(TestTags.PREFETCH_WIFI_ONLY_SWITCH).performScrollTo().performClick()
+        compose.waitForIdle()
+
+        assertThat(store.prefetchWifiOnly).isTrue()
+    }
+
+    @Test
+    fun the_streaming_cache_size_is_shown_and_clearing_it_calls_through() {
+        streamCache.bytes = 42L * 1024 * 1024
+        launch()
+
+        compose.onNodeWithText("42 MB").assertExists()
+        compose.onNodeWithTag(TestTags.CLEAR_STREAM_CACHE).performScrollTo().performClick()
+        compose.waitForIdle()
+
+        assertThat(streamCache.cleared).isTrue()
+    }
+
+    @Test
+    fun the_download_size_is_shown_and_removing_all_calls_through() {
+        downloads.bytesOnDisk = 7L * 1024 * 1024
+        downloads.emit("ep-1", com.solewis.podcaster.data.repo.DownloadStatus.DOWNLOADED)
+        launch()
+
+        compose.onNodeWithText("7 MB").assertExists()
+        compose.onNodeWithTag(TestTags.REMOVE_ALL_DOWNLOADS).performScrollTo().performClick()
+        compose.waitForIdle()
+
+        assertThat(downloads.removed).containsExactly("ep-1")
+    }
 }

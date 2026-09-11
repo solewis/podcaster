@@ -35,6 +35,24 @@ class SettingsStoreTest {
             assertThat(skipForward).isEqualTo(SkipAmount.FIFTEEN)
             assertThat(theme).isEqualTo(ThemeMode.SYSTEM)
             assertThat(autoAdvance).isTrue()
+            // A dropped connection cannot force a mid-episode reconnect over ground that is
+            // already fully downloaded - see PrefetchMode's doc comment - so this is on by
+            // default, with wifi-only off so it actually protects a listen away from wifi.
+            assertThat(prefetchMode).isEqualTo(PrefetchMode.FULL_EPISODE)
+            assertThat(prefetchWifiOnly).isFalse()
+        }
+    }
+
+    @Test
+    fun prefetch_settings_survive_a_separate_reader() {
+        SettingsStore(context).apply {
+            prefetchMode = PrefetchMode.CONSERVATIVE
+            prefetchWifiOnly = true
+        }
+
+        with(SettingsStore(context).snapshot()) {
+            assertThat(prefetchMode).isEqualTo(PrefetchMode.CONSERVATIVE)
+            assertThat(prefetchWifiOnly).isTrue()
         }
     }
 
@@ -102,11 +120,13 @@ class SettingsStoreTest {
         context.getSharedPreferences("playback", Context.MODE_PRIVATE).edit()
             .putInt("skipBackSeconds", 7)
             .putString("theme", "SEPIA")
+            .putString("prefetchMode", "WHOLE_SHOW")
             .apply()
 
         with(SettingsStore(context).snapshot()) {
             assertThat(skipBack).isEqualTo(SkipAmount.FIFTEEN)
             assertThat(theme).isEqualTo(ThemeMode.SYSTEM)
+            assertThat(prefetchMode).isEqualTo(PrefetchMode.FULL_EPISODE)
         }
     }
 }

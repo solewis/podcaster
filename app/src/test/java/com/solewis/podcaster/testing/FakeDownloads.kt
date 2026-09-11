@@ -37,6 +37,11 @@ class FakeDownloads : Downloads {
         removed += episodeId
     }
 
+    override suspend fun removeAll() {
+        removed += _states.value.keys
+        _states.value = emptyMap()
+    }
+
     // ---- driving download state from a test ----
 
     fun emit(

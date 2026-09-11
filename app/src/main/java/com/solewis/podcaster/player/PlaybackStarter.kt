@@ -29,7 +29,8 @@ class PlaybackStarter(
     private val playback: Playback,
     private val downloads: Downloads,
     private val connectivity: Connectivity,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    private val prefetcher: EpisodePrefetcher = NoOpEpisodePrefetcher
 ) {
 
     private val _pendingEpisodeId = MutableStateFlow<String?>(null)
@@ -77,12 +78,16 @@ class PlaybackStarter(
      * so it is checked before giving up.
      */
     suspend fun start(episode: PlayableEpisode) {
-        if (!connectivity.isOnline() && !downloads.isDownloaded(episode.episodeId)) {
+        val isDownloaded = downloads.isDownloaded(episode.episodeId)
+        if (!connectivity.isOnline() && !isDownloaded) {
             _messages.tryEmit(NO_CONNECTION_MESSAGE)
             _pendingEpisodeId.value = null
             return
         }
         _pendingEpisodeId.value = episode.episodeId
+        // A downloaded episode is already fully on disk in its own store - prefetching it into the
+        // streaming cache as well would just spend data and space duplicating it.
+        if (!isDownloaded) prefetcher.prefetch(episode)
         playback.play(episode)
     }
 
