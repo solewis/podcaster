@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.solewis.podcaster.data.db.entity.EpisodeEntity
+import com.solewis.podcaster.data.db.model.EpisodeDescriptionSource
 import com.solewis.podcaster.data.db.model.EpisodeDetailItem
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.EpisodeListItem
@@ -286,4 +287,25 @@ interface EpisodeDao {
         """
     )
     fun observeAllEpisodes(): Flow<List<EpisodeFeedItem>>
+
+    /**
+     * Episodes whose stored description predates the preview column, for the one-time backfill in
+     * [com.solewis.podcaster.data.repo.EpisodeRepository.backfillDescriptionPreviews].
+     *
+     * The schema migration could only default the new column to NULL - stripping HTML is not
+     * something SQLite can do - and a feed refresh is the only other thing that writes it, so
+     * without this every episode already in the library would show no preview until its feed
+     * happened to change. A conditional-GET 304 skips the refresh write too, which for a settled
+     * back catalogue means "never".
+     *
+     * Projected rather than selecting whole rows: the descriptions are the largest column in the
+     * table and this runs over the entire library at once.
+     */
+    @Query(
+        "SELECT id, descriptionHtml FROM episodes WHERE descriptionPreview IS NULL AND descriptionHtml IS NOT NULL"
+    )
+    suspend fun episodesMissingDescriptionPreview(): List<EpisodeDescriptionSource>
+
+    @Query("UPDATE episodes SET descriptionPreview = :descriptionPreview WHERE id = :id")
+    suspend fun setDescriptionPreview(id: String, descriptionPreview: String?)
 }

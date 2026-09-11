@@ -54,5 +54,9 @@ fun PodcastArtwork(
  * Thumbnail size for an episode inside a list. Shared so the Home feed and a show's own episode
  * list stay identical - the same episode should not be a different size depending on which list you
  * happened to reach it from.
+ *
+ * Trimmed from 56dp once list rows grew a description preview and a row of controls: at 56 the
+ * artwork was competing with the text for the row rather than labelling it, and the row was tall
+ * enough already.
  */
-val EpisodeArtworkSize = 56.dp
+val EpisodeArtworkSize = 48.dp

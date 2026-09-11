@@ -142,8 +142,8 @@ private fun FeedEpisodeRow(
     Column(
         // Tappable to open episode details; the trailing controls keep their own click targets,
         // matching the nested-clickable pattern used elsewhere (e.g. MiniPlayer).
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row {
             PodcastArtwork(

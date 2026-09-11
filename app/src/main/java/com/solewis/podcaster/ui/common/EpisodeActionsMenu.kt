@@ -1,6 +1,7 @@
 package com.solewis.podcaster.ui.common
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Close
@@ -23,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import com.solewis.podcaster.data.repo.DownloadStatus
 import com.solewis.podcaster.data.repo.EpisodeDownload
 
@@ -59,7 +61,15 @@ fun EpisodeActionsMenu(
     includeDownload: Boolean = true,
     /** Same reasoning as [includeDownload], for a row that already has its own standalone
      * add-to-queue button. */
-    includeEnqueue: Boolean = true
+    includeEnqueue: Boolean = true,
+    /**
+     * Unspecified leaves the trigger at the Material default. A list row passes explicit sizes so
+     * it matches the buttons it sits in a line with - see [EpisodeActionRow]. Only the `⋮` trigger
+     * is affected; the menu items it opens keep their normal size, since a dropdown has all the
+     * room it needs.
+     */
+    buttonSize: Dp = Dp.Unspecified,
+    iconSize: Dp = Dp.Unspecified
 ) {
     var open by remember { mutableStateOf(false) }
     var confirmingDelete by remember { mutableStateOf(false) }
@@ -75,9 +85,15 @@ fun EpisodeActionsMenu(
     Box(modifier = modifier) {
         IconButton(
             onClick = { open = true },
-            modifier = Modifier.testTag(TestTags.episodeMenu(episodeTitle))
+            modifier = Modifier
+                .then(if (buttonSize == Dp.Unspecified) Modifier else Modifier.size(buttonSize))
+                .testTag(TestTags.episodeMenu(episodeTitle))
         ) {
-            Icon(Icons.Default.MoreVert, contentDescription = "More actions for $episodeTitle")
+            Icon(
+                Icons.Default.MoreVert,
+                contentDescription = "More actions for $episodeTitle",
+                modifier = if (iconSize == Dp.Unspecified) Modifier else Modifier.size(iconSize)
+            )
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (includeEnqueue) MenuItem(

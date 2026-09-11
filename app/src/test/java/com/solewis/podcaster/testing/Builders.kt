@@ -42,6 +42,7 @@ fun episodeRow(
     durationMillis: Long? = null,
     artworkUrl: String? = null,
     episodeType: String = if (chronoIndex == null) "trailer" else "full",
+    descriptionHtml: String? = null,
     descriptionPreview: String? = null
 ) = EpisodeEntity(
     id = "$podcastId:$key",
@@ -49,6 +50,7 @@ fun episodeRow(
     stableKey = key,
     stableKeySource = "guid",
     title = title,
+    descriptionHtml = descriptionHtml,
     descriptionPreview = descriptionPreview,
     enclosureUrl = "https://example.com/$key.mp3",
     durationMillis = durationMillis,

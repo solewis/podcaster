@@ -12,13 +12,16 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.repo.EpisodeDownload
 
@@ -86,6 +89,18 @@ fun EpisodeMetaAndProgressRow(
  * Add to queue and download are now standalone buttons rather than menu items, which is why both
  * are turned off inside [EpisodeActionsMenu] here: offering the same action from a button and from
  * the menu it sits next to invites the reading that the two do something different.
+ *
+ * Right-aligned, and drawn smaller than a default [IconButton]. Left-aligned, the first icon sat
+ * about 12dp in from the row's left edge - an `IconButton` centres a 24dp icon in a 48dp box - so
+ * it lined up with neither the artwork above it nor the text beside that, and read as a mistake.
+ * Against the right edge there is nothing for it to fail to line up with, and the row's natural
+ * reading order (artwork, title, description, metadata) ends where the controls begin.
+ *
+ * [ActionButtonSize] then buys back most of the vertical space this row costs. Suppressing
+ * [LocalMinimumInteractiveComponentSize] is what makes that size real rather than advisory:
+ * Material3 otherwise pads every icon button back out to a 48dp layout footprint, so sizing the
+ * button alone changes where the icon is drawn and nothing about how tall the row is. 40dp is still
+ * a comfortable target, and these are spaced rather than crowded.
  */
 @Composable
 fun EpisodeActionRow(
@@ -101,39 +116,69 @@ fun EpisodeActionRow(
     onTogglePlayed: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onPlayOrToggle, enabled = !isLoading) {
-            when {
-                // A spinner in the button's own place, not beside it, so the row does not reflow -
-                // the wait between tapping play and hearing anything (controller connection, then
-                // buffering) is real and used to look like nothing had happened.
-                isLoading -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                isPlaying -> Icon(Icons.Default.Pause, contentDescription = "Pause $episodeTitle")
-                else -> Icon(Icons.Default.PlayArrow, contentDescription = "Play $episodeTitle")
-            }
-        }
-        IconButton(
-            onClick = onEnqueue,
-            modifier = Modifier.testTag(TestTags.enqueueButton(episodeTitle))
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add $episodeTitle to queue")
+            IconButton(
+                onClick = onPlayOrToggle,
+                enabled = !isLoading,
+                modifier = Modifier.size(ActionButtonSize)
+            ) {
+                when {
+                    // A spinner in the button's own place, not beside it, so the row does not reflow -
+                    // the wait between tapping play and hearing anything (controller connection, then
+                    // buffering) is real and used to look like nothing had happened.
+                    isLoading -> CircularProgressIndicator(modifier = Modifier.size(ActionIconSize), strokeWidth = 2.dp)
+                    isPlaying -> Icon(
+                        Icons.Default.Pause,
+                        contentDescription = "Pause $episodeTitle",
+                        modifier = Modifier.size(ActionIconSize)
+                    )
+
+                    else -> Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = "Play $episodeTitle",
+                        modifier = Modifier.size(ActionIconSize)
+                    )
+                }
+            }
+            IconButton(
+                onClick = onEnqueue,
+                modifier = Modifier.size(ActionButtonSize).testTag(TestTags.enqueueButton(episodeTitle))
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.PlaylistAdd,
+                    contentDescription = "Add $episodeTitle to queue",
+                    modifier = Modifier.size(ActionIconSize)
+                )
+            }
+            DownloadButton(
+                episodeTitle = episodeTitle,
+                download = download,
+                onDownload = onDownload,
+                onRemove = onRemoveDownload,
+                modifier = Modifier.size(ActionButtonSize),
+                iconSize = ActionIconSize
+            )
+            EpisodeActionsMenu(
+                episodeTitle = episodeTitle,
+                isPlayed = isPlayed,
+                download = download,
+                onEnqueue = onEnqueue,
+                onDownload = onDownload,
+                onRemoveDownload = onRemoveDownload,
+                onTogglePlayed = onTogglePlayed,
+                includeDownload = false,
+                includeEnqueue = false,
+                buttonSize = ActionButtonSize,
+                iconSize = ActionIconSize
+            )
         }
-        DownloadButton(
-            episodeTitle = episodeTitle,
-            download = download,
-            onDownload = onDownload,
-            onRemove = onRemoveDownload
-        )
-        EpisodeActionsMenu(
-            episodeTitle = episodeTitle,
-            isPlayed = isPlayed,
-            download = download,
-            onEnqueue = onEnqueue,
-            onDownload = onDownload,
-            onRemoveDownload = onRemoveDownload,
-            onTogglePlayed = onTogglePlayed,
-            includeDownload = false,
-            includeEnqueue = false
-        )
     }
 }
+
+private val ActionButtonSize = 40.dp
+private val ActionIconSize = 20.dp

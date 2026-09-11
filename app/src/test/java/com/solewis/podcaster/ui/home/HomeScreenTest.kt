@@ -1,11 +1,14 @@
 package com.solewis.podcaster.ui.home
 
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.common.truth.Truth.assertThat
 import com.solewis.podcaster.AppContainer
 import com.solewis.podcaster.testing.TestGraph
 import com.solewis.podcaster.testing.awaitText
@@ -81,6 +84,29 @@ class HomeScreenTest {
         compose.onNodeWithTag(TestTags.enqueueButton("An Episode")).assertExists()
         compose.onNodeWithTag(TestTags.downloadButton(null)).assertExists()
         compose.onNodeWithTag(TestTags.episodeMenu("An Episode")).assertExists()
+    }
+
+    /**
+     * Reported: left-aligned, the play button sat about 12dp in from the row's left edge - an
+     * IconButton centres its icon in a larger box - so it lined up with neither the artwork above
+     * it nor the text beside that, and read as a misalignment rather than a choice. Against the
+     * right edge there is nothing for it to fail to line up against.
+     */
+    @Test
+    fun the_action_row_is_aligned_to_the_right_edge_rather_than_the_left() {
+        launch()
+
+        val root = compose.onRoot().getUnclippedBoundsInRoot()
+        val play = compose.onNodeWithContentDescription("Play An Episode").getUnclippedBoundsInRoot()
+        val menu = compose.onNodeWithTag(TestTags.episodeMenu("An Episode")).getUnclippedBoundsInRoot()
+
+        // The overflow menu is the last control, so it is the one that has to reach the right edge -
+        // allowing for the row's own 16dp horizontal padding.
+        assertThat((root.right - menu.right).value).isLessThan(20f)
+        // Stated as a comparison of the two margins rather than against the middle of the row, so
+        // that it says the same thing at any screen width: the whole group is pushed right, not
+        // just the last icon in it. Left-aligned, the space left over sat on the right instead.
+        assertThat(play.left.value).isGreaterThan((root.right - menu.right).value)
     }
 
     @Test
