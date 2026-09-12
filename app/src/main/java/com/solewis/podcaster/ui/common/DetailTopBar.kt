@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.HorizontalDivider
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -50,10 +53,10 @@ fun DetailTopBar(
     Surface(modifier = modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
         Column {
             Row(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(end = 8.dp),
+                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBack) {
+                IconButton(onClick = onBack, modifier = Modifier.width(BackButtonWidth)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
                 Text(
@@ -62,11 +65,24 @@ fun DetailTopBar(
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    // Centred in the bar itself, not in the space left over beside the back button -
+                    // those are different places, and the second one reads as very slightly off.
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f).testTag(TestTags.screenTitle(title))
                 )
-                actions()
+                // Balances the back button's width so the title's centre is the bar's centre. Holds
+                // whatever `actions` puts here, and is an empty spacer of exactly that width when
+                // there is nothing - which is the usual case.
+                Row(
+                    modifier = Modifier.widthIn(min = BackButtonWidth),
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = actions
+                )
             }
             HorizontalDivider()
         }
     }
 }
+
+/** The back button's footprint, mirrored on the trailing side so the title centres on the bar. */
+private val BackButtonWidth = 48.dp

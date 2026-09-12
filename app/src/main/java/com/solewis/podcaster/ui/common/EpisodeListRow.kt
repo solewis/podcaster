@@ -9,7 +9,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -45,7 +48,9 @@ fun EpisodeDescriptionPreview(text: String?, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
-        modifier = modifier
+        // A little more air above than the row's own 4dp spacing gives, so this does not read as
+        // tight up against the bottom edge of the artwork it sits under.
+        modifier = modifier.padding(top = 4.dp)
     )
 }
 
@@ -86,17 +91,19 @@ fun EpisodeMetaAndProgressRow(
  * Play, add to queue, download, and everything else - the four controls a list row offers, in one
  * place so the Home feed and a show's episode list can't drift apart on what a row can do.
  *
- * Add to queue and download are now standalone buttons rather than menu items, which is why both
- * are turned off inside [EpisodeActionsMenu] here: offering the same action from a button and from
- * the menu it sits next to invites the reading that the two do something different.
+ * Add to queue and download are standalone buttons *and* still listed in the menu beside them. The
+ * duplication is deliberate: the buttons are unlabelled icons, and the menu is where you find out
+ * what they do, so dropping the menu entries would leave someone who doesn't recognise an icon with
+ * nowhere to look it up.
  *
- * Right-aligned, and drawn smaller than a default [IconButton]. Left-aligned, the first icon sat
- * about 12dp in from the row's left edge - an `IconButton` centres a 24dp icon in a 48dp box - so
- * it lined up with neither the artwork above it nor the text beside that, and read as a mistake.
- * Against the right edge there is nothing for it to fail to line up with, and the row's natural
- * reading order (artwork, title, description, metadata) ends where the controls begin.
+ * Play is separated from the rest: a filled circle in the accent colour, alone against the right
+ * edge, with the secondary controls gathered at the left. It is the reason the row exists and by
+ * far the most-tapped thing on it, and as a fourth bare icon in a line of four it was the same
+ * weight as "add to queue". The gap between the two groups is doing the work here - a filled
+ * button that still sat shoulder to shoulder with the others would read as a toolbar with one
+ * coloured item in it.
  *
- * [ActionButtonSize] then buys back most of the vertical space this row costs. Suppressing
+ * [ActionButtonSize] buys back most of the vertical space this row costs. Suppressing
  * [LocalMinimumInteractiveComponentSize] is what makes that size real rather than advisory:
  * Material3 otherwise pads every icon button back out to a 48dp layout footprint, so sizing the
  * button alone changes where the icon is drawn and nothing about how tall the row is. 40dp is still
@@ -119,19 +126,65 @@ fun EpisodeActionRow(
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
         Row(
             modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onEnqueue,
+                    modifier = Modifier.size(ActionButtonSize).testTag(TestTags.enqueueButton(episodeTitle))
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.PlaylistAdd,
+                        contentDescription = "Add $episodeTitle to queue",
+                        modifier = Modifier.size(ActionIconSize)
+                    )
+                }
+                DownloadButton(
+                    episodeTitle = episodeTitle,
+                    download = download,
+                    onDownload = onDownload,
+                    onRemove = onRemoveDownload,
+                    modifier = Modifier.size(ActionButtonSize),
+                    iconSize = ActionIconSize
+                )
+                EpisodeActionsMenu(
+                    episodeTitle = episodeTitle,
+                    isPlayed = isPlayed,
+                    download = download,
+                    onEnqueue = onEnqueue,
+                    onDownload = onDownload,
+                    onRemoveDownload = onRemoveDownload,
+                    onTogglePlayed = onTogglePlayed,
+                    buttonSize = ActionButtonSize,
+                    iconSize = ActionIconSize
+                )
+            }
+
+            FilledIconButton(
                 onClick = onPlayOrToggle,
                 enabled = !isLoading,
-                modifier = Modifier.size(ActionButtonSize)
+                shape = CircleShape,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                modifier = Modifier.size(PlayButtonSize)
             ) {
                 when {
                     // A spinner in the button's own place, not beside it, so the row does not reflow -
                     // the wait between tapping play and hearing anything (controller connection, then
                     // buffering) is real and used to look like nothing had happened.
-                    isLoading -> CircularProgressIndicator(modifier = Modifier.size(ActionIconSize), strokeWidth = 2.dp)
+                    isLoading -> CircularProgressIndicator(
+                        modifier = Modifier.size(ActionIconSize),
+                        strokeWidth = 2.dp,
+                        // On the filled container, not on the page behind it.
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+
                     isPlaying -> Icon(
                         Icons.Default.Pause,
                         contentDescription = "Pause $episodeTitle",
@@ -145,40 +198,15 @@ fun EpisodeActionRow(
                     )
                 }
             }
-            IconButton(
-                onClick = onEnqueue,
-                modifier = Modifier.size(ActionButtonSize).testTag(TestTags.enqueueButton(episodeTitle))
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.PlaylistAdd,
-                    contentDescription = "Add $episodeTitle to queue",
-                    modifier = Modifier.size(ActionIconSize)
-                )
-            }
-            DownloadButton(
-                episodeTitle = episodeTitle,
-                download = download,
-                onDownload = onDownload,
-                onRemove = onRemoveDownload,
-                modifier = Modifier.size(ActionButtonSize),
-                iconSize = ActionIconSize
-            )
-            EpisodeActionsMenu(
-                episodeTitle = episodeTitle,
-                isPlayed = isPlayed,
-                download = download,
-                onEnqueue = onEnqueue,
-                onDownload = onDownload,
-                onRemoveDownload = onRemoveDownload,
-                onTogglePlayed = onTogglePlayed,
-                includeDownload = false,
-                includeEnqueue = false,
-                buttonSize = ActionButtonSize,
-                iconSize = ActionIconSize
-            )
         }
     }
 }
 
 private val ActionButtonSize = 40.dp
 private val ActionIconSize = 20.dp
+
+/**
+ * The same footprint as the bare icon buttons beside it. The filled circle and the gap already say
+ * this is the row's main control, so extra size on top of both read as heavy rather than emphatic.
+ */
+private val PlayButtonSize = 40.dp

@@ -39,7 +39,6 @@ import com.solewis.podcaster.data.db.model.HomeShowSummary
 import com.solewis.podcaster.ui.common.EmptyState
 import com.solewis.podcaster.ui.common.EpisodeActionRow
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
-import com.solewis.podcaster.ui.common.EpisodeArtworkShape
 import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
 import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.downloadStatusLabel
@@ -151,8 +150,7 @@ private fun FeedEpisodeRow(
         Row(verticalAlignment = Alignment.CenterVertically) {
             PodcastArtwork(
                 artworkUrl = episode.artworkUrl ?: episode.podcastArtworkUrl,
-                modifier = Modifier.size(EpisodeArtworkSize),
-                shape = EpisodeArtworkShape
+                modifier = Modifier.size(EpisodeArtworkSize)
             )
             Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(

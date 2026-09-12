@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.ui.common.DetailTopBar
 import com.solewis.podcaster.ui.common.EmptyState
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
-import com.solewis.podcaster.ui.common.EpisodeArtworkShape
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.common.formatBytes
@@ -91,8 +90,7 @@ fun StreamCacheScreen(
                     ) {
                         PodcastArtwork(
                             artworkUrl = episode?.artworkUrl ?: episode?.podcastArtworkUrl,
-                            modifier = Modifier.size(EpisodeArtworkSize),
-                            shape = EpisodeArtworkShape
+                            modifier = Modifier.size(EpisodeArtworkSize)
                         )
                         Column(
                             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),

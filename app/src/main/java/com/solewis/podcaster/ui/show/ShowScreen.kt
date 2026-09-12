@@ -72,7 +72,6 @@ import com.solewis.podcaster.ui.common.EpisodeActionRow
 import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
 import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.downloadStatusLabel
-import com.solewis.podcaster.ui.common.EpisodeArtworkShape
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.SubscribeButton
@@ -397,8 +396,7 @@ private fun EpisodeRow(
             // in both lists rather than showing art in one place and a bare row in the other.
             PodcastArtwork(
                 artworkUrl = episode.artworkUrl ?: podcastArtworkUrl,
-                modifier = Modifier.size(EpisodeArtworkSize),
-                shape = EpisodeArtworkShape
+                modifier = Modifier.size(EpisodeArtworkSize)
             )
 
             Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {

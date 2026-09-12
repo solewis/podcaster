@@ -1,6 +1,5 @@
 package com.solewis.podcaster.ui.episodedetail
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,13 +25,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,7 +47,6 @@ import com.solewis.podcaster.ui.common.htmlToAnnotatedString
 import androidx.compose.ui.platform.testTag
 import com.solewis.podcaster.ui.common.TestTags
 
-private const val COLLAPSED_DESCRIPTION_LINES = 8
 
 @Composable
 fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
@@ -238,26 +233,9 @@ private fun DescriptionSection(descriptionHtml: String?) {
         return
     }
 
-    var expanded by remember(description) { mutableStateOf(false) }
-    // Only worth offering the toggle once the text actually overflows - short notes shouldn't
-    // grow a "Show more" that does nothing.
-    var overflows by remember(description) { mutableStateOf(false) }
-
-    Text(
-        description,
-        style = MaterialTheme.typography.bodyMedium,
-        maxLines = if (expanded) Int.MAX_VALUE else COLLAPSED_DESCRIPTION_LINES,
-        overflow = TextOverflow.Ellipsis,
-        onTextLayout = { if (!expanded) overflows = it.hasVisualOverflow },
-        modifier = Modifier.animateContentSize()
-    )
-
-    if (overflows || expanded) {
-        TextButton(
-            onClick = { expanded = !expanded },
-            modifier = Modifier.padding(top = 4.dp)
-        ) {
-            Text(if (expanded) "Show less" else "Show more")
-        }
-    }
+    // Shown in full, with no collapse. Truncating at eight lines was worth a tap when it saved you
+    // scrolling past the notes to reach something - but the description is the last thing on this
+    // screen, so the only thing "Show more" ever revealed was the text directly above where the
+    // button itself had been.
+    Text(description, style = MaterialTheme.typography.bodyMedium)
 }

@@ -87,26 +87,26 @@ class HomeScreenTest {
     }
 
     /**
-     * Reported: left-aligned, the play button sat about 12dp in from the row's left edge - an
-     * IconButton centres its icon in a larger box - so it lined up with neither the artwork above
-     * it nor the text beside that, and read as a misalignment rather than a choice. Against the
-     * right edge there is nothing for it to fail to line up against.
+     * Play is held apart from the rest of the controls - alone against the right edge, with queue,
+     * download and the overflow menu gathered at the left. As one more bare icon in a line of four
+     * it carried the same weight as "add to queue", which is not what the row is for.
      */
     @Test
-    fun the_action_row_is_aligned_to_the_right_edge_rather_than_the_left() {
+    fun play_sits_alone_at_the_right_with_the_other_controls_gathered_left() {
         launch()
 
         val root = compose.onRoot().getUnclippedBoundsInRoot()
         val play = compose.onNodeWithContentDescription("Play An Episode").getUnclippedBoundsInRoot()
+        val queue = compose.onNodeWithTag(TestTags.enqueueButton("An Episode")).getUnclippedBoundsInRoot()
         val menu = compose.onNodeWithTag(TestTags.episodeMenu("An Episode")).getUnclippedBoundsInRoot()
 
-        // The overflow menu is the last control, so it is the one that has to reach the right edge -
-        // allowing for the row's own 16dp horizontal padding.
-        assertThat((root.right - menu.right).value).isLessThan(20f)
-        // Stated as a comparison of the two margins rather than against the middle of the row, so
-        // that it says the same thing at any screen width: the whole group is pushed right, not
-        // just the last icon in it. Left-aligned, the space left over sat on the right instead.
-        assertThat(play.left.value).isGreaterThan((root.right - menu.right).value)
+        // Play reaches the right edge, allowing for the row's own 16dp horizontal padding.
+        assertThat((root.right - play.right).value).isLessThan(20f)
+        // The secondary controls start at the left edge, by the same margin.
+        assertThat(queue.left.value).isLessThan(20f)
+        // And there is real space between the two groups, which is what separates play rather than
+        // the fill alone - shoulder to shoulder it would read as a toolbar with one coloured item.
+        assertThat((play.left - menu.right).value).isGreaterThan(24f)
     }
 
     @Test

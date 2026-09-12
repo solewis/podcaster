@@ -11,6 +11,7 @@ import androidx.media3.common.MediaItem
 import com.solewis.podcaster.testing.AudioHost
 import com.solewis.podcaster.testing.PlayerBackedPlayback
 import com.solewis.podcaster.testing.awaitPlayer
+import com.solewis.podcaster.testing.cancelAndClose
 import com.solewis.podcaster.testing.onMain
 import com.solewis.podcaster.testing.silenceSource
 import com.solewis.podcaster.data.db.PodcasterDatabase
@@ -20,7 +21,6 @@ import com.solewis.podcaster.data.repo.EpisodeRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -116,9 +116,9 @@ class ProgressWriterIntegrationTest {
     @After
     fun tearDown() {
         onMain { player.release() }
-        scope.cancel()
         audio.close()
-        db.close()
+        // See [cancelAndClose]: the progress writer's own coroutine can still be mid-write here.
+        cancelAndClose(scope, db)
     }
 
     private fun loadEpisode(durationMillis: Long) {
