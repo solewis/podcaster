@@ -413,9 +413,15 @@ private fun SpeedControl(currentSpeed: Float, onSpeedChange: (Float) -> Unit) {
 private fun secondaryControlColors() =
     ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
 
-/** Between the three controls under the scrubber - they sat almost touching, which read as
- * one lump rather than three separate things to press. */
-private val SECONDARY_CONTROL_SPACING = 12.dp
+/**
+ * Between the three controls under the scrubber - they sat almost touching, which read as one lump
+ * rather than three separate things to press.
+ *
+ * Reads as less than it is, which is why it took two goes: each of these buttons already carries
+ * its own content padding inside its touch target, so a good part of the apparent gap is the
+ * buttons themselves and only this much is real space between them.
+ */
+private val SECONDARY_CONTROL_SPACING = 28.dp
 
 /** One size for the three controls under the transport row, so they read as a set. */
 private val SecondaryControlIconSize = 20.dp

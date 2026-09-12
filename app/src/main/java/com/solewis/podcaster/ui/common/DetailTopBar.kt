@@ -16,6 +16,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +50,13 @@ fun DetailTopBar(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Off, the bar keeps its shape and its back button but shows no name. For a screen that already
+     * prints the title in its content, this is how the bar takes the title over once the content's
+     * own copy has scrolled away - faded rather than swapped, so the two never both read as the
+     * heading and nothing jumps when they trade.
+     */
+    showTitle: Boolean = true,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     // Opaque, because the content it pins itself above scrolls underneath it.
@@ -59,17 +69,30 @@ fun DetailTopBar(
                 IconButton(onClick = onBack, modifier = Modifier.width(BackButtonWidth)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    // Centred in the bar itself, not in the space left over beside the back button -
-                    // those are different places, and the second one reads as very slightly off.
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f).testTag(TestTags.screenTitle(title))
-                )
+                // Composed away rather than made transparent when hidden: an invisible heading
+                // that a screen reader still announces is not hidden in any sense that matters, and
+                // it is the difference between a test being able to say "there is no title here"
+                // and not. The weight stays on the AnimatedVisibility itself, so the slot holds its
+                // width either way and the back button does not shift when a title arrives.
+                AnimatedVisibility(
+                    visible = showTitle,
+                    modifier = Modifier.weight(1f),
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        // Centred in the bar itself, not in the space left over beside the back
+                        // button - those are different places, and the second one reads as very
+                        // slightly off.
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().testTag(TestTags.screenTitle(title))
+                    )
+                }
                 // Balances the back button's width so the title's centre is the bar's centre. Holds
                 // whatever `actions` puts here, and is an empty spacer of exactly that width when
                 // there is nothing - which is the usual case.
