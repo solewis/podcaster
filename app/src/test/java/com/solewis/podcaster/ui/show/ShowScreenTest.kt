@@ -1,6 +1,7 @@
 package com.solewis.podcaster.ui.show
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollToNode
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.google.common.truth.Truth.assertThat
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.solewis.podcaster.data.db.model.SortOrder
 import com.solewis.podcaster.testing.TestGraph
 import com.solewis.podcaster.testing.awaitText
 import com.solewis.podcaster.testing.episodeRow
@@ -283,6 +285,78 @@ class ShowScreenTest {
 
         // Wholly below the tab row, not tucked under it. Its own top edge is what was being eaten.
         assertThat(target.top.value).isAtLeast(tabsBottom.value)
+    }
+
+    /**
+     * Refresh moved off the list and into the menu: opening a show already checks the feed, and a
+     * periodic job checks them all, so a permanent button invited doing by hand what had just been
+     * done automatically.
+     */
+    @Test
+    fun refresh_is_in_the_menu_rather_than_beside_the_list() {
+        openShow()
+
+        compose.onNodeWithContentDescription("Check for new episodes").assertDoesNotExist()
+
+        compose.onNodeWithTag(TestTags.SHOW_MENU).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag(TestTags.REFRESH_SHOW).assertExists()
+        compose.onNodeWithTag(TestTags.UNSUBSCRIBE_MENU_ITEM).assertExists()
+    }
+
+    @Test
+    fun the_options_button_names_the_sort_order_and_opens_the_sheet() {
+        openShow()
+
+        compose.onNodeWithText("Newest first").assertExists()
+
+        compose.onNodeWithTag(TestTags.EPISODE_OPTIONS).performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithTag(TestTags.sortOption(SortOrder.OLDEST_FIRST)).assertExists()
+        compose.onNodeWithTag(TestTags.filterOption(EpisodeFilter.DOWNLOADED)).assertExists()
+        // Defaults, stated in the sheet rather than only implied by the list.
+        compose.onNodeWithTag(TestTags.sortOption(SortOrder.NEWEST_FIRST)).assertIsSelected()
+        compose.onNodeWithTag(TestTags.filterOption(EpisodeFilter.ALL)).assertIsSelected()
+    }
+
+    @Test
+    fun choosing_oldest_first_in_the_sheet_relabels_the_button() {
+        openShow()
+        compose.onNodeWithTag(TestTags.EPISODE_OPTIONS).performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithTag(TestTags.sortOption(SortOrder.OLDEST_FIRST)).performClick()
+        compose.waitForIdle()
+
+        // The label tracks the sort order and nothing else - it is what the control has always
+        // said, and the only thing anyone reads it for.
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithText("Oldest first").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    /**
+     * A filter hides episodes without changing the label, so the icon has to carry that - otherwise
+     * a list quietly missing half a show looks like a list that has lost half a show.
+     */
+    @Test
+    fun filtering_to_not_finished_hides_the_finished_episodes() {
+        // Numbered above the filler episodes so it sorts first and is actually on screen to begin
+        // with. Left at the bottom it would be past the fold and uncomposed, and "no Patient Zero
+        // in the tree" would be true whether the filter worked or not.
+        openShow(positionMillis = 51 * 60_000L, isPlayed = true, extraEpisodes = 3, episodeKey = "9")
+        scrollToFirstEpisode()
+
+        compose.onNodeWithTag(TestTags.EPISODE_OPTIONS).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag(TestTags.filterOption(EpisodeFilter.UNFINISHED)).performClick()
+        compose.waitForIdle()
+
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithText("Patient Zero", useUnmergedTree = true)
+                .fetchSemanticsNodes().isEmpty()
+        }
     }
 
     @Test

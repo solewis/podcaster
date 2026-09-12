@@ -42,6 +42,13 @@ object TestTags {
     const val CLEAR_PLAYBACK_LOG = "clearPlaybackLog"
     const val SHOW_MENU = "showMenu"
     const val MARK_ALL_PLAYED = "markAllPlayed"
+    const val REFRESH_SHOW = "refreshShow"
+    const val UNSUBSCRIBE_MENU_ITEM = "unsubscribeMenuItem"
+    const val EPISODE_OPTIONS = "episodeOptions"
+    const val EPISODE_OPTIONS_SHEET = "episodeOptionsSheet"
+
+    fun sortOption(order: com.solewis.podcaster.data.db.model.SortOrder) = "sortOption:${order.name}"
+    fun filterOption(filter: com.solewis.podcaster.ui.show.EpisodeFilter) = "filterOption:${filter.name}"
     const val MENU_ENQUEUE = "menuEnqueue"
     const val MENU_TOGGLE_PLAYED = "menuTogglePlayed"
     const val MENU_DOWNLOAD = "menuDownload"

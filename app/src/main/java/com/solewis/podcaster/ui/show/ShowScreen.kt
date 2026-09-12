@@ -22,9 +22,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -32,6 +35,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SnackbarHost
@@ -59,6 +65,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -108,6 +115,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     var highlightedEpisodeId by remember { mutableStateOf<String?>(null) }
     var pendingUnsubscribe by remember { mutableStateOf(false) }
     var showMenuOpen by remember { mutableStateOf(false) }
+    var optionsOpen by remember { mutableStateOf(false) }
 
     // Same mechanism as the episode screen: compare where the show's name currently is against
     // where the bar is, rather than guessing a scroll offset that the artwork and author line
@@ -179,6 +187,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                             menuOpen = showMenuOpen,
                             onMenuOpenChange = { showMenuOpen = it },
                             onMarkAllPlayed = viewModel::markAllPlayed,
+                            onRefresh = viewModel::refresh,
                             onTitleBottomChanged = { titleBottom = it }
                         )
                     }
@@ -204,9 +213,9 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                         item(key = SORT_KEY) {
                             EpisodeListControls(
                                 sortOrder = podcast.sortOrder,
+                                filter = state.filter,
                                 isRefreshing = isRefreshing,
-                                onToggleSort = viewModel::toggleSortOrder,
-                                onRefresh = viewModel::refresh
+                                onOpenOptions = { optionsOpen = true }
                             )
                         }
                         items(state.episodes, key = { it.id }) { episode ->
@@ -274,6 +283,18 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
         }
     }
 
+    if (optionsOpen) {
+        state.podcast?.let { podcast ->
+            EpisodeListOptionsSheet(
+                sortOrder = podcast.sortOrder,
+                filter = state.filter,
+                onSortOrderChange = viewModel::setSortOrder,
+                onFilterChange = viewModel::setFilter,
+                onDismiss = { optionsOpen = false }
+            )
+        }
+    }
+
     if (pendingUnsubscribe) {
         state.podcast?.let { podcast ->
             UnsubscribeConfirmDialog(
@@ -303,6 +324,7 @@ private fun ShowHeader(
     menuOpen: Boolean,
     onMenuOpenChange: (Boolean) -> Unit,
     onMarkAllPlayed: () -> Unit,
+    onRefresh: () -> Unit,
     onTitleBottomChanged: (Float) -> Unit
 ) {
     Column {
@@ -356,6 +378,19 @@ private fun ShowHeader(
                     Icon(Icons.Default.MoreVert, contentDescription = "More actions for this show")
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }) {
+                    // Refresh lives here rather than beside the list. Opening a show already checks
+                    // the feed, and a periodic job checks them all, so a permanent button was an
+                    // invitation to do by hand something the app has already done - but it is worth
+                    // keeping for the moment you know a new episode is out and want it now.
+                    DropdownMenuItem(
+                        text = { Text("Check for new episodes") },
+                        leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                        onClick = {
+                            onMenuOpenChange(false)
+                            onRefresh()
+                        },
+                        modifier = Modifier.testTag(TestTags.REFRESH_SHOW)
+                    )
                     DropdownMenuItem(
                         text = { Text("Mark all as played") },
                         leadingIcon = { Icon(Icons.Default.DoneAll, contentDescription = null) },
@@ -365,6 +400,15 @@ private fun ShowHeader(
                         },
                         modifier = Modifier.testTag(TestTags.MARK_ALL_PLAYED)
                     )
+                    DropdownMenuItem(
+                        text = { Text("Unsubscribe") },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                        onClick = {
+                            onMenuOpenChange(false)
+                            onUnsubscribe()
+                        },
+                        modifier = Modifier.testTag(TestTags.UNSUBSCRIBE_MENU_ITEM)
+                    )
                 }
             }
         }
@@ -372,29 +416,109 @@ private fun ShowHeader(
     }
 }
 
-/** Sort order and refresh - the controls for the episode list rather than for the show. */
+/**
+ * How the episode list is sorted and filtered, as one control that opens [EpisodeListOptionsSheet].
+ *
+ * The label names the sort order only, even when a filter is on. That is what this used to say and
+ * it is what people read it for - but it does mean a filtered list could otherwise look like a
+ * complete one, so the icon takes the accent colour whenever something is being hidden. A list
+ * quietly missing episodes is a worse outcome than a slightly busier button.
+ */
 @Composable
 private fun EpisodeListControls(
     sortOrder: SortOrder,
+    filter: EpisodeFilter,
     isRefreshing: Boolean,
-    onToggleSort: () -> Unit,
-    onRefresh: () -> Unit
+    onOpenOptions: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TextButton(onClick = onToggleSort) {
+        TextButton(onClick = onOpenOptions, modifier = Modifier.testTag(TestTags.EPISODE_OPTIONS)) {
+            Icon(
+                Icons.Default.Tune,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = if (filter == EpisodeFilter.ALL) LocalContentColor.current
+                else MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(6.dp))
             Text(if (sortOrder == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first")
         }
         Spacer(modifier = Modifier.weight(1f))
+        // The only trace refresh leaves on this screen now that its button has moved into the menu:
+        // without it a tap on the menu item would look like nothing happened at all.
         if (isRefreshing) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp).padding(horizontal = 12.dp))
-        } else {
-            IconButton(onClick = onRefresh) {
-                Icon(Icons.Default.Refresh, contentDescription = "Check for new episodes")
+        }
+    }
+}
+
+/**
+ * Sort order and filter together in one sheet, because they are one question - what do you want to
+ * see and in what order - and because a filter needs somewhere its options are all visible at once.
+ * The old control cycled the sort order on every tap, which could only ever offer two states and
+ * had nowhere to put a third thing.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EpisodeListOptionsSheet(
+    sortOrder: SortOrder,
+    filter: EpisodeFilter,
+    onSortOrderChange: (SortOrder) -> Unit,
+    onFilterChange: (EpisodeFilter) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.testTag(TestTags.EPISODE_OPTIONS_SHEET)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
+            OptionsSectionLabel("Sort")
+            SortOrder.entries.forEach { option ->
+                OptionRow(
+                    label = if (option == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first",
+                    selected = option == sortOrder,
+                    testTag = TestTags.sortOption(option),
+                    onClick = { onSortOrderChange(option) }
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            OptionsSectionLabel("Show")
+            EpisodeFilter.entries.forEach { option ->
+                OptionRow(
+                    label = option.label,
+                    selected = option == filter,
+                    testTag = TestTags.filterOption(option),
+                    onClick = { onFilterChange(option) }
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun OptionsSectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+    )
+}
+
+/** The whole row is the target, not just the button - a 24dp circle is a poor thing to aim at. */
+@Composable
+private fun OptionRow(label: String, selected: Boolean, testTag: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 12.dp)
+            .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
