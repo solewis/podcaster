@@ -67,6 +67,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -198,27 +199,33 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                         // Opaque: the episodes it pins above scroll underneath it.
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
-                            // Measured because the jump pill has to scroll its target clear of this
-                            // row - it now overlays the top of the list, and anything scrolled
+                            // Measured because the jump pill has to scroll its target clear of all
+                            // of this - it overlays the top of the list, and anything scrolled
                             // exactly to the top lands underneath it.
                             modifier = Modifier.onGloballyPositioned { tabsHeight = it.size.height }
                         ) {
-                            SecondaryTabRow(selectedTabIndex = selectedTab) {
-                                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Episodes") })
-                                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("About") })
+                            Column {
+                                SecondaryTabRow(selectedTabIndex = selectedTab) {
+                                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Episodes", style = TabLabelStyle) })
+                                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("About", style = TabLabelStyle) })
+                                }
+                                // Pinned with the tabs rather than scrolling away above them.
+                                // Changing how a list is sorted or filtered is something you decide
+                                // *while reading it*, and it used to mean scrolling back to the top
+                                // of the show to reach the control.
+                                if (selectedTab == 0) {
+                                    EpisodeListControls(
+                                        sortOrder = podcast.sortOrder,
+                                        filter = state.filter,
+                                        isRefreshing = isRefreshing,
+                                        onOpenOptions = { optionsOpen = true }
+                                    )
+                                }
                             }
                         }
                     }
 
                     if (selectedTab == 0) {
-                        item(key = SORT_KEY) {
-                            EpisodeListControls(
-                                sortOrder = podcast.sortOrder,
-                                filter = state.filter,
-                                isRefreshing = isRefreshing,
-                                onOpenOptions = { optionsOpen = true }
-                            )
-                        }
                         items(state.episodes, key = { it.id }) { episode ->
                             EpisodeRow(
                                 episode = episode,
@@ -286,11 +293,20 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
 
     if (optionsOpen) {
         state.podcast?.let { podcast ->
+            // Back to the top on either change. Both of them rewrite what the list contains, so
+            // whatever row you were parked on is either somewhere else entirely or gone - holding
+            // the scroll offset would land you at an arbitrary point in a list you have not seen.
             EpisodeListOptionsSheet(
                 sortOrder = podcast.sortOrder,
                 filter = state.filter,
-                onSortOrderChange = viewModel::setSortOrder,
-                onFilterChange = viewModel::setFilter,
+                onSortOrderChange = {
+                    viewModel.setSortOrder(it)
+                    scope.launch { listState.scrollToItem(0) }
+                },
+                onFilterChange = {
+                    viewModel.setFilter(it)
+                    scope.launch { listState.scrollToItem(0) }
+                },
                 onDismiss = { optionsOpen = false }
             )
         }
@@ -450,12 +466,15 @@ private fun EpisodeListControls(
                 // what a screen reader does not get - so the filter is named here when one is on.
                 contentDescription = if (filter == EpisodeFilter.ALL) null
                 else "Filtered to ${filter.label.lowercase()}",
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(22.dp),
                 tint = if (filter == EpisodeFilter.ALL) LocalContentColor.current
                 else MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.width(6.dp))
-            Text(if (sortOrder == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first")
+            Text(
+                if (sortOrder == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first",
+                style = TabLabelStyle
+            )
         }
         Spacer(modifier = Modifier.weight(1f))
         // The only trace refresh leaves on this screen now that its button has moved into the menu:
@@ -533,13 +552,20 @@ private fun OptionRow(label: String, selected: Boolean, testTag: String, onClick
     }
 }
 
+/**
+ * One size for the tab labels and the sort/filter label beside them - they sit in the same pinned
+ * block and are read as one set of controls, so they should not be two different sizes. A step up
+ * from the Material default, which at 14sp was legible but read as fine print.
+ */
+private val TabLabelStyle: TextStyle
+    @Composable get() = MaterialTheme.typography.titleMedium
+
 private const val HEADER_KEY = "showHeader"
 private const val TABS_KEY = "showTabs"
-private const val SORT_KEY = "episodeSort"
 private const val ABOUT_KEY = "about"
 
-/** Header, tab row and sort row all sit ahead of the episodes in the same list. */
-private const val EPISODES_LEADING_ITEMS = 3
+/** The header and the pinned block (tabs plus list controls) sit ahead of the episodes. */
+private const val EPISODES_LEADING_ITEMS = 2
 
 @Composable
 private fun AboutTab(podcast: PodcastEntity, episodeCount: Int) {
