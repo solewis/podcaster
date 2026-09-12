@@ -13,12 +13,12 @@ import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.repo.EpisodeRepository
 import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.testing.awaitPlayer
+import com.solewis.podcaster.testing.cancelAndClose
 import com.solewis.podcaster.testing.onMain
 import com.solewis.podcaster.testing.silenceSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -81,8 +81,11 @@ class AutoAdvancerTest {
     @After
     fun tearDown() {
         onMain { player.release() }
-        scope.cancel()
-        db.close()
+        // Joined, not just cancelled: an ending fires a queue lookup on this scope, and a test that
+        // only asserts the player stayed put finishes while that read is still in Room. See
+        // [cancelAndClose] - closing the database out from under it is what made the whole suite
+        // flaky, and it was never this class that got the blame.
+        cancelAndClose(scope, db)
     }
 
     private fun episode(key: String, chronoIndex: Int) = EpisodeEntity(

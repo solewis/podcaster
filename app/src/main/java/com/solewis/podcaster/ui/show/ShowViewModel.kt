@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.db.model.SortOrder
+import com.solewis.podcaster.data.repo.DownloadStatus
 import com.solewis.podcaster.data.repo.Downloads
 import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.repo.EpisodeRepository
@@ -17,7 +18,10 @@ import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayedMarker
 import com.solewis.podcaster.ui.common.formatDuration
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,14 +46,35 @@ class ShowViewModel(
         val podcast: PodcastEntity? = null,
         val episodes: List<EpisodeListItem> = emptyList(),
         val jump: JumpPillUi? = null,
+        val filter: EpisodeFilter = EpisodeFilter.ALL,
         val isLoading: Boolean = true
     )
 
+    /**
+     * Not persisted, unlike the sort order. A filter hides episodes, and a hidden episode you did
+     * not hide this session is how a library comes to look like it has lost things - so every
+     * launch starts from the whole list.
+     */
+    private val _filter = MutableStateFlow(EpisodeFilter.ALL)
+
+    /**
+     * Which episodes are on the device, as a set that only changes when one finishes or is removed.
+     *
+     * Deliberately not [downloadStates]: that map changes on every progress tick, and combining it
+     * into [state] would rebuild and re-sort the whole episode list several times a second for the
+     * duration of a download - the exact cost [downloadStates] exists separately to avoid.
+     */
+    private val downloadedIds: Flow<Set<String>> = downloads.observe()
+        .map { states -> states.filterValues { it.status == DownloadStatus.DOWNLOADED }.keys }
+        .distinctUntilChanged()
+
     val state: StateFlow<UiState> = combine(
         podcastRepository.observeById(podcastId),
-        episodeRepository.observeEpisodes(podcastId)
-    ) { podcast, episodes ->
-        buildUiState(podcast, episodes)
+        episodeRepository.observeEpisodes(podcastId),
+        _filter,
+        downloadedIds
+    ) { podcast, episodes, filter, downloaded ->
+        buildUiState(podcast, episodes, filter, downloaded)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
     /** Whatever is currently audible, so the row for it can move rather than step every 5s. */
@@ -159,10 +184,13 @@ class ShowViewModel(
         viewModelScope.launch { downloads.remove(episodeId) }
     }
 
-    fun toggleSortOrder() {
-        val current = state.value.podcast?.sortOrder ?: return
-        val next = if (current == SortOrder.NEWEST_FIRST) SortOrder.OLDEST_FIRST else SortOrder.NEWEST_FIRST
-        viewModelScope.launch { podcastRepository.setSortOrder(podcastId, next) }
+    fun setSortOrder(sortOrder: SortOrder) {
+        if (state.value.podcast?.sortOrder == sortOrder) return
+        viewModelScope.launch { podcastRepository.setSortOrder(podcastId, sortOrder) }
+    }
+
+    fun setFilter(filter: EpisodeFilter) {
+        _filter.value = filter
     }
 
     /**
@@ -182,14 +210,30 @@ class ShowViewModel(
     }
 
 
-    private fun buildUiState(podcast: PodcastEntity?, episodes: List<EpisodeListItem>): UiState {
+    private fun buildUiState(
+        podcast: PodcastEntity?,
+        episodes: List<EpisodeListItem>,
+        filter: EpisodeFilter,
+        downloadedIds: Set<String>
+    ): UiState {
         if (podcast == null) return UiState(podcast = null, isLoading = episodes.isEmpty())
 
-        val sorted = sortEpisodes(episodes, podcast.sortOrder)
+        val visible = episodes.filter { filter.accepts(it, downloadedIds) }
+        val sorted = sortEpisodes(visible, podcast.sortOrder)
+        // Resolved against the whole show, not the filtered view - which episode you were last on
+        // is a fact about the show. buildJumpPill then finds no row for it when the filter has
+        // hidden it, and returns null: a pill promising to jump somewhere not in the list would
+        // scroll to the wrong episode.
         val target = JumpTargetResolver.resolve(episodes)
         val jump = target?.let { buildJumpPill(it, episodes, sorted) }
 
-        return UiState(podcast = podcast, episodes = sorted, jump = jump, isLoading = false)
+        return UiState(
+            podcast = podcast,
+            episodes = sorted,
+            jump = jump,
+            filter = filter,
+            isLoading = false
+        )
     }
 
     private fun sortEpisodes(episodes: List<EpisodeListItem>, sortOrder: SortOrder): List<EpisodeListItem> {

@@ -8,6 +8,7 @@ import com.solewis.podcaster.data.repo.Downloads
 import com.solewis.podcaster.player.PlayerFactory
 import androidx.room.Room
 import com.solewis.podcaster.data.db.MIGRATION_1_2
+import com.solewis.podcaster.data.db.MIGRATION_2_3
 import com.solewis.podcaster.data.db.PodcasterDatabase
 import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.data.remote.HttpClient
@@ -146,7 +147,7 @@ class AppContainer(
                 PodcasterDatabase::class.java,
                 PodcasterDatabase.NAME
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

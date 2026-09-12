@@ -125,6 +125,7 @@ class SubscriptionRepository(
                 id = entity.id,
                 title = entity.title,
                 descriptionHtml = entity.descriptionHtml,
+                descriptionPreview = entity.descriptionPreview,
                 pubDateMillis = entity.pubDateMillis,
                 enclosureUrl = entity.enclosureUrl,
                 enclosureBytes = entity.enclosureBytes,
@@ -236,6 +237,10 @@ class SubscriptionRepository(
          * than this.
          */
         const val STALE_AFTER_MILLIS = 15 * 60 * 1000L
+
+        /** Long enough to read as a real excerpt rather than a fragment cut off mid-clause on a
+         * list row, short enough that two lines of `bodySmall` never overflows it first anyway. */
+        const val DESCRIPTION_PREVIEW_LENGTH = 200
     }
 
     private fun FeedToEpisodesMapper.MappedEpisode.toEntity(podcastId: Long, firstSeenAt: Long) = EpisodeEntity(
@@ -245,6 +250,7 @@ class SubscriptionRepository(
         stableKeySource = stableKeySource,
         title = title,
         descriptionHtml = descriptionHtml,
+        descriptionPreview = HtmlToText.toPlainText(descriptionHtml)?.take(DESCRIPTION_PREVIEW_LENGTH),
         pubDateMillis = pubDateMillis,
         enclosureUrl = enclosureUrl,
         enclosureBytes = enclosureBytes,

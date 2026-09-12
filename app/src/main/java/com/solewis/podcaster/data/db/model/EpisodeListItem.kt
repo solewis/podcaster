@@ -10,6 +10,7 @@ data class EpisodeListItem(
     val id: String,
     val podcastId: Long,
     val title: String,
+    val descriptionPreview: String? = null,
     val pubDateMillis: Long?,
     val durationMillis: Long?,
     val displayNumber: Int?,

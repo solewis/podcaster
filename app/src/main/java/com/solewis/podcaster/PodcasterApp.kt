@@ -33,6 +33,27 @@ open class PodcasterApp : Application(), SingletonImageLoader.Factory {
             RefreshAllWorker.schedule(this)
         }
         restoreLastPlayed()
+        backfillDescriptionPreviews()
+    }
+
+    /**
+     * One-time repair of the episode list's description previews for a library that predates the
+     * column - see [com.solewis.podcaster.data.repo.EpisodeRepository.backfillDescriptionPreviews]
+     * for why neither the migration nor a feed refresh covers it.
+     *
+     * On the app scope and off the main thread because it touches every episode once and then, on
+     * every subsequent launch, costs one indexed query returning nothing. Deliberately not blocking
+     * startup: a missing preview is a row that looks slightly plainer for a second, not a broken
+     * screen, and the list re-renders itself when the rows land.
+     *
+     * The repository is read here rather than inside the coroutine, matching [restoreLastPlayed].
+     * `onCreate` runs once per process, so an instrumentation test's [installContainer] lands after
+     * this - and a coroutine that resolved [container] when it happened to be scheduled could pick
+     * up a test's database and then still be querying it after that test closed it.
+     */
+    private fun backfillDescriptionPreviews() {
+        val episodes = container.episodeRepository
+        appScope.launch(Dispatchers.IO) { episodes.backfillDescriptionPreviews() }
     }
 
     /**

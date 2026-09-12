@@ -22,12 +22,17 @@ import coil3.compose.AsyncImage
  * through whenever there's no URL, the image is still loading, or the request fails (a fair few
  * real feeds have artwork hosts that reject requests or omit artwork entirely) - so there's never
  * a blank gap where a rounded rectangle full of nothing would otherwise sit.
+ *
+ * Rounded from the bottom of the shared shape scale by default. A radius is only ever read relative
+ * to what it is rounding, and the scale's `medium` took most of the corner off a 48dp thumbnail,
+ * which read as a squircle rather than as a picture of something. Screens showing artwork much
+ * larger than a list thumbnail pass a shape one or two steps up to keep the proportion similar.
  */
 @Composable
 fun PodcastArtwork(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.medium
+    shape: Shape = MaterialTheme.shapes.extraSmall
 ) {
     Box(
         modifier = modifier
@@ -54,5 +59,10 @@ fun PodcastArtwork(
  * Thumbnail size for an episode inside a list. Shared so the Home feed and a show's own episode
  * list stay identical - the same episode should not be a different size depending on which list you
  * happened to reach it from.
+ *
+ * Trimmed from 56dp once list rows grew a description preview and a row of controls: at 56 the
+ * artwork was competing with the text for the row rather than labelling it, and the row was tall
+ * enough already.
  */
-val EpisodeArtworkSize = 56.dp
+val EpisodeArtworkSize = 48.dp
+
