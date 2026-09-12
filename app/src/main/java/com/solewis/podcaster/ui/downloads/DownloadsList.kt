@@ -30,6 +30,7 @@ import com.solewis.podcaster.data.repo.DownloadStatus
 import com.solewis.podcaster.ui.common.EmptyState
 import com.solewis.podcaster.ui.common.EpisodeActionsMenu
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
+import com.solewis.podcaster.ui.common.EpisodeArtworkShape
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.common.formatBytes
@@ -75,7 +76,8 @@ fun DownloadsList(
                 ) {
                     PodcastArtwork(
                         artworkUrl = row.episode.artworkUrl ?: row.episode.podcastArtworkUrl,
-                        modifier = Modifier.size(EpisodeArtworkSize)
+                        modifier = Modifier.size(EpisodeArtworkSize),
+                        shape = EpisodeArtworkShape
                     )
                     Column(
                         modifier = Modifier.weight(1f).padding(horizontal = 12.dp),

@@ -60,3 +60,12 @@ fun PodcastArtwork(
  * enough already.
  */
 val EpisodeArtworkSize = 48.dp
+
+/**
+ * Corner rounding for that same thumbnail, one step down the shared shape scale from what larger
+ * artwork uses. A radius is only ever read relative to the thing it is rounding: `medium` (16dp) is
+ * a gentle curve on the show header's full-width cover and most of the corner on a 48dp thumbnail,
+ * where it started to read as a squircle rather than as a picture.
+ */
+val EpisodeArtworkShape: Shape
+    @Composable get() = MaterialTheme.shapes.extraSmall

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
@@ -32,9 +31,8 @@ import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.settings.PrefetchMode
 import com.solewis.podcaster.data.settings.SkipAmount
 import com.solewis.podcaster.data.settings.ThemeMode
+import com.solewis.podcaster.ui.common.DetailTopBar
 import com.solewis.podcaster.ui.common.formatBytes
-import com.solewis.podcaster.ui.common.BackButtonRow
-import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.SkipIcon
 import com.solewis.podcaster.ui.common.TestTags
 
@@ -47,18 +45,17 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, onOpenStrea
 
     Scaffold(
         modifier = Modifier.testTag(TestTags.SETTINGS_SCREEN),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        // Pinned rather than scrolled with the content: this screen is longer than any phone, and
+        // the back button used to scroll away with the title the moment you started reading it.
+        topBar = { DetailTopBar("Settings", onBack) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
-            BackButtonRow(onBack)
-            ScreenTitle("Settings")
-
             SettingSection("Skip back") {
                 SkipAmountRow(
                     selected = settings.skipBack,

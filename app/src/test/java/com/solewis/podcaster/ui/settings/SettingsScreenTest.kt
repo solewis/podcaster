@@ -1,10 +1,12 @@
 package com.solewis.podcaster.ui.settings
 
 import android.content.Context
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -56,6 +58,8 @@ class SettingsScreenTest {
     var openedStreamCache = false
         private set
 
+    private var wentBack = false
+
     private fun launch() {
         val viewModel = host.hosting(
             SettingsViewModel(store, PlaybackLog(logFolder.newFile()), streamCache, downloads)
@@ -64,7 +68,7 @@ class SettingsScreenTest {
             PodcasterTheme {
                 SettingsScreen(
                     viewModel = viewModel,
-                    onBack = {},
+                    onBack = { wentBack = true },
                     onOpenStreamCache = { openedStreamCache = true }
                 )
             }
@@ -203,5 +207,35 @@ class SettingsScreenTest {
         compose.waitForIdle()
 
         assertThat(downloads.removed).containsExactly("ep-1")
+    }
+
+    /**
+     * The title and the back button used to sit inside the scrolling content, so on a screen this
+     * long they were gone the moment you started reading it and the system gesture was the only way
+     * out. Reported from the phone.
+     */
+    @Test
+    fun the_header_and_its_back_button_stay_put_when_the_screen_is_scrolled() {
+        launch()
+
+        // Scrolling to the last section on the screen is what "scrolled down" has to mean here -
+        // a fixed pixel offset would stop being a scroll at all the first time the page got longer.
+        compose.onNodeWithTag(TestTags.REMOVE_ALL_DOWNLOADS).performScrollTo()
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription("Back").assertIsDisplayed()
+        compose.onNodeWithTag(TestTags.screenTitle("Settings")).assertIsDisplayed()
+    }
+
+    /** Whatever else moves, the way off the screen has to still be the way off the screen. */
+    @Test
+    fun the_pinned_back_button_still_navigates_back() {
+        launch()
+        compose.onNodeWithTag(TestTags.REMOVE_ALL_DOWNLOADS).performScrollTo()
+
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitForIdle()
+
+        assertThat(wentBack).isTrue()
     }
 }

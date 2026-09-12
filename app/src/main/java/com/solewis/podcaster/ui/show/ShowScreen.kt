@@ -72,6 +72,7 @@ import com.solewis.podcaster.ui.common.EpisodeActionRow
 import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
 import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.downloadStatusLabel
+import com.solewis.podcaster.ui.common.EpisodeArtworkShape
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.SubscribeButton
@@ -377,7 +378,10 @@ private fun EpisodeRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Row {
+        // Centred against the artwork rather than top-aligned. The column beside it holds two short
+        // lines to the artwork's 48dp, so aligning them to the top left the pair sitting high in the
+        // row with the slack collecting underneath, which read as a misalignment.
+        Row(verticalAlignment = Alignment.CenterVertically) {
             if (isHighlighted) {
                 Box(
                     modifier = Modifier
@@ -393,20 +397,24 @@ private fun EpisodeRow(
             // in both lists rather than showing art in one place and a bare row in the other.
             PodcastArtwork(
                 artworkUrl = episode.artworkUrl ?: podcastArtworkUrl,
-                modifier = Modifier.size(EpisodeArtworkSize)
+                modifier = Modifier.size(EpisodeArtworkSize),
+                shape = EpisodeArtworkShape
             )
 
             Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                val numberLabel = episode.displayNumber?.let { "Ep $it" }
+                // "Episode 1", not "Ep 1", and on a line of its own: this sits exactly where the
+                // Home feed puts the show's name, in the same weight and accent colour, so a row
+                // has the same shape in both lists. The date used to share this line and now goes
+                // where Home already puts it, in the metadata line under the description.
+                val numberLabel = episode.displayNumber?.let { "Episode $it" }
                     ?: episode.episodeType.takeIf { it != "full" }?.replaceFirstChar(Char::uppercase)
-                Row {
-                    numberLabel?.let {
-                        Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text("  ", style = MaterialTheme.typography.labelMedium)
-                    }
-                    formatEpisodeDate(episode.pubDateMillis)?.let {
-                        Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                numberLabel?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1
+                    )
                 }
                 Text(
                     episode.title,
@@ -418,14 +426,17 @@ private fun EpisodeRow(
             }
         }
 
-        EpisodeDescriptionPreview(episode.descriptionPreview, modifier = Modifier.padding(start = EpisodeArtworkSize + 12.dp))
+        // Flush with the artwork rather than indented past it, matching the Home feed. Indented,
+        // these lines started at a different place here than there for no reason a reader could
+        // see, and the row lost the left edge that the title, artwork and controls all share.
+        EpisodeDescriptionPreview(episode.descriptionPreview)
 
-        // Null date on purpose: this row already prints it in the header above, and passing
-        // it again would repeat it. Everything else - "20m left" vs "51m" vs "Finished", and
-        // whether a bar is drawn at all - is the same rule the Home feed and the detail
+        // The date now comes through here rather than from the row's header, which is where the
+        // Home feed has always carried it. Everything else - "20m left" vs "51m" vs "Finished",
+        // and whether a bar is drawn at all - is the same rule the Home feed and the detail
         // screen use, so an episode reads identically wherever you meet it.
         val progress = episodeProgressUi(
-            pubDateMillis = null,
+            pubDateMillis = episode.pubDateMillis,
             durationMillis = episode.durationMillis,
             positionMillis = episode.positionMillis,
             isPlayed = episode.isPlayed,
@@ -443,8 +454,7 @@ private fun EpisodeRow(
             isPlayed = episode.isPlayed,
             // This list keeps the default onSurface rather than the muted variant the Home feed
             // uses, so the tick's own line stays as legible as the titles above it.
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = EpisodeArtworkSize + 12.dp)
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         // This row had no pause state at all before this - it always drew a play arrow and always

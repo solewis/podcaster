@@ -1,6 +1,7 @@
 package com.solewis.podcaster.ui.show
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -48,14 +49,19 @@ class ShowScreenTest {
     @After
     fun tearDown() = graph.close()
 
-    private fun openShow(positionMillis: Long = 0, isPlayed: Boolean = false, descriptionPreview: String? = null) {
+    private fun openShow(
+        positionMillis: Long = 0,
+        isPlayed: Boolean = false,
+        descriptionPreview: String? = null,
+        pubDateMillis: Long? = null
+    ) {
         runBlocking {
             podcastId = graph.insertShow(title = "Radiolab")
             graph.insertEpisodes(
                 episodeRow(
                     podcastId, "1", title = "Patient Zero",
                     durationMillis = 51 * 60_000L, positionMillis = positionMillis, isPlayed = isPlayed,
-                    descriptionPreview = descriptionPreview
+                    descriptionPreview = descriptionPreview, pubDateMillis = pubDateMillis
                 )
             )
         }
@@ -124,12 +130,50 @@ class ShowScreenTest {
             .assertCountEquals(0)
     }
 
+    /**
+     * "Episode 1", spelled out and alone on the line where the Home feed puts the show's name, in
+     * the same weight and accent colour - the two lists had drifted into describing the same
+     * episode differently. The date it used to share this line with now sits in the metadata line
+     * below the description, which is where Home has always carried it.
+     */
     @Test
-    fun the_header_carries_the_episode_number_and_date() {
-        openShow()
+    fun the_header_names_the_episode_number_in_full_and_leaves_the_date_to_the_meta_line() {
+        openShow(pubDateMillis = 1_756_000_000_000L)
 
-        compose.awaitText("Ep 1")
-        compose.onAllNodesWithText("Ep 1", useUnmergedTree = true).assertCountEquals(1)
+        compose.awaitText("Episode 1")
+        compose.onAllNodesWithText("Episode 1", useUnmergedTree = true).assertCountEquals(1)
+        compose.onAllNodesWithText("Ep 1", useUnmergedTree = true).assertCountEquals(0)
+
+        // Unmerged throughout: the row is clickable, so the merged tree collapses every Text in it
+        // into one node whose bounds are the whole row - the trap the tests above document.
+        val date = compose.onAllNodesWithText("Aug", substring = true, useUnmergedTree = true)
+        date.assertCountEquals(1)
+        // Below the description, not up in the header beside the episode number.
+        assertThat(date[0].getUnclippedBoundsInRoot().top.value)
+            .isGreaterThan(
+                compose.onAllNodesWithText("Episode 1", useUnmergedTree = true)[0]
+                    .getUnclippedBoundsInRoot().bottom.value
+            )
+    }
+
+    /**
+     * The description and the metadata line used to be indented past the artwork, so this list
+     * started them at a different place than the Home feed did, and the row lost the single left
+     * edge its title, artwork and controls all otherwise share.
+     */
+    @Test
+    fun the_description_and_meta_line_share_the_rows_left_edge_with_the_artwork() {
+        openShow(descriptionPreview = "Real show notes go here.")
+
+        val titleLeft = compose.onAllNodesWithText("Patient Zero", useUnmergedTree = true)[0]
+            .getUnclippedBoundsInRoot().left
+        val descriptionLeft =
+            compose.onAllNodesWithText("Real show notes go here.", useUnmergedTree = true)[0]
+                .getUnclippedBoundsInRoot().left
+
+        // The title is the indented one - it sits beside the artwork - so the description starting
+        // to the left of it is exactly what "flush with the artwork" looks like from here.
+        assertThat(descriptionLeft.value).isLessThan(titleLeft.value)
     }
 
     @Test

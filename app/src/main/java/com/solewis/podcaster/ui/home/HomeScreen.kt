@@ -39,6 +39,7 @@ import com.solewis.podcaster.data.db.model.HomeShowSummary
 import com.solewis.podcaster.ui.common.EmptyState
 import com.solewis.podcaster.ui.common.EpisodeActionRow
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
+import com.solewis.podcaster.ui.common.EpisodeArtworkShape
 import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
 import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.downloadStatusLabel
@@ -145,10 +146,13 @@ private fun FeedEpisodeRow(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Row {
+        // Centred against the artwork for the same reason the show's own list is - and centred in
+        // both so that a row does not sit differently depending on which list you reached it from.
+        Row(verticalAlignment = Alignment.CenterVertically) {
             PodcastArtwork(
                 artworkUrl = episode.artworkUrl ?: episode.podcastArtworkUrl,
-                modifier = Modifier.size(EpisodeArtworkSize)
+                modifier = Modifier.size(EpisodeArtworkSize),
+                shape = EpisodeArtworkShape
             )
             Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(

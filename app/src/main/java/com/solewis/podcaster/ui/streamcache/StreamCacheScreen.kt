@@ -28,11 +28,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.solewis.podcaster.ui.common.BackButtonRow
+import com.solewis.podcaster.ui.common.DetailTopBar
 import com.solewis.podcaster.ui.common.EmptyState
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
+import com.solewis.podcaster.ui.common.EpisodeArtworkShape
 import com.solewis.podcaster.ui.common.PodcastArtwork
-import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.common.formatBytes
 import com.solewis.podcaster.ui.common.formatEpisodeDate
@@ -52,12 +52,13 @@ fun StreamCacheScreen(
 
     Scaffold(
         modifier = Modifier.testTag(TestTags.STREAM_CACHE_SCREEN),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        // The bar carries the status-bar padding this screen was missing entirely, which had left
+        // the back button drawn up inside the phone's status bar. Pinned for the same reason as
+        // Settings: the list below it is as long as the cache is full.
+        topBar = { DetailTopBar("Streaming cache", onBack) }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            BackButtonRow(onBack)
-            ScreenTitle("Streaming cache")
-
             if (rows.isEmpty()) {
                 EmptyState("Nothing cached right now.", modifier = Modifier.fillMaxSize())
                 return@Scaffold
@@ -90,7 +91,8 @@ fun StreamCacheScreen(
                     ) {
                         PodcastArtwork(
                             artworkUrl = episode?.artworkUrl ?: episode?.podcastArtworkUrl,
-                            modifier = Modifier.size(EpisodeArtworkSize)
+                            modifier = Modifier.size(EpisodeArtworkSize),
+                            shape = EpisodeArtworkShape
                         )
                         Column(
                             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
