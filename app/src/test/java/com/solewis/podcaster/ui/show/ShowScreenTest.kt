@@ -1,6 +1,9 @@
 package com.solewis.podcaster.ui.show
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
@@ -57,18 +60,29 @@ class ShowScreenTest {
         isPlayed: Boolean = false,
         descriptionPreview: String? = null,
         pubDateMillis: Long? = null,
+        lastPlayedAt: Long? = null,
         /** Extra filler rows, for the tests that need the list to be longer than the screen. */
-        extraEpisodes: Int = 0
+        extraEpisodes: Int = 0,
+        /**
+         * Which episode number Patient Zero takes. Defaults to the first, which under newest-first
+         * puts it at the very bottom of the list - fine for reading a row, wrong for anything about
+         * scrolling *to* it, since a list clamped at its end ignores where you asked the row to go.
+         */
+        episodeKey: String = "1"
     ) {
         runBlocking {
             podcastId = graph.insertShow(title = "Radiolab")
             graph.insertEpisodes(
                 episodeRow(
-                    podcastId, "1", title = "Patient Zero",
+                    podcastId, episodeKey, title = "Patient Zero",
                     durationMillis = 51 * 60_000L, positionMillis = positionMillis, isPlayed = isPlayed,
-                    descriptionPreview = descriptionPreview, pubDateMillis = pubDateMillis
+                    descriptionPreview = descriptionPreview, pubDateMillis = pubDateMillis,
+                    lastPlayedAt = lastPlayedAt
                 ),
-                *(2..(extraEpisodes + 1)).map { episodeRow(podcastId, "$it") }.toTypedArray()
+                *(1..(extraEpisodes + 1))
+                    .filter { it.toString() != episodeKey }
+                    .map { episodeRow(podcastId, "$it") }
+                    .toTypedArray()
             )
         }
         val container = graph.appContainer()
@@ -80,9 +94,20 @@ class ShowScreenTest {
         compose.waitForIdle()
     }
 
+    /**
+     * Brings the first episode row into view. Necessary since the whole page became one lazy list:
+     * the show header scrolls with everything else, which means the first row starts below the fold
+     * and a LazyColumn has not composed it at all - so it cannot be found, let alone asserted on.
+     */
+    private fun scrollToFirstEpisode() {
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Patient Zero", substring = true))
+        compose.waitForIdle()
+    }
+
     @Test
     fun a_description_preview_is_shown_under_the_title() {
         openShow(descriptionPreview = "Real show notes go here.")
+        scrollToFirstEpisode()
 
         compose.onNodeWithText("Real show notes go here.").assertExists()
     }
@@ -90,8 +115,8 @@ class ShowScreenTest {
     @Test
     fun an_untouched_episode_states_its_length_once() {
         openShow()
+        scrollToFirstEpisode()
 
-        compose.awaitText("Patient Zero")
         // Exactly one, counted on the unmerged tree: the row is clickable, so the merged tree
         // collapses its Texts into a single node whose text is a concatenation, and counting there
         // would report 1 however many times the label actually appears.
@@ -101,8 +126,8 @@ class ShowScreenTest {
     @Test
     fun a_part_listened_episode_states_time_remaining_once_and_not_its_length() {
         openShow(positionMillis = 10 * 60_000L)
+        scrollToFirstEpisode()
 
-        compose.awaitText("41m left")
         compose.onAllNodesWithText("41m left", substring = true, useUnmergedTree = true).assertCountEquals(1)
         // The full length is not the useful number once you are partway in, so it should be gone
         // rather than sitting alongside the remaining time.
@@ -112,10 +137,10 @@ class ShowScreenTest {
     @Test
     fun a_finished_episode_says_finished_once_and_drops_the_timings() {
         openShow(positionMillis = 51 * 60_000L, isPlayed = true)
+        scrollToFirstEpisode()
 
         // Once, and inline in the metadata line. It used to say "Played" and to be accompanied by
         // a separate tick icon adrift in the trailing controls, which read as a third button.
-        compose.awaitText("Finished", substring = true)
         compose.onAllNodesWithText("Finished", substring = true, useUnmergedTree = true).assertCountEquals(1)
         compose.onAllNodesWithText("51m", substring = true, useUnmergedTree = true).assertCountEquals(0)
     }
@@ -123,7 +148,7 @@ class ShowScreenTest {
     @Test
     fun the_finished_tick_is_not_a_control_of_its_own() {
         openShow(positionMillis = 51 * 60_000L, isPlayed = true)
-        compose.awaitText("Finished", substring = true)
+        scrollToFirstEpisode()
 
         // The tick used to be a separately-labelled icon below the play button and the overflow
         // menu, floating between them with nothing to attach it to - it read as a third thing to
@@ -145,8 +170,8 @@ class ShowScreenTest {
     @Test
     fun the_header_names_the_episode_number_in_full_and_leaves_the_date_to_the_meta_line() {
         openShow(pubDateMillis = 1_756_000_000_000L)
+        scrollToFirstEpisode()
 
-        compose.awaitText("Episode 1")
         compose.onAllNodesWithText("Episode 1", useUnmergedTree = true).assertCountEquals(1)
         compose.onAllNodesWithText("Ep 1", useUnmergedTree = true).assertCountEquals(0)
 
@@ -170,6 +195,7 @@ class ShowScreenTest {
     @Test
     fun the_description_and_meta_line_share_the_rows_left_edge_with_the_artwork() {
         openShow(descriptionPreview = "Real show notes go here.")
+        scrollToFirstEpisode()
 
         val titleLeft = compose.onAllNodesWithText("Patient Zero", useUnmergedTree = true)[0]
             .getUnclippedBoundsInRoot().left
@@ -222,13 +248,50 @@ class ShowScreenTest {
         compose.onNodeWithTag(TestTags.SHOW_MENU).assertDoesNotExist()
     }
 
+    /**
+     * Reported: tapping the resume pill landed the episode it jumped to underneath the tab row,
+     * clipped along its top edge.
+     *
+     * The old code scrolled the row flush to the top of the list and then nudged it down by a fixed
+     * 80px. That was tuned when the tab row was fixed furniture *above* the list; now it is pinned
+     * *inside* it, overlaying the top, and a constant cannot know how tall it is.
+     */
+    @Test
+    fun jumping_to_the_last_listened_episode_clears_the_pinned_tab_row() {
+        // lastPlayedAt, not just a position: JumpTargetResolver picks the episode with the greatest
+        // lastPlayedAt and ignores position entirely, so without it there is no target and no pill.
+        // Mid-list on purpose - see openShow's episodeKey. At the bottom the list clamps at its
+        // end and lands the row clear of the tabs whatever clearance is asked for, so the test
+        // passed with the fix reverted.
+        openShow(
+            positionMillis = 10 * 60_000L,
+            lastPlayedAt = 5_000L,
+            extraEpisodes = 30,
+            episodeKey = "16"
+        )
+        compose.awaitText("Radiolab")
+
+        // No scrolling to set this up: under newest-first the target is the *last* row, so it is
+        // already off screen and the pill is already offering to jump to it. Swiping down here
+        // would scroll toward the target and hide the pill, which is what the pill is for.
+        compose.onNodeWithTag(TestTags.RESUME_PILL).performClick()
+        compose.waitForIdle()
+
+        val tabsBottom = compose.onNodeWithText("Episodes").getUnclippedBoundsInRoot().bottom
+        val target = compose.onAllNodesWithText("Patient Zero", useUnmergedTree = true)[0]
+            .getUnclippedBoundsInRoot()
+
+        // Wholly below the tab row, not tucked under it. Its own top edge is what was being eaten.
+        assertThat(target.top.value).isAtLeast(tabsBottom.value)
+    }
+
     @Test
     fun the_row_for_the_playing_episode_offers_pause_rather_than_play() {
         // Reported: an episode started from this list kept showing a play arrow, so the row that
         // was making sound looked unplayed and its button could not stop it. These rows had no
         // pause state at all - the Home feed's have always had one, and these were missed.
         openShow()
-        compose.awaitText("Patient Zero")
+        scrollToFirstEpisode()
 
         graph.playback.emitPlaying("$podcastId:1")
         compose.waitForIdle()
@@ -242,7 +305,7 @@ class ShowScreenTest {
     @Test
     fun that_pause_button_stops_playback_rather_than_restarting_the_episode() {
         openShow()
-        compose.awaitText("Patient Zero")
+        scrollToFirstEpisode()
         graph.playback.emitPlaying("$podcastId:1")
         compose.waitForIdle()
 
@@ -260,7 +323,7 @@ class ShowScreenTest {
     @Test
     fun a_row_that_is_not_playing_still_offers_play() {
         openShow()
-        compose.awaitText("Patient Zero")
+        scrollToFirstEpisode()
 
         graph.playback.emitPlaying("$podcastId:something-else")
         compose.waitForIdle()

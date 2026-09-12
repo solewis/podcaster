@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +53,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -112,6 +112,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     // Same mechanism as the episode screen: compare where the show's name currently is against
     // where the bar is, rather than guessing a scroll offset that the artwork and author line
     // would invalidate. derivedStateOf so only the crossing recomposes.
+    var tabsHeight by remember { mutableIntStateOf(0) }
     var titleBottom by remember { mutableFloatStateOf(Float.MAX_VALUE) }
     var barBottom by remember { mutableFloatStateOf(0f) }
     val showBarTitle by remember { derivedStateOf { titleBottom < barBottom } }
@@ -148,6 +149,8 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     }
 
     val podcast = state.podcast
+    // Generous on purpose: the row landing a little low is fine, the row landing half-hidden is not.
+    val jumpClearance = with(LocalDensity.current) { 24.dp.roundToPx() }
 
     Scaffold(
         modifier = Modifier.testTag(TestTags.SHOW_SCREEN),
@@ -183,7 +186,13 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                     // The index parameter is the current overload's; this header does not need it.
                     stickyHeader(key = TABS_KEY) { _ ->
                         // Opaque: the episodes it pins above scroll underneath it.
-                        Surface(color = MaterialTheme.colorScheme.surface) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface,
+                            // Measured because the jump pill has to scroll its target clear of this
+                            // row - it now overlays the top of the list, and anything scrolled
+                            // exactly to the top lands underneath it.
+                            modifier = Modifier.onGloballyPositioned { tabsHeight = it.size.height }
+                        ) {
                             SecondaryTabRow(selectedTabIndex = selectedTab) {
                                 Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Episodes") })
                                 Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("About") })
@@ -238,14 +247,17 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                 // The pill's index counts episodes; the list now also holds the
                                 // header, the tab row and the sort row ahead of them.
                                 val target = jump.itemIndex + EPISODES_LEADING_ITEMS
+                                // Negative, so the row lands this far *below* the top of the list
+                                // rather than at it. Scrolling flush to the top now puts the row
+                                // under the pinned tab row, which is what was clipping it - and a
+                                // fixed nudge afterwards could not know how tall that row is.
+                                val clearance = -(tabsHeight + jumpClearance)
                                 val distance = abs(target - listState.firstVisibleItemIndex)
                                 if (distance > 40) {
-                                    listState.scrollToItem(target)
+                                    listState.scrollToItem(target, clearance)
                                 } else {
-                                    listState.animateScrollToItem(target)
+                                    listState.animateScrollToItem(target, clearance)
                                 }
-                                // Breathing room so the target row isn't flush against the tab row.
-                                listState.animateScrollBy(-80f)
 
                                 highlightedEpisodeId = jump.episodeId
                                 delay(1200)
@@ -318,7 +330,7 @@ private fun ShowHeader(
                 }
             }
             Spacer(modifier = Modifier.width(12.dp))
-            PodcastArtwork(artworkUrl = podcast.artworkUrl, modifier = Modifier.size(72.dp))
+            PodcastArtwork(artworkUrl = podcast.artworkUrl, modifier = Modifier.size(96.dp))
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
