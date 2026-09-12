@@ -1,6 +1,9 @@
 package com.solewis.podcaster.ui.show
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -53,7 +56,9 @@ class ShowScreenTest {
         positionMillis: Long = 0,
         isPlayed: Boolean = false,
         descriptionPreview: String? = null,
-        pubDateMillis: Long? = null
+        pubDateMillis: Long? = null,
+        /** Extra filler rows, for the tests that need the list to be longer than the screen. */
+        extraEpisodes: Int = 0
     ) {
         runBlocking {
             podcastId = graph.insertShow(title = "Radiolab")
@@ -62,7 +67,8 @@ class ShowScreenTest {
                     podcastId, "1", title = "Patient Zero",
                     durationMillis = 51 * 60_000L, positionMillis = positionMillis, isPlayed = isPlayed,
                     descriptionPreview = descriptionPreview, pubDateMillis = pubDateMillis
-                )
+                ),
+                *(2..(extraEpisodes + 1)).map { episodeRow(podcastId, "$it") }.toTypedArray()
             )
         }
         val container = graph.appContainer()
@@ -174,6 +180,46 @@ class ShowScreenTest {
         // The title is the indented one - it sits beside the artwork - so the description starting
         // to the left of it is exactly what "flush with the artwork" looks like from here.
         assertThat(descriptionLeft.value).isLessThan(titleLeft.value)
+    }
+
+    /**
+     * The show's name, artwork and subscribe row used to be pinned above the list, spending a third
+     * of a phone screen on things you read once. They scroll now, and the bar picks the name up on
+     * the way past - so the name is in exactly one of the two places at any time.
+     */
+    @Test
+    fun the_header_takes_the_show_name_over_once_it_has_scrolled_away() {
+        openShow()
+
+        // Not in the bar to begin with: the header's own copy is on screen.
+        compose.onNodeWithTag(TestTags.screenTitle("Radiolab")).assertDoesNotExist()
+
+        compose.onNodeWithTag(TestTags.SHOW_SCREEN).performTouchInput { swipeUp() }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag(TestTags.screenTitle("Radiolab")).assertIsDisplayed()
+    }
+
+    /**
+     * The tab row is the one thing that does not scroll away, so there is always a way back to
+     * About - and, once the episodes are long past, something saying what you are looking at.
+     */
+    @Test
+    fun the_tab_row_stays_put_when_the_header_scrolls_away() {
+        // Long enough that the swipes below actually carry the tab row's own position off the top
+        // of the screen. With one episode the page barely scrolls, and the tabs stay visible
+        // whether they are pinned or not - the test passed either way and proved nothing.
+        openShow(extraEpisodes = 30)
+
+        repeat(6) {
+            compose.onNodeWithTag(TestTags.SHOW_SCREEN).performTouchInput { swipeUp() }
+            compose.waitForIdle()
+        }
+
+        compose.onNodeWithText("Episodes").assertIsDisplayed()
+        compose.onNodeWithText("About").assertIsDisplayed()
+        // The header went with the scroll - it is not pinned alongside the tabs.
+        compose.onNodeWithTag(TestTags.SHOW_MENU).assertDoesNotExist()
     }
 
     @Test

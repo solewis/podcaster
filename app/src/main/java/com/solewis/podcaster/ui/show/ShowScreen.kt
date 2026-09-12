@@ -46,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +54,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -63,7 +66,7 @@ import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.db.model.EpisodeListItem
 import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.db.model.SortOrder
-import com.solewis.podcaster.ui.common.BackButtonRow
+import com.solewis.podcaster.ui.common.DetailTopBar
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material3.DropdownMenu
@@ -106,6 +109,13 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     var pendingUnsubscribe by remember { mutableStateOf(false) }
     var showMenuOpen by remember { mutableStateOf(false) }
 
+    // Same mechanism as the episode screen: compare where the show's name currently is against
+    // where the bar is, rather than guessing a scroll offset that the artwork and author line
+    // would invalidate. derivedStateOf so only the crossing recomposes.
+    var titleBottom by remember { mutableFloatStateOf(Float.MAX_VALUE) }
+    var barBottom by remember { mutableFloatStateOf(0f) }
+    val showBarTitle by remember { derivedStateOf { titleBottom < barBottom } }
+
     val markedAllPlayed by viewModel.markedAllPlayed.collectAsState()
     LaunchedEffect(markedAllPlayed) {
         // Says what it did: an action that silently rewrites a few hundred rows is indistinguishable
@@ -137,164 +147,115 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
         }
     }
 
+    val podcast = state.podcast
+
     Scaffold(
         modifier = Modifier.testTag(TestTags.SHOW_SCREEN),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            DetailTopBar(
+                title = podcast?.title.orEmpty(),
+                onBack = onBack,
+                showTitle = podcast != null && showBarTitle,
+                modifier = Modifier.onGloballyPositioned { barBottom = it.boundsInRoot().bottom }
+            )
+        }
     ) { innerPadding ->
-        // Deliberately no statusBarsPadding on this outer Column - the banner Surface below
-        // needs to paint its color all the way to the true top of the screen, under the status
-        // bar. statusBarsPadding is applied just inside the Surface instead, so only the back
-        // button/title/artwork/subscribe content (not the color itself) is inset from it.
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            val podcast = state.podcast
-
-            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.statusBarsPadding()) {
-                    BackButtonRow(onBack)
-                    podcast?.let {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    it.title,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                it.author?.let { author ->
-                                    Text(
-                                        author,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 2.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(72.dp))
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            SubscribeButton(
-                                isSubscribed = true,
-                                isBusy = false,
-                                onClick = { pendingUnsubscribe = true }
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-                            // A menu rather than another button: per-show actions are only going to
-                            // accumulate (a speed override, intro trimming), and the episode rows
-                            // below have already run out of room for trailing controls.
-                            Box {
-                                IconButton(
-                                    onClick = { showMenuOpen = true },
-                                    modifier = Modifier.testTag(TestTags.SHOW_MENU)
-                                ) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "More actions for this show")
-                                }
-                                DropdownMenu(
-                                    expanded = showMenuOpen,
-                                    onDismissRequest = { showMenuOpen = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Mark all as played") },
-                                        leadingIcon = { Icon(Icons.Default.DoneAll, contentDescription = null) },
-                                        onClick = {
-                                            showMenuOpen = false
-                                            viewModel.markAllPlayed()
-                                        },
-                                        modifier = Modifier.testTag(TestTags.MARK_ALL_PLAYED)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             if (podcast != null) {
-                SecondaryTabRow(selectedTabIndex = selectedTab) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Episodes") })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("About") })
-                }
+                // One list for the whole page, rather than a fixed header above a list. The show's
+                // name, artwork and subscribe row used to be pinned, which on a phone spent a third
+                // of the screen on information you read once - now they scroll away and the
+                // episodes get that room back. The tab row is the only thing that stays.
+                LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 88.dp)) {
+                    item(key = HEADER_KEY) {
+                        ShowHeader(
+                            podcast = podcast,
+                            onUnsubscribe = { pendingUnsubscribe = true },
+                            menuOpen = showMenuOpen,
+                            onMenuOpenChange = { showMenuOpen = it },
+                            onMarkAllPlayed = viewModel::markAllPlayed,
+                            onTitleBottomChanged = { titleBottom = it }
+                        )
+                    }
 
-                when (selectedTab) {
-                    0 -> Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                TextButton(onClick = viewModel::toggleSortOrder) {
-                                    Text(if (podcast.sortOrder == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first")
-                                }
-                                Spacer(modifier = Modifier.weight(1f))
-                                if (isRefreshing) {
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp).padding(horizontal = 12.dp))
-                                } else {
-                                    IconButton(onClick = viewModel::refresh) {
-                                        Icon(Icons.Default.Refresh, contentDescription = "Check for new episodes")
-                                    }
-                                }
+                    // The index parameter is the current overload's; this header does not need it.
+                    stickyHeader(key = TABS_KEY) { _ ->
+                        // Opaque: the episodes it pins above scroll underneath it.
+                        Surface(color = MaterialTheme.colorScheme.surface) {
+                            SecondaryTabRow(selectedTabIndex = selectedTab) {
+                                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Episodes") })
+                                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("About") })
                             }
-                            LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 88.dp)) {
-                                items(state.episodes, key = { it.id }) { episode ->
-                                    EpisodeRow(
-                                        episode = episode,
-                                        podcastArtworkUrl = podcast.artworkUrl,
-                                        isHighlighted = episode.id == highlightedEpisodeId,
-                                        onClick = { onOpenEpisode(episode.id) },
-                                        isStarting = episode.id == pendingEpisodeId,
-                                        isNowPlaying = episode.id == nowPlayingId,
-                                        livePositionMillis = livePosition.takeIf { episode.id == nowPlayingId },
-                                        liveDurationMillis = liveDuration.takeIf { episode.id == nowPlayingId },
-                                        onPlay = {
-                                            if (episode.id == nowPlayingId) viewModel.togglePlayPause()
-                                            else viewModel.play(episode.id)
-                                        },
-                                        onEnqueue = { viewModel.enqueue(episode.id) },
-                                        download = downloadStates[episode.id],
-                                        onDownload = { viewModel.download(episode.id) },
-                                        onRemoveDownload = { viewModel.removeDownload(episode.id) },
-                                        onTogglePlayed = { viewModel.togglePlayed(episode.id) }
-                                    )
-                                    HorizontalDivider()
-                                }
-                            }
-                        }
-
-                        if (jump != null && !isJumpTargetVisible) {
-                            JumpToLastListenedPill(
-                                jump = jump,
-                                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                                onClick = {
-                                    scope.launch {
-                                        val distance = abs(jump.itemIndex - listState.firstVisibleItemIndex)
-                                        if (distance > 40) {
-                                            listState.scrollToItem(jump.itemIndex)
-                                        } else {
-                                            listState.animateScrollToItem(jump.itemIndex)
-                                        }
-                                        // Breathing room so the target row isn't flush against the top bar.
-                                        listState.animateScrollBy(-80f)
-
-                                        highlightedEpisodeId = jump.episodeId
-                                        delay(1200)
-                                        highlightedEpisodeId = null
-                                    }
-                                }
-                            )
                         }
                     }
-                    else -> AboutTab(podcast = podcast, episodeCount = state.episodes.size)
+
+                    if (selectedTab == 0) {
+                        item(key = SORT_KEY) {
+                            EpisodeListControls(
+                                sortOrder = podcast.sortOrder,
+                                isRefreshing = isRefreshing,
+                                onToggleSort = viewModel::toggleSortOrder,
+                                onRefresh = viewModel::refresh
+                            )
+                        }
+                        items(state.episodes, key = { it.id }) { episode ->
+                            EpisodeRow(
+                                episode = episode,
+                                podcastArtworkUrl = podcast.artworkUrl,
+                                isHighlighted = episode.id == highlightedEpisodeId,
+                                onClick = { onOpenEpisode(episode.id) },
+                                isStarting = episode.id == pendingEpisodeId,
+                                isNowPlaying = episode.id == nowPlayingId,
+                                livePositionMillis = livePosition.takeIf { episode.id == nowPlayingId },
+                                liveDurationMillis = liveDuration.takeIf { episode.id == nowPlayingId },
+                                onPlay = {
+                                    if (episode.id == nowPlayingId) viewModel.togglePlayPause()
+                                    else viewModel.play(episode.id)
+                                },
+                                onEnqueue = { viewModel.enqueue(episode.id) },
+                                download = downloadStates[episode.id],
+                                onDownload = { viewModel.download(episode.id) },
+                                onRemoveDownload = { viewModel.removeDownload(episode.id) },
+                                onTogglePlayed = { viewModel.togglePlayed(episode.id) }
+                            )
+                            HorizontalDivider()
+                        }
+                    } else {
+                        item(key = ABOUT_KEY) {
+                            AboutTab(podcast = podcast, episodeCount = state.episodes.size)
+                        }
+                    }
+                }
+
+                if (jump != null && !isJumpTargetVisible && selectedTab == 0) {
+                    JumpToLastListenedPill(
+                        jump = jump,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                        onClick = {
+                            scope.launch {
+                                // The pill's index counts episodes; the list now also holds the
+                                // header, the tab row and the sort row ahead of them.
+                                val target = jump.itemIndex + EPISODES_LEADING_ITEMS
+                                val distance = abs(target - listState.firstVisibleItemIndex)
+                                if (distance > 40) {
+                                    listState.scrollToItem(target)
+                                } else {
+                                    listState.animateScrollToItem(target)
+                                }
+                                // Breathing room so the target row isn't flush against the tab row.
+                                listState.animateScrollBy(-80f)
+
+                                highlightedEpisodeId = jump.episodeId
+                                delay(1200)
+                                highlightedEpisodeId = null
+                            }
+                        }
+                    )
                 }
             } else if (state.isLoading) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
@@ -315,9 +276,127 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     }
 }
 
+/**
+ * The show's identity and the two things you can do to the show itself.
+ *
+ * No tinted surface behind it any more. The band of `surfaceContainerHigh` was there to mark this
+ * off as a header, which mattered when it was pinned and the list scrolled under it - now that it
+ * scrolls away with everything else the colour was just a slab that slid past, and the divider
+ * underneath says the same thing more quietly.
+ */
+@Composable
+private fun ShowHeader(
+    podcast: PodcastEntity,
+    onUnsubscribe: () -> Unit,
+    menuOpen: Boolean,
+    onMenuOpenChange: (Boolean) -> Unit,
+    onMarkAllPlayed: () -> Unit,
+    onTitleBottomChanged: (Float) -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    podcast.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    // Reports itself as it scrolls; the bar decides when to take the name over.
+                    modifier = Modifier.onGloballyPositioned { onTitleBottomChanged(it.boundsInRoot().bottom) }
+                )
+                podcast.author?.let { author ->
+                    Text(
+                        author,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            PodcastArtwork(artworkUrl = podcast.artworkUrl, modifier = Modifier.size(72.dp))
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SubscribeButton(
+                isSubscribed = true,
+                isBusy = false,
+                onClick = onUnsubscribe
+            )
+            // Beside the subscribe button rather than pushed to the far edge. Alone across the row
+            // it read as belonging to the page at large; next to the only other control here, the
+            // two are obviously the same kind of thing - what you can do to this show.
+            Spacer(modifier = Modifier.width(4.dp))
+            // A menu rather than another button: per-show actions are only going to accumulate (a
+            // speed override, intro trimming), and the episode rows below have already run out of
+            // room for trailing controls.
+            Box {
+                IconButton(
+                    onClick = { onMenuOpenChange(true) },
+                    modifier = Modifier.testTag(TestTags.SHOW_MENU)
+                ) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More actions for this show")
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }) {
+                    DropdownMenuItem(
+                        text = { Text("Mark all as played") },
+                        leadingIcon = { Icon(Icons.Default.DoneAll, contentDescription = null) },
+                        onClick = {
+                            onMenuOpenChange(false)
+                            onMarkAllPlayed()
+                        },
+                        modifier = Modifier.testTag(TestTags.MARK_ALL_PLAYED)
+                    )
+                }
+            }
+        }
+        HorizontalDivider()
+    }
+}
+
+/** Sort order and refresh - the controls for the episode list rather than for the show. */
+@Composable
+private fun EpisodeListControls(
+    sortOrder: SortOrder,
+    isRefreshing: Boolean,
+    onToggleSort: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TextButton(onClick = onToggleSort) {
+            Text(if (sortOrder == SortOrder.NEWEST_FIRST) "Newest first" else "Oldest first")
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        if (isRefreshing) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp).padding(horizontal = 12.dp))
+        } else {
+            IconButton(onClick = onRefresh) {
+                Icon(Icons.Default.Refresh, contentDescription = "Check for new episodes")
+            }
+        }
+    }
+}
+
+private const val HEADER_KEY = "showHeader"
+private const val TABS_KEY = "showTabs"
+private const val SORT_KEY = "episodeSort"
+private const val ABOUT_KEY = "about"
+
+/** Header, tab row and sort row all sit ahead of the episodes in the same list. */
+private const val EPISODES_LEADING_ITEMS = 3
+
 @Composable
 private fun AboutTab(podcast: PodcastEntity, episodeCount: Int) {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Text(
             "$episodeCount episodes",
             style = MaterialTheme.typography.bodyMedium,
