@@ -52,6 +52,10 @@ data class EpisodeEntity(
     // --- feed metadata ---
     val title: String,
     val descriptionHtml: String? = null,
+    /** A short plain-text excerpt of [descriptionHtml], computed once at feed-refresh time (see
+     * `SubscriptionRepository.toEntity`) - so a list row can show a preview without holding
+     * several KB of raw HTML per episode live in a `StateFlow`. */
+    val descriptionPreview: String? = null,
     val pubDateMillis: Long? = null,
     val enclosureUrl: String,
     val enclosureBytes: Long? = null,

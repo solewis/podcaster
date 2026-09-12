@@ -49,6 +49,12 @@ class PlaybackService : MediaLibraryService() {
         super.onCreate()
         val container = (application as PodcasterApp).container
         player = PlayerFactory.create(this, container.downloadCache, container.streamCache)
+        // Here rather than at app startup: the stream cache is only actually open once playback
+        // needs it, and a size limit alone lets it hold an episode nobody has any intention of
+        // finishing indefinitely, as long as nothing bigger ever needs the room - see
+        // StreamCache.evictOlderThan. A screen test that never starts playback never pays for
+        // this, the same reason streamCacheInfo is lazy.
+        lifecycleScope.launch { container.streamCacheInfo.evictOlderThan(STREAM_CACHE_MAX_AGE_MILLIS) }
         // Before the persister is attached, so reading the saved speed back doesn't immediately
         // rewrite it. This is the only place speed is applied, which is what makes it hold for
         // playback started from Android Auto or a media button as well as from the app's own UI.
@@ -146,6 +152,8 @@ class PlaybackService : MediaLibraryService() {
         @Volatile
         var isRunning: Boolean = false
             private set
+
+        private const val STREAM_CACHE_MAX_AGE_MILLIS = 30L * 24 * 60 * 60 * 1000
     }
 
     private fun nowPlayingIntent(): PendingIntent = PendingIntent.getActivity(

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
@@ -32,14 +31,13 @@ import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.settings.PrefetchMode
 import com.solewis.podcaster.data.settings.SkipAmount
 import com.solewis.podcaster.data.settings.ThemeMode
+import com.solewis.podcaster.ui.common.DetailTopBar
 import com.solewis.podcaster.ui.common.formatBytes
-import com.solewis.podcaster.ui.common.BackButtonRow
-import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.SkipIcon
 import com.solewis.podcaster.ui.common.TestTags
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
+fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, onOpenStreamCache: () -> Unit) {
     val settings by viewModel.settings.collectAsState()
     val streamCacheBytes by viewModel.streamCacheBytes.collectAsState()
     val downloadBytes by viewModel.downloadBytes.collectAsState()
@@ -47,18 +45,17 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
 
     Scaffold(
         modifier = Modifier.testTag(TestTags.SETTINGS_SCREEN),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        // Pinned rather than scrolled with the content: this screen is longer than any phone, and
+        // the back button used to scroll away with the title the moment you started reading it.
+        topBar = { DetailTopBar("Settings", onBack) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
-            BackButtonRow(onBack)
-            ScreenTitle("Settings")
-
             SettingSection("Skip back") {
                 SkipAmountRow(
                     selected = settings.skipBack,
@@ -133,12 +130,15 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             StorageSection(
                 title = "Streaming cache",
                 description = "Episodes you stream, kept so replaying or resuming doesn't " +
-                    "re-download them. Bounded on its own - clearing it just means the next " +
-                    "listen refetches from the start.",
+                    "re-download them. Bounded by size and dropped after a month of not being " +
+                    "touched - clearing it just means the next listen refetches from the start.",
                 sizeLabel = formatBytes(streamCacheBytes),
                 actionLabel = "Clear cache",
                 onAction = viewModel::clearStreamCache,
-                testTag = TestTags.CLEAR_STREAM_CACHE
+                testTag = TestTags.CLEAR_STREAM_CACHE,
+                secondaryLabel = "View cached episodes",
+                onSecondaryAction = onOpenStreamCache,
+                secondaryTestTag = TestTags.VIEW_CACHED_EPISODES
             )
             HorizontalDivider()
             StorageSection(
@@ -272,7 +272,10 @@ private fun StorageSection(
     sizeLabel: String,
     actionLabel: String,
     onAction: () -> Unit,
-    testTag: String
+    testTag: String,
+    secondaryLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
+    secondaryTestTag: String? = null
 ) {
     SettingSection(title) {
         Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -282,8 +285,18 @@ private fun StorageSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(sizeLabel, style = MaterialTheme.typography.titleMedium)
-            TextButton(onClick = onAction, modifier = Modifier.testTag(testTag)) {
-                Text(actionLabel)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (secondaryLabel != null && onSecondaryAction != null) {
+                    TextButton(
+                        onClick = onSecondaryAction,
+                        modifier = secondaryTestTag?.let { Modifier.testTag(it) } ?: Modifier
+                    ) {
+                        Text(secondaryLabel)
+                    }
+                }
+                TextButton(onClick = onAction, modifier = Modifier.testTag(testTag)) {
+                    Text(actionLabel)
+                }
             }
         }
     }

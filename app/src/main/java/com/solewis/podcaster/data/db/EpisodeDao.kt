@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.solewis.podcaster.data.db.entity.EpisodeEntity
+import com.solewis.podcaster.data.db.model.EpisodeDescriptionSource
 import com.solewis.podcaster.data.db.model.EpisodeDetailItem
 import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.db.model.EpisodeListItem
@@ -38,6 +39,7 @@ interface EpisodeDao {
         UPDATE episodes SET
             title = :title,
             descriptionHtml = :descriptionHtml,
+            descriptionPreview = :descriptionPreview,
             pubDateMillis = :pubDateMillis,
             enclosureUrl = :enclosureUrl,
             enclosureBytes = :enclosureBytes,
@@ -58,6 +60,7 @@ interface EpisodeDao {
         id: String,
         title: String,
         descriptionHtml: String?,
+        descriptionPreview: String?,
         pubDateMillis: Long?,
         enclosureUrl: String,
         enclosureBytes: Long?,
@@ -115,7 +118,7 @@ interface EpisodeDao {
 
     @Query(
         """
-        SELECT id, podcastId, title, pubDateMillis, durationMillis, displayNumber, chronoIndex,
+        SELECT id, podcastId, title, descriptionPreview, pubDateMillis, durationMillis, displayNumber, chronoIndex,
                episodeType, artworkUrl, positionMillis, isPlayed, lastPlayedAt
         FROM episodes
         WHERE podcastId = :podcastId
@@ -161,7 +164,7 @@ interface EpisodeDao {
      */
     @Query(
         """
-        SELECT id, podcastId, title, pubDateMillis, durationMillis, displayNumber, chronoIndex,
+        SELECT id, podcastId, title, descriptionPreview, pubDateMillis, durationMillis, displayNumber, chronoIndex,
                episodeType, artworkUrl, positionMillis, isPlayed, lastPlayedAt
         FROM episodes
         WHERE podcastId = :podcastId AND lastPlayedAt IS NOT NULL
@@ -276,7 +279,7 @@ interface EpisodeDao {
     @Query(
         """
         SELECT e.id, e.podcastId, p.title AS podcastTitle, p.artworkUrl AS podcastArtworkUrl,
-               e.title, e.pubDateMillis, e.durationMillis, e.displayNumber, e.episodeType,
+               e.title, e.descriptionPreview, e.pubDateMillis, e.durationMillis, e.displayNumber, e.episodeType,
                e.artworkUrl, e.positionMillis, e.isPlayed, e.lastPlayedAt
         FROM episodes e
         JOIN podcasts p ON p.id = e.podcastId
@@ -284,4 +287,25 @@ interface EpisodeDao {
         """
     )
     fun observeAllEpisodes(): Flow<List<EpisodeFeedItem>>
+
+    /**
+     * Episodes whose stored description predates the preview column, for the one-time backfill in
+     * [com.solewis.podcaster.data.repo.EpisodeRepository.backfillDescriptionPreviews].
+     *
+     * The schema migration could only default the new column to NULL - stripping HTML is not
+     * something SQLite can do - and a feed refresh is the only other thing that writes it, so
+     * without this every episode already in the library would show no preview until its feed
+     * happened to change. A conditional-GET 304 skips the refresh write too, which for a settled
+     * back catalogue means "never".
+     *
+     * Projected rather than selecting whole rows: the descriptions are the largest column in the
+     * table and this runs over the entire library at once.
+     */
+    @Query(
+        "SELECT id, descriptionHtml FROM episodes WHERE descriptionPreview IS NULL AND descriptionHtml IS NOT NULL"
+    )
+    suspend fun episodesMissingDescriptionPreview(): List<EpisodeDescriptionSource>
+
+    @Query("UPDATE episodes SET descriptionPreview = :descriptionPreview WHERE id = :id")
+    suspend fun setDescriptionPreview(id: String, descriptionPreview: String?)
 }

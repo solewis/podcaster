@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,7 +54,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.ui.common.BackButtonRow
 import com.solewis.podcaster.ui.common.PodcastArtwork
-import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.HorizontalDivider
 import com.solewis.podcaster.player.SleepTimerState
 import com.solewis.podcaster.ui.common.TestTags
@@ -75,7 +79,7 @@ private const val EXTEND_MINUTES = 5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
+fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit, onOpenEpisode: (String) -> Unit) {
     val playback by viewModel.playbackState.collectAsState()
     val progress by viewModel.progress.collectAsState()
     val settings by viewModel.settings.collectAsState()
@@ -123,10 +127,13 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                 BackButtonRow(onBack)
             }
 
+            // Sized to the column rather than pinned at 280dp. Fixed, it left a wide margin down
+            // both sides of a modern phone while the screen's whole subject sat small in the
+            // middle; the 24dp the column already pads by is margin enough.
             PodcastArtwork(
                 artworkUrl = playback.artworkUrl,
-                modifier = Modifier.size(280.dp),
-                shape = MaterialTheme.shapes.extraLarge
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                shape = MaterialTheme.shapes.medium
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -152,6 +159,53 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+
+            // Transport above the scrubber, so the bar sits between the two rows of controls
+            // rather than on the far side of both. The times printed under it belong to the bar and
+            // travel with it.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(TRANSPORT_BUTTON_SPACING)
+            ) {
+                IconButton(onClick = viewModel::skipBack) {
+                    SkipIcon(
+                        seconds = settings.skipBack.seconds,
+                        forward = false,
+                        contentDescription = "Back ${settings.skipBack.seconds} seconds",
+                        modifier = Modifier.size(SkipIconSize)
+                    )
+                }
+                FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
+                    if (isStalled) {
+                        // In the button's place rather than beside it, so nothing reflows. Only
+                        // after half a second of waiting - a scrub rebuffers in ~200ms, and a
+                        // spinner for that would flicker exactly like the icon used to.
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(SkipIconSize),
+                            strokeWidth = 3.dp,
+                            color = LocalContentColor.current
+                        )
+                    } else {
+                        Icon(
+                            // playWhenReady, not isPlaying: a scrub buffers, and isPlaying dips
+                            // false for that moment - the icon used to flick to play and back.
+                            if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playback.playWhenReady) "Pause" else "Play",
+                            modifier = Modifier.size(SkipIconSize)
+                        )
+                    }
+                }
+                IconButton(onClick = viewModel::skipForward) {
+                    SkipIcon(
+                        seconds = settings.skipForward.seconds,
+                        forward = true,
+                        contentDescription = "Forward ${settings.skipForward.seconds} seconds",
+                        modifier = Modifier.size(SkipIconSize)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Slider(
                 value = sliderPositionMillis,
@@ -204,49 +258,8 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(TRANSPORT_BUTTON_SPACING)
+                horizontalArrangement = Arrangement.spacedBy(SECONDARY_CONTROL_SPACING)
             ) {
-                IconButton(onClick = viewModel::skipBack) {
-                    SkipIcon(
-                        seconds = settings.skipBack.seconds,
-                        forward = false,
-                        contentDescription = "Back ${settings.skipBack.seconds} seconds",
-                        modifier = Modifier.size(SkipIconSize)
-                    )
-                }
-                FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
-                    if (isStalled) {
-                        // In the button's place rather than beside it, so nothing reflows. Only
-                        // after half a second of waiting - a scrub rebuffers in ~200ms, and a
-                        // spinner for that would flicker exactly like the icon used to.
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(SkipIconSize),
-                            strokeWidth = 3.dp,
-                            color = LocalContentColor.current
-                        )
-                    } else {
-                        Icon(
-                            // playWhenReady, not isPlaying: a scrub buffers, and isPlaying dips
-                            // false for that moment - the icon used to flick to play and back.
-                            if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (playback.playWhenReady) "Pause" else "Play",
-                            modifier = Modifier.size(SkipIconSize)
-                        )
-                    }
-                }
-                IconButton(onClick = viewModel::skipForward) {
-                    SkipIcon(
-                        seconds = settings.skipForward.seconds,
-                        forward = true,
-                        contentDescription = "Forward ${settings.skipForward.seconds} seconds",
-                        modifier = Modifier.size(SkipIconSize)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
                 SpeedControl(currentSpeed = playback.speed, onSpeedChange = viewModel::setSpeed)
                 SleepTimerControl(
                     state = sleepTimer,
@@ -255,6 +268,23 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit) {
                     onExtend = { viewModel.extendSleepTimer(EXTEND_MINUTES) },
                     onCancel = viewModel::cancelSleepTimer
                 )
+                // Nothing else on this screen shows what the episode is actually about - the
+                // title is truncated above the artwork, and reading the description has always
+                // meant leaving this screen anyway. Placed here rather than nearer the title so it
+                // reads as one more control among the others, not as a fifth thing competing with
+                // the artwork for attention.
+                playback.episodeId?.let { episodeId ->
+                    IconButton(
+                        onClick = { onOpenEpisode(episodeId) },
+                        modifier = Modifier.testTag(TestTags.NOW_PLAYING_INFO)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = "Episode details",
+                            modifier = Modifier.size(SecondaryControlIconSize)
+                        )
+                    }
+                }
             }
         }
     }
@@ -278,14 +308,24 @@ private fun SleepTimerControl(
     Box {
         TextButton(
             onClick = { expanded = true },
+            colors = secondaryControlColors(),
+            // A TextButton reserves room for a word on each side; with no word there, that padding
+            // is just a gap holding the moon away from its neighbours.
+            contentPadding = PaddingValues(horizontal = 12.dp),
             modifier = Modifier.testTag(TestTags.SLEEP_TIMER)
         ) {
             Icon(
-                Icons.Default.Bedtime,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp).padding(end = 2.dp)
+                Icons.Outlined.Bedtime,
+                // The icon is the whole control when the timer is off, so it has to carry the name
+                // itself rather than leave an unlabelled button for a screen reader.
+                contentDescription = if (state == SleepTimerState.Off) "Sleep timer" else null,
+                modifier = Modifier.size(SecondaryControlIconSize)
             )
-            Text(sleepTimerLabel(state))
+            // Off, the moon says it. Running, the button itself *is* the countdown - see this
+            // function's doc comment - so the remaining time stays beside the icon.
+            if (state != SleepTimerState.Off) {
+                Text(sleepTimerLabel(state), modifier = Modifier.padding(start = 4.dp))
+            }
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (state != SleepTimerState.Off) {
@@ -335,8 +375,10 @@ private fun SpeedControl(currentSpeed: Float, onSpeedChange: (Float) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
     Box {
-        TextButton(onClick = { expanded = true }) {
-            Text("Speed: ${formatSpeed(currentSpeed)}x")
+        TextButton(onClick = { expanded = true }, colors = secondaryControlColors()) {
+            // The number alone. "Speed:" was the widest part of a control whose whole job is to
+            // report one value, and a playback rate shown as "1.75x" needs no label to be read.
+            Text("${formatSpeed(currentSpeed)}x")
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             SPEEDS.forEach { speed ->
@@ -356,6 +398,33 @@ private fun SpeedControl(currentSpeed: Float, onSpeedChange: (Float) -> Unit) {
         }
     }
 }
+
+/**
+ * Plain foreground colour for the controls under the transport row - speed, sleep timer, episode
+ * details.
+ *
+ * A `TextButton` defaults its content to the accent colour, so those two were drawn in it while the
+ * info button beside them, an `IconButton`, took the ordinary foreground colour. That looked like an
+ * oversight on the info button, but the fix is the other direction: with the accent already carrying
+ * the play button and the progress bar, spending it on secondary controls as well left the screen
+ * mostly accent-coloured and nothing actually standing out.
+ */
+@Composable
+private fun secondaryControlColors() =
+    ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
+
+/**
+ * Between the three controls under the scrubber - they sat almost touching, which read as one lump
+ * rather than three separate things to press.
+ *
+ * Reads as less than it is, which is why it took two goes: each of these buttons already carries
+ * its own content padding inside its touch target, so a good part of the apparent gap is the
+ * buttons themselves and only this much is real space between them.
+ */
+private val SECONDARY_CONTROL_SPACING = 28.dp
+
+/** One size for the three controls under the transport row, so they read as a set. */
+private val SecondaryControlIconSize = 20.dp
 
 /** "1.0" reads worse than "1" for a whole-number speed; fractional speeds print as-is. */
 private fun formatSpeed(speed: Float): String =

@@ -42,6 +42,13 @@ object TestTags {
     const val CLEAR_PLAYBACK_LOG = "clearPlaybackLog"
     const val SHOW_MENU = "showMenu"
     const val MARK_ALL_PLAYED = "markAllPlayed"
+    const val REFRESH_SHOW = "refreshShow"
+    const val UNSUBSCRIBE_MENU_ITEM = "unsubscribeMenuItem"
+    const val EPISODE_OPTIONS = "episodeOptions"
+    const val EPISODE_OPTIONS_SHEET = "episodeOptionsSheet"
+
+    fun sortOption(order: com.solewis.podcaster.data.db.model.SortOrder) = "sortOption:${order.name}"
+    fun filterOption(filter: com.solewis.podcaster.ui.show.EpisodeFilter) = "filterOption:${filter.name}"
     const val MENU_ENQUEUE = "menuEnqueue"
     const val MENU_TOGGLE_PLAYED = "menuTogglePlayed"
     const val MENU_DOWNLOAD = "menuDownload"
@@ -49,12 +56,23 @@ object TestTags {
     const val SLEEP_TIMER_EXTEND = "sleepTimerExtend"
     const val SLEEP_TIMER_OFF = "sleepTimerOff"
     const val SLEEP_TIMER_END_OF_EPISODE = "sleepTimerEndOfEpisode"
+    const val NOW_PLAYING_INFO = "nowPlayingInfo"
     const val PREFETCH_WIFI_ONLY_SWITCH = "prefetchWifiOnlySwitch"
     const val CLEAR_STREAM_CACHE = "clearStreamCache"
     const val REMOVE_ALL_DOWNLOADS = "removeAllDownloads"
+    const val VIEW_CACHED_EPISODES = "viewCachedEpisodes"
+    const val STREAM_CACHE_SCREEN = "streamCacheScreen"
+    const val CLEAR_ALL_CACHED_EPISODES = "clearAllCachedEpisodes"
+
+    /** Per-entry, since a list has one of these per cached episode. */
+    fun removeCachedEpisode(episodeId: String) = "removeCachedEpisode:$episodeId"
 
     /** Per-episode, since a list has one of these per row and a test has to open a specific one. */
     fun episodeMenu(episodeTitle: String) = "episodeMenu:$episodeTitle"
+
+    /** The standalone add-to-queue button in an episode row's action row - distinct from
+     * [MENU_ENQUEUE], which is the same action from inside the `⋮` menu on a screen still using it. */
+    fun enqueueButton(episodeTitle: String) = "enqueueButton:$episodeTitle"
 
     /** Direction included: the two rows are identical apart from it, which is the bug worth catching. */
     fun skipChoice(forward: Boolean, amount: SkipAmount) =

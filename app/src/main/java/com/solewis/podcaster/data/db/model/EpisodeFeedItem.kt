@@ -13,6 +13,7 @@ data class EpisodeFeedItem(
     val podcastTitle: String,
     val podcastArtworkUrl: String?,
     val title: String,
+    val descriptionPreview: String? = null,
     val pubDateMillis: Long?,
     val durationMillis: Long?,
     val displayNumber: Int?,

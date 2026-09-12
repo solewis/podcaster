@@ -1,6 +1,5 @@
 package com.solewis.podcaster.ui.episodedetail
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,19 +20,22 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.model.EpisodeDetailItem
@@ -43,7 +44,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.RemoveDone
 import com.solewis.podcaster.ui.common.DownloadButton
 import com.solewis.podcaster.ui.common.EpisodeActionsMenu
-import com.solewis.podcaster.ui.common.BackButtonRow
+import com.solewis.podcaster.ui.common.DetailTopBar
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.episodeProgressUi
@@ -51,11 +52,21 @@ import com.solewis.podcaster.ui.common.htmlToAnnotatedString
 import androidx.compose.ui.platform.testTag
 import com.solewis.podcaster.ui.common.TestTags
 
-private const val COLLAPSED_DESCRIPTION_LINES = 8
 
 @Composable
 fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
+
+    // Where the heading and the bar currently are on screen, so the bar can take the title over at
+    // exactly the moment the heading goes behind it. Compared as on-screen bounds rather than
+    // against a scroll offset: the offset the heading sits at depends on the artwork, the show
+    // name, the progress line and whether there is a progress bar at all, so any threshold would
+    // have been a guess that quietly drifted as this screen changed.
+    var titleBottom by remember { mutableFloatStateOf(Float.MAX_VALUE) }
+    var barBottom by remember { mutableFloatStateOf(0f) }
+    // derivedStateOf so only the crossing recomposes anything - these two floats change on every
+    // frame of a scroll, and the bar only cares about the moment one passes the other.
+    val showBarTitle by remember { derivedStateOf { titleBottom < barBottom } }
 
     Scaffold(
         modifier = Modifier.testTag(TestTags.EPISODE_DETAIL_SCREEN),
@@ -65,11 +76,16 @@ fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .statusBarsPadding()
         ) {
-            BackButtonRow(onBack)
-
             val episode = state.episode
+
+            DetailTopBar(
+                title = episode?.title.orEmpty(),
+                onBack = onBack,
+                showTitle = episode != null && showBarTitle,
+                modifier = Modifier.onGloballyPositioned { barBottom = it.boundsInRoot().bottom }
+            )
+
             when {
                 episode != null -> EpisodeDetailContent(
                     episode = episode,
@@ -82,7 +98,8 @@ fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
                     download = state.download,
                     onDownload = viewModel::download,
                     onRemoveDownload = viewModel::removeDownload,
-                    onTogglePlayed = viewModel::togglePlayed
+                    onTogglePlayed = viewModel::togglePlayed,
+                    onTitleBottomChanged = { titleBottom = it }
                 )
 
                 state.isLoading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -105,7 +122,8 @@ private fun EpisodeDetailContent(
     download: EpisodeDownload?,
     onDownload: () -> Unit,
     onRemoveDownload: () -> Unit,
-    onTogglePlayed: () -> Unit
+    onTogglePlayed: () -> Unit,
+    onTitleBottomChanged: (Float) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -138,7 +156,12 @@ private fun EpisodeDetailContent(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Text(episode.title, style = MaterialTheme.typography.headlineSmall)
+        Text(
+            episode.title,
+            style = MaterialTheme.typography.headlineSmall,
+            // Reports itself on every scroll frame; the bar decides what to do about it.
+            modifier = Modifier.onGloballyPositioned { onTitleBottomChanged(it.boundsInRoot().bottom) }
+        )
 
         val progress = episodeProgressUi(
             pubDateMillis = episode.pubDateMillis,
@@ -186,17 +209,26 @@ private fun EpisodeDetailContent(
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(12.dp))
-            // Outlined, so it reads as the second button in the row rather than as an icon
-            // decorating the first.
+            Spacer(modifier = Modifier.width(8.dp))
+            // The same three controls in the same order as an episode row, and bare rather than
+            // outlined. Play is already a labelled, filled button taking the width the other three
+            // leave; giving those three containers of their own as well made a row of four things
+            // all claiming to be buttons of roughly equal standing.
+            IconButton(
+                onClick = onEnqueue,
+                modifier = Modifier.testTag(TestTags.enqueueButton(episode.title))
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.PlaylistAdd,
+                    contentDescription = "Add ${episode.title} to queue"
+                )
+            }
             DownloadButton(
                 episodeTitle = episode.title,
                 download = download,
                 onDownload = onDownload,
-                onRemove = onRemoveDownload,
-                outlined = true
+                onRemove = onRemoveDownload
             )
-            Spacer(modifier = Modifier.width(4.dp))
             // Everything that is neither "play it" nor "keep it" goes behind the overflow, the
             // same as on every episode row. Marking finished used to be a labelled text button
             // sitting on its own line under Play, which read like a second primary action for
@@ -208,8 +240,7 @@ private fun EpisodeDetailContent(
                 onEnqueue = onEnqueue,
                 onDownload = onDownload,
                 onRemoveDownload = onRemoveDownload,
-                onTogglePlayed = onTogglePlayed,
-                includeDownload = false
+                onTogglePlayed = onTogglePlayed
             )
         }
 
@@ -238,26 +269,9 @@ private fun DescriptionSection(descriptionHtml: String?) {
         return
     }
 
-    var expanded by remember(description) { mutableStateOf(false) }
-    // Only worth offering the toggle once the text actually overflows - short notes shouldn't
-    // grow a "Show more" that does nothing.
-    var overflows by remember(description) { mutableStateOf(false) }
-
-    Text(
-        description,
-        style = MaterialTheme.typography.bodyMedium,
-        maxLines = if (expanded) Int.MAX_VALUE else COLLAPSED_DESCRIPTION_LINES,
-        overflow = TextOverflow.Ellipsis,
-        onTextLayout = { if (!expanded) overflows = it.hasVisualOverflow },
-        modifier = Modifier.animateContentSize()
-    )
-
-    if (overflows || expanded) {
-        TextButton(
-            onClick = { expanded = !expanded },
-            modifier = Modifier.padding(top = 4.dp)
-        ) {
-            Text(if (expanded) "Show less" else "Show more")
-        }
-    }
+    // Shown in full, with no collapse. Truncating at eight lines was worth a tap when it saved you
+    // scrolling past the notes to reach something - but the description is the last thing on this
+    // screen, so the only thing "Show more" ever revealed was the text directly above where the
+    // button itself had been.
+    Text(description, style = MaterialTheme.typography.bodyMedium)
 }

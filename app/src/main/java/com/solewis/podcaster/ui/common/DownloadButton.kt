@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.repo.DownloadStatus
 import com.solewis.podcaster.data.repo.EpisodeDownload
@@ -45,8 +46,15 @@ fun DownloadButton(
      * tappable from the company it keeps; on the episode screen it stands beside a filled Play
      * button, where a bare icon reads as decoration rather than as the second control in a row.
      */
-    outlined: Boolean = false
+    outlined: Boolean = false,
+    /**
+     * Unspecified leaves every icon at the Material default. A list row passes an explicit size so
+     * this button matches the others it sits in a line with, which are drawn smaller than default
+     * to keep the row short - see [EpisodeActionRow].
+     */
+    iconSize: Dp = Dp.Unspecified
 ) {
+    fun Modifier.icon() = if (iconSize == Dp.Unspecified) this else this.size(iconSize)
     val status = download?.status
     var confirmingDelete by remember { mutableStateOf(false) }
 
@@ -75,19 +83,21 @@ fun DownloadButton(
         when (status) {
             null -> Icon(
                 Icons.Default.Download,
-                contentDescription = "Download this episode"
+                contentDescription = "Download this episode",
+                modifier = Modifier.icon()
             )
 
             DownloadStatus.QUEUED -> Icon(
                 Icons.Default.Download,
                 contentDescription = "Queued for download - tap to cancel",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.icon()
             )
 
             DownloadStatus.DOWNLOADING -> Box(contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
                     progress = { download.percent / 100f },
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(if (iconSize == Dp.Unspecified) 20.dp else iconSize)
                 )
                 Icon(
                     Icons.Default.Close,
@@ -99,19 +109,22 @@ fun DownloadButton(
             DownloadStatus.DOWNLOADED -> Icon(
                 Icons.Default.DownloadDone,
                 contentDescription = "Downloaded - tap to delete",
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.icon()
             )
 
             DownloadStatus.FAILED -> Icon(
                 Icons.Default.ErrorOutline,
                 contentDescription = "Download failed - tap to retry",
-                tint = MaterialTheme.colorScheme.error
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.icon()
             )
 
             DownloadStatus.REMOVING -> Icon(
                 Icons.Default.Download,
                 contentDescription = "Deleting",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.icon()
             )
         }
     }

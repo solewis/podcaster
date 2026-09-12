@@ -18,9 +18,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -40,12 +37,12 @@ import com.solewis.podcaster.data.db.model.EpisodeFeedItem
 import com.solewis.podcaster.data.repo.EpisodeDownload
 import com.solewis.podcaster.data.db.model.HomeShowSummary
 import com.solewis.podcaster.ui.common.EmptyState
-import com.solewis.podcaster.ui.common.EpisodeProgressBar
-import com.solewis.podcaster.ui.common.EpisodeActionsMenu
+import com.solewis.podcaster.ui.common.EpisodeActionRow
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
+import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
+import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.PodcastArtwork
-import com.solewis.podcaster.ui.common.EpisodeMetaLine
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.TestTags
@@ -142,77 +139,63 @@ private fun FeedEpisodeRow(
     onRemoveDownload: () -> Unit,
     onTogglePlayed: () -> Unit
 ) {
-    Row(
-        // Tappable to open episode details; the play/enqueue icons keep their own click targets,
+    Column(
+        // Tappable to open episode details; the trailing controls keep their own click targets,
         // matching the nested-clickable pattern used elsewhere (e.g. MiniPlayer).
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.Top
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        PodcastArtwork(
-            artworkUrl = episode.artworkUrl ?: episode.podcastArtworkUrl,
-            modifier = Modifier.size(EpisodeArtworkSize)
+        // Centred against the artwork for the same reason the show's own list is - and centred in
+        // both so that a row does not sit differently depending on which list you reached it from.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PodcastArtwork(
+                artworkUrl = episode.artworkUrl ?: episode.podcastArtworkUrl,
+                modifier = Modifier.size(EpisodeArtworkSize)
+            )
+            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(
+                    episode.podcastTitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1
+                )
+                Text(
+                    episode.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+
+        EpisodeDescriptionPreview(episode.descriptionPreview)
+
+        val progress = episodeProgressUi(
+            pubDateMillis = episode.pubDateMillis,
+            durationMillis = episode.durationMillis,
+            positionMillis = episode.positionMillis,
+            isPlayed = episode.isPlayed,
+            livePositionMillis = nowPlayingPositionMillis.takeIf { isNowPlaying },
+            liveDurationMillis = nowPlayingDurationMillis.takeIf { isNowPlaying }
         )
+        val label = listOfNotNull(
+            progress.label.takeIf { it.isNotEmpty() },
+            downloadStatusLabel(download)
+        ).joinToString(" · ")
+        EpisodeMetaAndProgressRow(progress = progress.copy(label = label), isPlayed = episode.isPlayed)
 
-        Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(
-                episode.podcastTitle,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1
-            )
-            Text(
-                episode.title,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-
-            val progress = episodeProgressUi(
-                pubDateMillis = episode.pubDateMillis,
-                durationMillis = episode.durationMillis,
-                positionMillis = episode.positionMillis,
-                isPlayed = episode.isPlayed,
-                livePositionMillis = nowPlayingPositionMillis.takeIf { isNowPlaying },
-                liveDurationMillis = nowPlayingDurationMillis.takeIf { isNowPlaying }
-            )
-            val label = listOfNotNull(
-                progress.label.takeIf { it.isNotEmpty() },
-                downloadStatusLabel(download)
-            ).joinToString(" · ")
-            EpisodeMetaLine(
-                label = label,
-                isPlayed = episode.isPlayed,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-            if (progress.showBar) {
-                EpisodeProgressBar(
-                    positionMillis = progress.positionMillis!!,
-                    durationMillis = progress.durationMillis!!,
-                    modifier = Modifier.padding(top = 6.dp)
-                )
-            }
-        }
-
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row {
-                IconButton(onClick = onPlayOrToggle, enabled = !isLoading) {
-                    when {
-                        isLoading -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        isNowPlaying -> Icon(Icons.Default.Pause, contentDescription = "Pause ${episode.title}")
-                        else -> Icon(Icons.Default.PlayArrow, contentDescription = "Play ${episode.title}")
-                    }
-                }
-                EpisodeActionsMenu(
-                    episodeTitle = episode.title,
-                    isPlayed = episode.isPlayed,
-                    download = download,
-                    onEnqueue = onEnqueue,
-                    onDownload = onDownload,
-                    onRemoveDownload = onRemoveDownload,
-                    onTogglePlayed = onTogglePlayed
-                )
-            }
-        }
+        EpisodeActionRow(
+            episodeTitle = episode.title,
+            isPlaying = isNowPlaying,
+            isLoading = isLoading,
+            onPlayOrToggle = onPlayOrToggle,
+            onEnqueue = onEnqueue,
+            download = download,
+            onDownload = onDownload,
+            onRemoveDownload = onRemoveDownload,
+            isPlayed = episode.isPlayed,
+            onTogglePlayed = onTogglePlayed
+        )
     }
 }

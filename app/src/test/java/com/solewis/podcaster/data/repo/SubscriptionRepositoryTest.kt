@@ -484,4 +484,30 @@ class SubscriptionRepositoryTest {
             assertThat(results).hasSize(1)
             assertThat(results.single()).isInstanceOf(RefreshResult.Failure::class.java)
         }
+
+    @Test
+    fun subscribe_computes_a_plain_text_preview_from_the_html_description() = runTest {
+        host.enqueueBody(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0"><channel>
+                <title>A Show</title>
+                <item>
+                    <title>Episode One</title>
+                    <description>&lt;p&gt;Real &lt;b&gt;show notes&lt;/b&gt; go here.&lt;/p&gt;</description>
+                    <enclosure url="https://example.com/ep1.mp3" length="100" type="audio/mpeg"/>
+                </item>
+            </channel></rss>
+            """.trimIndent(),
+            contentType = "application/rss+xml"
+        )
+
+        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+
+        val episode = db.episodeDao().getAllForPodcast(podcastId).single()
+        assertThat(episode.descriptionHtml).isEqualTo("<p>Real <b>show notes</b> go here.</p>")
+        // The tags and entities are gone, not just re-escaped - a list row renders this as plain
+        // Text, which would otherwise show the literal "&lt;p&gt;" or a stray "<b>".
+        assertThat(episode.descriptionPreview).isEqualTo("Real show notes go here.")
+    }
 }

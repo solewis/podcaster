@@ -193,4 +193,75 @@ class EpisodeRepositoryTest {
         assertThat(stored?.durationMillis).isEqualTo(987_000)
         assertThat(stored?.durationIsExact).isTrue()
     }
+
+    /**
+     * The description preview was added as a column that only a feed refresh writes, which left
+     * every episode already in the library showing no preview - and a settled back catalogue
+     * answers a conditional GET with 304 forever, so "until the feed next changes" meant "never".
+     * Reported as simply not seeing the descriptions at all.
+     */
+    @Test
+    fun an_episode_stored_before_the_preview_column_existed_gets_one_from_its_description() = runTest {
+        db.episodeDao().insertNew(
+            listOf(
+                episodeRow(
+                    podcastId, "1",
+                    descriptionHtml = "<p>Two &amp;amp; a half thoughts</p>",
+                    descriptionPreview = null
+                )
+            )
+        )
+
+        assertThat(repository.backfillDescriptionPreviews()).isEqualTo(1)
+
+        // Tags stripped and the feed's double-encoded entity resolved, the same treatment a fresh
+        // refresh would have given it.
+        assertThat(db.episodeDao().getById("$podcastId:1")?.descriptionPreview)
+            .isEqualTo("Two & a half thoughts")
+    }
+
+    @Test
+    fun the_backfill_leaves_a_preview_that_is_already_there_alone() = runTest {
+        db.episodeDao().insertNew(
+            listOf(
+                episodeRow(
+                    podcastId, "1",
+                    descriptionHtml = "<p>The full show notes.</p>",
+                    descriptionPreview = "What the last refresh stored"
+                )
+            )
+        )
+
+        assertThat(repository.backfillDescriptionPreviews()).isEqualTo(0)
+        assertThat(db.episodeDao().getById("$podcastId:1")?.descriptionPreview)
+            .isEqualTo("What the last refresh stored")
+    }
+
+    @Test
+    fun a_description_that_is_all_markup_is_settled_rather_than_retried_on_every_launch() = runTest {
+        // Real feeds do contain these. Left NULL, such a row would be selected and re-stripped on
+        // every single app launch for as long as it existed, because nothing about it would have
+        // changed - so the pass has to reach a fixed point.
+        db.episodeDao().insertNew(
+            listOf(episodeRow(podcastId, "1", descriptionHtml = "<p></p>", descriptionPreview = null))
+        )
+
+        assertThat(repository.backfillDescriptionPreviews()).isEqualTo(1)
+        assertThat(repository.backfillDescriptionPreviews()).isEqualTo(0)
+        assertThat(db.episodeDao().getById("$podcastId:1")?.descriptionPreview).isEmpty()
+    }
+
+    @Test
+    fun a_preview_longer_than_a_row_can_show_is_stored_truncated() = runTest {
+        db.episodeDao().insertNew(
+            listOf(episodeRow(podcastId, "1", descriptionHtml = "a".repeat(1_000), descriptionPreview = null))
+        )
+
+        repository.backfillDescriptionPreviews()
+
+        // The same bound a refresh applies - the column exists so a list row never has to hold a
+        // whole episode's show notes.
+        assertThat(db.episodeDao().getById("$podcastId:1")?.descriptionPreview)
+            .hasLength(SubscriptionRepository.DESCRIPTION_PREVIEW_LENGTH)
+    }
 }

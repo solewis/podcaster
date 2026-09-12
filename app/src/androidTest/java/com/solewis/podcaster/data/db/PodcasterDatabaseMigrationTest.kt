@@ -62,4 +62,39 @@ class PodcasterDatabaseMigrationTest {
 
         migrated.close()
     }
+
+    @Test
+    fun migrate2To3_addsDescriptionPreviewWithoutLosingExistingData() {
+        helper.createDatabase(testDbName, 2).apply {
+            execSQL(
+                "INSERT INTO podcasts (id, feedUrl, title, subscribedAt) VALUES (1, 'https://example.com/feed.xml', 'Test Show', 1000)"
+            )
+            execSQL(
+                """
+                INSERT INTO episodes
+                    (id, podcastId, stableKey, stableKeySource, title, descriptionHtml, enclosureUrl, feedPosition, firstSeenAt, positionMillis, isPlayed)
+                VALUES
+                    ('1:abc', 1, 'abc', 'hash', 'Ep 1', '<p>Show notes</p>', 'https://example.com/ep1.mp3', 0, 1000, 42000, 0)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(testDbName, 3, true, MIGRATION_2_3)
+
+        // Existing data survives, including the column the migration does not touch.
+        migrated.query("SELECT descriptionHtml, positionMillis FROM episodes WHERE id = '1:abc'").use { cursor ->
+            assertThat(cursor.moveToFirst()).isTrue()
+            assertThat(cursor.getString(0)).isEqualTo("<p>Show notes</p>")
+            assertThat(cursor.getLong(1)).isEqualTo(42000L)
+        }
+        // The new column exists and reads back null for a row that predates it - nothing
+        // backfills old rows; the next feed refresh does that naturally.
+        migrated.query("SELECT descriptionPreview FROM episodes WHERE id = '1:abc'").use { cursor ->
+            assertThat(cursor.moveToFirst()).isTrue()
+            assertThat(cursor.isNull(0)).isTrue()
+        }
+
+        migrated.close()
+    }
 }

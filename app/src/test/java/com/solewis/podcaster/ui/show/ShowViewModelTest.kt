@@ -86,12 +86,79 @@ class ShowViewModelTest {
         assertThat(vm.state.value.episodes.map { it.title })
             .containsExactly("Episode 3", "Episode 2", "Episode 1").inOrder()
 
-        vm.toggleSortOrder()
+        vm.setSortOrder(SortOrder.OLDEST_FIRST)
 
         val flipped = vm.state.awaitValue { it.podcast?.sortOrder == SortOrder.OLDEST_FIRST }
         assertThat(flipped.episodes.map { it.title })
             .containsExactly("Episode 1", "Episode 2", "Episode 3").inOrder()
     }
+
+    @Test
+    fun the_list_starts_unfiltered() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+
+        assertThat(vm.state.value.filter).isEqualTo(EpisodeFilter.ALL)
+        assertThat(vm.state.value.episodes).hasSize(3)
+    }
+
+    @Test
+    fun filtering_to_unfinished_drops_the_played_ones() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+        graph.db.episodeDao().markPlayed("$podcastId:2", now = 5_000)
+        vm.state.awaitValue { state -> state.episodes.any { it.id == "$podcastId:2" && it.isPlayed } }
+
+        vm.setFilter(EpisodeFilter.UNFINISHED)
+
+        val filtered = vm.state.awaitValue { it.filter == EpisodeFilter.UNFINISHED }
+        assertThat(filtered.episodes.map { it.title })
+            .containsExactly("Episode 3", "Episode 1").inOrder()
+    }
+
+    @Test
+    fun filtering_to_downloaded_keeps_only_what_is_on_the_device() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+        graph.downloads.emit("$podcastId:2", DownloadStatus.DOWNLOADED)
+
+        vm.setFilter(EpisodeFilter.DOWNLOADED)
+
+        val filtered = vm.state.awaitValue { it.filter == EpisodeFilter.DOWNLOADED }
+        assertThat(filtered.episodes.map { it.title }).containsExactly("Episode 2")
+    }
+
+    /**
+     * An episode part-way through a download is not on the device yet, so it does not belong in a
+     * list whose whole promise is "these will play with no signal".
+     */
+    @Test
+    fun a_download_still_in_progress_does_not_count_as_downloaded() = runTest(mainDispatcher.dispatcher) {
+        val vm = loadedViewModel()
+        graph.downloads.emit("$podcastId:2", DownloadStatus.DOWNLOADING)
+
+        vm.setFilter(EpisodeFilter.DOWNLOADED)
+
+        val filtered = vm.state.awaitValue { it.filter == EpisodeFilter.DOWNLOADED }
+        assertThat(filtered.episodes).isEmpty()
+    }
+
+    /**
+     * The pill's index addresses the list as drawn. Resolving the target against every episode but
+     * indexing into the filtered list is exactly how it would come to point at the wrong row, so
+     * when the filter hides the target there is no pill at all.
+     */
+    @Test
+    fun no_pill_when_the_filter_has_hidden_the_episode_it_would_jump_to() =
+        runTest(mainDispatcher.dispatcher) {
+            val vm = loadedViewModel()
+            graph.db.episodeDao().setProgress("$podcastId:1", positionMillis = 60_000, isPlayed = false, now = 5_000)
+            vm.state.awaitValue { it.jump != null }
+
+            graph.downloads.emit("$podcastId:2", DownloadStatus.DOWNLOADED)
+            vm.setFilter(EpisodeFilter.DOWNLOADED)
+
+            val filtered = vm.state.awaitValue { it.filter == EpisodeFilter.DOWNLOADED }
+            assertThat(filtered.episodes.map { it.id }).doesNotContain("$podcastId:1")
+            assertThat(filtered.jump).isNull()
+        }
 
     @Test
     fun trailers_trail_the_list_whichever_way_it_is_sorted() = runTest(mainDispatcher.dispatcher) {
@@ -107,7 +174,7 @@ class ShowViewModelTest {
 
         assertThat(vm.state.value.episodes.last().title).isEqualTo("Trailer")
 
-        vm.toggleSortOrder()
+        vm.setSortOrder(SortOrder.OLDEST_FIRST)
 
         val flipped = vm.state.awaitValue { it.podcast?.sortOrder == SortOrder.OLDEST_FIRST }
         assertThat(flipped.episodes.last().title).isEqualTo("Trailer")
@@ -166,7 +233,7 @@ class ShowViewModelTest {
         val newestFirst = vm.state.awaitValue { it.jump != null }.jump!!
         assertThat(newestFirst.itemIndex).isEqualTo(2)
 
-        vm.toggleSortOrder()
+        vm.setSortOrder(SortOrder.OLDEST_FIRST)
 
         val oldestFirst = vm.state.awaitValue { it.podcast?.sortOrder == SortOrder.OLDEST_FIRST }.jump!!
         assertThat(oldestFirst.itemIndex).isEqualTo(0)

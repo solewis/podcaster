@@ -47,6 +47,37 @@ class EpisodeRepository(
     }
 
     /**
+     * Fills in the list-row description preview for episodes stored before that column existed.
+     *
+     * Needed because the two things that would otherwise populate it both miss the existing
+     * library: the schema migration can only default the column to NULL (SQLite cannot strip
+     * HTML), and the feed refresh writes it only for feeds that actually return new content - a
+     * settled back catalogue answers a conditional GET with 304 indefinitely. Without this, every
+     * episode already subscribed to would show no preview, which is exactly what the column was
+     * added for.
+     *
+     * Writes one row at a time rather than in a transaction: it is a cosmetic field, so a process
+     * death partway through should leave the rows it did reach filled in and let the next launch
+     * pick up the rest, rather than rolling the whole pass back.
+     *
+     * A description that strips down to nothing (markup with no text in it, which real feeds do
+     * contain) is stored as an empty string rather than left NULL, so that the pass is a fixed
+     * point - a NULL would be re-selected and re-stripped on every launch for as long as the
+     * episode existed. The row renders identically either way.
+     *
+     * Returns how many rows it wrote, for tests.
+     */
+    suspend fun backfillDescriptionPreviews(): Int {
+        val pending = episodeDao.episodesMissingDescriptionPreview()
+        pending.forEach { source ->
+            val preview = HtmlToText.toPlainText(source.descriptionHtml)
+                ?.take(SubscriptionRepository.DESCRIPTION_PREVIEW_LENGTH)
+            episodeDao.setDescriptionPreview(id = source.id, descriptionPreview = preview.orEmpty())
+        }
+        return pending.size
+    }
+
+    /**
      * [EpisodeListItem]/[EpisodeFeedItem] (what the list screens hold) deliberately omit
      * `enclosureUrl` - they're lightweight list projections. This fetches the one field playback
      * actually needs, packaged with the podcast title/artwork the caller already has on hand
