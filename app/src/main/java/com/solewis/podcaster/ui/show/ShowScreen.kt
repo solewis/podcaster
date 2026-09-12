@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -435,10 +436,20 @@ private fun EpisodeListControls(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TextButton(onClick = onOpenOptions, modifier = Modifier.testTag(TestTags.EPISODE_OPTIONS)) {
+        TextButton(
+            onClick = onOpenOptions,
+            // A TextButton's content defaults to the accent colour, so the tint below used to be
+            // the accent either way and the icon was permanently lit. Neutral here is what gives
+            // the accent something to mean.
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+            modifier = Modifier.testTag(TestTags.EPISODE_OPTIONS)
+        ) {
             Icon(
                 Icons.Default.Tune,
-                contentDescription = null,
+                // Colour is the whole signal that episodes are being hidden, and colour is exactly
+                // what a screen reader does not get - so the filter is named here when one is on.
+                contentDescription = if (filter == EpisodeFilter.ALL) null
+                else "Filtered to ${filter.label.lowercase()}",
                 modifier = Modifier.size(18.dp),
                 tint = if (filter == EpisodeFilter.ALL) LocalContentColor.current
                 else MaterialTheme.colorScheme.primary

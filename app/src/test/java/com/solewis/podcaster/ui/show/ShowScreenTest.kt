@@ -359,6 +359,32 @@ class ShowScreenTest {
         }
     }
 
+    /**
+     * The options icon is meant to be lit only while something is hidden. It was lit always: a
+     * TextButton's content colour is already the accent, so `LocalContentColor.current` and
+     * `colorScheme.primary` were the same colour and the conditional did nothing.
+     *
+     * Asserted through the icon's description rather than its tint, because a test cannot read a
+     * colour - and because colour alone was never enough anyway. A screen reader gets nothing from
+     * a tinted icon, so the same condition now names the filter out loud.
+     */
+    @Test
+    fun the_options_icon_announces_a_filter_only_while_one_is_hiding_episodes() {
+        openShow()
+
+        compose.onNodeWithContentDescription("Filtered", substring = true).assertDoesNotExist()
+
+        compose.onNodeWithTag(TestTags.EPISODE_OPTIONS).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag(TestTags.filterOption(EpisodeFilter.DOWNLOADED)).performClick()
+        compose.waitForIdle()
+
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithContentDescription("Filtered to downloaded", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test
     fun the_row_for_the_playing_episode_offers_pause_rather_than_play() {
         // Reported: an episode started from this list kept showing a play arrow, so the row that
