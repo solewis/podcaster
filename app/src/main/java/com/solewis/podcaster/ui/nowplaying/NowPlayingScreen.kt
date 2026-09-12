@@ -160,6 +160,53 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit, onOpenE
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // Transport above the scrubber, so the bar sits between the two rows of controls
+            // rather than on the far side of both. The times printed under it belong to the bar and
+            // travel with it.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(TRANSPORT_BUTTON_SPACING)
+            ) {
+                IconButton(onClick = viewModel::skipBack) {
+                    SkipIcon(
+                        seconds = settings.skipBack.seconds,
+                        forward = false,
+                        contentDescription = "Back ${settings.skipBack.seconds} seconds",
+                        modifier = Modifier.size(SkipIconSize)
+                    )
+                }
+                FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
+                    if (isStalled) {
+                        // In the button's place rather than beside it, so nothing reflows. Only
+                        // after half a second of waiting - a scrub rebuffers in ~200ms, and a
+                        // spinner for that would flicker exactly like the icon used to.
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(SkipIconSize),
+                            strokeWidth = 3.dp,
+                            color = LocalContentColor.current
+                        )
+                    } else {
+                        Icon(
+                            // playWhenReady, not isPlaying: a scrub buffers, and isPlaying dips
+                            // false for that moment - the icon used to flick to play and back.
+                            if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playback.playWhenReady) "Pause" else "Play",
+                            modifier = Modifier.size(SkipIconSize)
+                        )
+                    }
+                }
+                IconButton(onClick = viewModel::skipForward) {
+                    SkipIcon(
+                        seconds = settings.skipForward.seconds,
+                        forward = true,
+                        contentDescription = "Forward ${settings.skipForward.seconds} seconds",
+                        modifier = Modifier.size(SkipIconSize)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Slider(
                 value = sliderPositionMillis,
                 valueRange = 0f..durationMillis.toFloat(),
@@ -211,49 +258,8 @@ fun NowPlayingScreen(viewModel: NowPlayingViewModel, onBack: () -> Unit, onOpenE
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(TRANSPORT_BUTTON_SPACING)
+                horizontalArrangement = Arrangement.spacedBy(SECONDARY_CONTROL_SPACING)
             ) {
-                IconButton(onClick = viewModel::skipBack) {
-                    SkipIcon(
-                        seconds = settings.skipBack.seconds,
-                        forward = false,
-                        contentDescription = "Back ${settings.skipBack.seconds} seconds",
-                        modifier = Modifier.size(SkipIconSize)
-                    )
-                }
-                FilledIconButton(onClick = viewModel::togglePlayPause, modifier = Modifier.size(72.dp)) {
-                    if (isStalled) {
-                        // In the button's place rather than beside it, so nothing reflows. Only
-                        // after half a second of waiting - a scrub rebuffers in ~200ms, and a
-                        // spinner for that would flicker exactly like the icon used to.
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(SkipIconSize),
-                            strokeWidth = 3.dp,
-                            color = LocalContentColor.current
-                        )
-                    } else {
-                        Icon(
-                            // playWhenReady, not isPlaying: a scrub buffers, and isPlaying dips
-                            // false for that moment - the icon used to flick to play and back.
-                            if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (playback.playWhenReady) "Pause" else "Play",
-                            modifier = Modifier.size(SkipIconSize)
-                        )
-                    }
-                }
-                IconButton(onClick = viewModel::skipForward) {
-                    SkipIcon(
-                        seconds = settings.skipForward.seconds,
-                        forward = true,
-                        contentDescription = "Forward ${settings.skipForward.seconds} seconds",
-                        modifier = Modifier.size(SkipIconSize)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
                 SpeedControl(currentSpeed = playback.speed, onSpeedChange = viewModel::setSpeed)
                 SleepTimerControl(
                     state = sleepTimer,
@@ -406,6 +412,10 @@ private fun SpeedControl(currentSpeed: Float, onSpeedChange: (Float) -> Unit) {
 @Composable
 private fun secondaryControlColors() =
     ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
+
+/** Between the three controls under the scrubber - they sat almost touching, which read as
+ * one lump rather than three separate things to press. */
+private val SECONDARY_CONTROL_SPACING = 12.dp
 
 /** One size for the three controls under the transport row, so they read as a set. */
 private val SecondaryControlIconSize = 20.dp
