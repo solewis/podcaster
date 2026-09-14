@@ -11,6 +11,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -246,8 +247,36 @@ class ShowScreenTest {
 
         compose.onNodeWithText("Episodes").assertIsDisplayed()
         compose.onNodeWithText("About").assertIsDisplayed()
-        // The header went with the scroll - it is not pinned alongside the tabs.
+        // The sort/filter control is pinned with the tabs: deciding how to sort a list is something
+        // you do while reading it, and it used to mean scrolling back to the top of the show.
+        compose.onNodeWithTag(TestTags.EPISODE_OPTIONS).assertIsDisplayed()
+        // The header went with the scroll - it is not pinned alongside them.
         compose.onNodeWithTag(TestTags.SHOW_MENU).assertDoesNotExist()
+    }
+
+    /**
+     * Both change what the list contains, so the row you were parked on is either somewhere else or
+     * gone entirely - keeping the offset would leave you mid-way through a list you have not seen.
+     */
+    @Test
+    fun changing_the_sort_order_returns_to_the_top_of_the_list() {
+        openShow(extraEpisodes = 30)
+        repeat(6) {
+            compose.onNodeWithTag(TestTags.SHOW_SCREEN).performTouchInput { swipeUp() }
+            compose.waitForIdle()
+        }
+        // Scrolled well past the show header.
+        compose.onNodeWithTag(TestTags.SHOW_MENU).assertDoesNotExist()
+
+        compose.onNodeWithTag(TestTags.EPISODE_OPTIONS).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag(TestTags.sortOption(SortOrder.OLDEST_FIRST)).performClick()
+        compose.waitForIdle()
+
+        // Back at the top, so the show header is on screen again.
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithTag(TestTags.SHOW_MENU).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     /**
