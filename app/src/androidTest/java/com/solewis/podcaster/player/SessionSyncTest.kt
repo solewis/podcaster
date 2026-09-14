@@ -218,6 +218,29 @@ class SessionSyncTest {
         assertThat(playback.progress.value.positionMillis).isAtLeast(4_000)
     }
 
+    /**
+     * The ticker used to find out that playback had started by asking every 500ms. It waits on the
+     * state instead now, which is the same fact arriving by the route it was already being
+     * delivered on - but it means a resume has to actually restart the loop, where before the poll
+     * would have picked it up regardless of whether anything was listening.
+     */
+    @Test
+    fun the_clock_picks_up_again_after_a_pause_and_resume_from_outside_the_app() {
+        val playback = coldApp()
+        runBlocking(Dispatchers.Main) { playback.syncWithSession() }
+        awaitPlayer("the clock to be running") { playback.progress.value.positionMillis > 0 }
+
+        onMain { external.pause() }
+        awaitPlayer("the app to see the pause") { !playback.state.value.isPlaying }
+        val whilePaused = playback.progress.value.positionMillis
+
+        onMain { external.play() }
+
+        awaitPlayer("the clock to advance again") {
+            playback.progress.value.positionMillis > whilePaused
+        }
+    }
+
     @Test
     fun the_clock_starts_ticking_after_a_sync() {
         val playback = coldApp()
