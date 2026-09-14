@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * A [Playback] that records what it was asked to do and lets a test drive playback state directly.
@@ -50,18 +51,20 @@ class FakePlayback : Playback {
         _errors.tryEmit(message)
     }
 
-    val played = mutableListOf<PlayableEpisode>()
-    val restored = mutableListOf<PlayableEpisode>()
+    // Copy-on-write: written from the code under test, read from polling assertions, on different
+    // threads. See FakeDownloads for the ConcurrentModificationException this prevents.
+    val played: MutableList<PlayableEpisode> = CopyOnWriteArrayList()
+    val restored: MutableList<PlayableEpisode> = CopyOnWriteArrayList()
     var togglePlayPauseCount = 0
         private set
     var pauseCount = 0
         private set
-    val seekedTo = mutableListOf<Long>()
+    val seekedTo: MutableList<Long> = CopyOnWriteArrayList()
     var skipForwardCount = 0
         private set
     var skipBackCount = 0
         private set
-    val speedsSet = mutableListOf<Float>()
+    val speedsSet: MutableList<Float> = CopyOnWriteArrayList()
 
     override suspend fun play(episode: PlayableEpisode) {
         played += episode
