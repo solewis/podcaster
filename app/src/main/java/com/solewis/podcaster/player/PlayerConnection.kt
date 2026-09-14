@@ -86,6 +86,27 @@ class PlayerConnection(
             }
         }
 
+        // Adopt any session that appears, rather than only the one that happens to be there when a
+        // screen starts.
+        //
+        // Reported from the car: get in, playback starts on its own, and the phone still shows a
+        // play button - while a pause from the car afterwards came through fine. Nothing had built
+        // a controller (that happens on the first command), and the one thing that adopts an
+        // outside session runs on ON_START, which does not fire again for an app that was already
+        // open. So the session started with nobody listening; whatever built a controller later
+        // got a listener, which is why the *next* change was heard and the first was not.
+        //
+        // Costs nothing when nothing is running - the flag is false and this does not connect, so
+        // the deliberate laziness about not starting a service to browse the library is intact.
+        // When a session does appear, connecting is enough on its own: even if it has no item
+        // loaded yet and there is nothing to adopt, the listener is attached in time to hear
+        // playback start.
+        scope.launch {
+            PlaybackService.isRunningFlow.collect { running ->
+                if (running && controller == null) syncWithSession()
+            }
+        }
+
         // The other half of [PlaybackErrorRetrier]: that class keeps trying in silence, and this
         // is what notices if it never pays off. Fires once per error - clearing
         // `hasRecoverableNetworkError` here is what stops the spinner along with the message,

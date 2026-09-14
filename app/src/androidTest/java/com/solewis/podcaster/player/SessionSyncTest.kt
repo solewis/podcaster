@@ -162,6 +162,26 @@ class SessionSyncTest {
         }
     }
 
+    /**
+     * Reported from the car: get in, the podcast starts on its own, and the phone's play button
+     * still shows play. Pausing from the car afterwards *did* register.
+     *
+     * That asymmetry is the whole diagnosis. Nothing had built a `MediaController` yet - it is
+     * built lazily on the first command - and the one thing that adopts an outside session,
+     * `syncWithSession`, runs on ON_START, which does not fire again for an app that was already
+     * open when the car connected. So the session started unheard. Whatever later built a
+     * controller then had a listener attached, which is why the *next* change came through.
+     *
+     * Deliberately never calls syncWithSession: the point is that nobody is there to call it.
+     */
+    @Test
+    fun a_session_that_starts_while_the_app_is_open_is_noticed_without_being_asked() {
+        val playback = coldApp()
+
+        awaitPlayer("the app to notice playback it did not start") { playback.state.value.isPlaying }
+        assertThat(playback.state.value.episodeId).isEqualTo(episodeId)
+    }
+
     @Test
     fun a_cold_app_syncing_with_a_live_session_reports_it_as_playing() {
         val playback = coldApp()
