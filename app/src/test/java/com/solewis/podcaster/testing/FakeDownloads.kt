@@ -6,6 +6,7 @@ import com.solewis.podcaster.data.repo.EpisodeDownload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * A [Downloads] that records what it was asked to do and lets a test drive download state directly.
@@ -20,8 +21,14 @@ class FakeDownloads : Downloads {
     private val _states = MutableStateFlow<Map<String, EpisodeDownload>>(emptyMap())
     override fun observe(): Flow<Map<String, EpisodeDownload>> = _states.asStateFlow()
 
-    val requested = mutableListOf<String>()
-    val removed = mutableListOf<String>()
+    /**
+     * Copy-on-write because these are written from the code under test and read from a polling
+     * assertion, on different threads. A plain ArrayList threw ConcurrentModificationException out
+     * of `awaitTrue`'s predicate - not often, and never in the test that caused it, since the
+     * reader is whoever happens to be waiting.
+     */
+    val requested: MutableList<String> = CopyOnWriteArrayList()
+    val removed: MutableList<String> = CopyOnWriteArrayList()
     var bytesOnDisk = 0L
 
     override suspend fun downloadedBytes(): Long = bytesOnDisk

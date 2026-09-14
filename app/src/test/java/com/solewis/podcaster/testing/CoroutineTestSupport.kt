@@ -119,7 +119,14 @@ suspend fun CoroutineScope.settle() {
     withContext(Dispatchers.Default) { delay(SETTLE_MILLIS) }
 }
 
-private const val TIMEOUT_MILLIS = 5_000L
+/**
+ * A real-time bound, so it has to survive the slowest machine the suite runs on rather than the
+ * fastest. Every use is an "eventually" wait - a Room emission, an HTTP round trip to a local
+ * MockWebServer - and the bound exists only to fail instead of hanging forever; a tight one buys
+ * nothing and turns a busy CI runner into a failed assertion. Raised from 5s after exactly that:
+ * a search test timed out on CI with the request still in flight.
+ */
+private const val TIMEOUT_MILLIS = 20_000L
 private const val POLL_MILLIS = 5L
 private const val SETTLE_MILLIS = 150L
 

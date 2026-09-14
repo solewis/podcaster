@@ -2,16 +2,20 @@ package com.solewis.podcaster.testing
 
 import com.solewis.podcaster.data.repo.CachedEpisode
 import com.solewis.podcaster.data.repo.StreamCache
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /** A [StreamCache] a test can seed with entries and observe being cleared or trimmed. */
 class FakeStreamCache : StreamCache {
 
-    private val byId = mutableMapOf<String, CachedEpisode>()
+    // Copy-on-write: written from the code under test, read from polling assertions, on different
+    // threads. See FakeDownloads for the ConcurrentModificationException this prevents.
+    private val byId: MutableMap<String, CachedEpisode> = ConcurrentHashMap()
 
     var cleared = false
         private set
 
-    val removed = mutableListOf<String>()
+    val removed: MutableList<String> = CopyOnWriteArrayList()
 
     override suspend fun sizeBytes(): Long = byId.values.sumOf { it.sizeBytes }
 
