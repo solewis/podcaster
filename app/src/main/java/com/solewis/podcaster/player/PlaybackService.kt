@@ -18,6 +18,9 @@ import com.solewis.podcaster.data.settings.AppSettings
 import com.solewis.podcaster.data.settings.SkipAmount
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -149,9 +152,20 @@ class PlaybackService : MediaLibraryService() {
          * `ExoPlayer` for nothing. The service and the UI share one process (no `android:process`
          * on the manifest entry), so a plain flag is an honest answer rather than a guess.
          */
-        @Volatile
-        var isRunning: Boolean = false
-            private set
+        /**
+         * Observable, not just readable. A poll only answers for whoever happens to ask, and the
+         * one caller that asked did so on ON_START - which never fires again for an app that was
+         * already open, so a session started from the car or the notification while the app sat in
+         * the foreground went unnoticed. See PlayerConnection's init.
+         */
+        private val _isRunning = MutableStateFlow(false)
+        val isRunningFlow: StateFlow<Boolean> = _isRunning.asStateFlow()
+
+        var isRunning: Boolean
+            get() = _isRunning.value
+            private set(value) {
+                _isRunning.value = value
+            }
 
         private const val STREAM_CACHE_MAX_AGE_MILLIS = 30L * 24 * 60 * 60 * 1000
     }
