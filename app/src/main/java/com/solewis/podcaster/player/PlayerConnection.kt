@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -73,17 +74,32 @@ class PlayerConnection(
         _state.stalledAfterWaiting().stateIn(scope, SharingStarted.Eagerly, false)
 
     init {
+        // The progress ticker. Position is the one thing a MediaController never pushes - it
+        // advances with the audio and there is no callback for "the clock moved" - so drawing a
+        // moving clock means reading it.
+        //
+        // Whether to be reading at all, though, *is* pushed: onIsPlayingChanged says so. This used
+        // to ask twice a second whether playback had started, which is polling for a fact already
+        // being delivered. Parked on the state instead, it costs nothing at all while paused.
+        //
+        // collectLatest so a pause cancels the inner loop rather than leaving it to notice on its
+        // own; the guard against a null controller is what stops that loop spinning if the session
+        // dies mid-playback, since `controller` is cleared without the state changing.
         scope.launch {
-            while (true) {
-                val mediaController = controller
-                if (mediaController == null || !_state.value.isPlaying) {
-                    delay(IDLE_POLL_MILLIS)
-                    continue
+            _state
+                .map { it.isPlaying && controller != null }
+                .distinctUntilChanged()
+                .collectLatest { shouldTick ->
+                    if (!shouldTick) return@collectLatest
+                    while (true) {
+                        val mediaController = controller ?: return@collectLatest
+                        val position = mediaController.currentPosition
+                        publishProgress(position)
+                        // Speed read fresh each time rather than captured, so changing it takes
+                        // effect on the next tick instead of the next play/pause.
+                        delay(millisUntilNextDisplayedSecond(position, _state.value.speed))
+                    }
                 }
-                val position = mediaController.currentPosition
-                publishProgress(position)
-                delay(millisUntilNextDisplayedSecond(position, _state.value.speed))
-            }
         }
 
         // Adopt any session that appears, rather than only the one that happens to be there when a
@@ -423,10 +439,6 @@ class PlayerConnection(
         scope.cancel()
     }
 
-    private companion object {
-        /** How often to look for playback having started, while nothing is playing. */
-        const val IDLE_POLL_MILLIS = 500L
-    }
 }
 
 /**
