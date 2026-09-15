@@ -18,6 +18,11 @@ coil = "3.5.0"
 okhttp = "5.3.0" # 5.4.0 requires compileSdk>=36 and 5.5.0 requires >=37 (okhttp-android AAR metadata) - 5.3.0 has no such floor
 kotlinxSerialization = "1.9.0"
 kotlinxCoroutines = "1.11.0"
+googleServices = "4.5.0"
+firebaseCrashlyticsPlugin = "3.0.8"
+# BOM, so firebase-crashlytics and everything it pulls in (firebase-common,
+# firebase-installations) stay on one aligned set of versions.
+firebaseBom = "34.19.0"
 
 junit = "4.13.2"
 truth = "1.4.4"
@@ -65,6 +70,9 @@ work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "w
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+# Version comes from the BOM above.
+firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
@@ -89,3 +97,5 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 room = { id = "androidx.room", version.ref = "room" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }

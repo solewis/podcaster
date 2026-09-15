@@ -36,3 +36,32 @@ Never run destructive `adb` commands (`uninstall`, `pm clear`, `rm`) against the
 ## Branches
 
 `main` is PR-protected - direct pushes are rejected. Push the branch and hand over the PR URL.
+
+## Crash reporting
+
+Firebase Crashlytics, project `podcaster-b3b10`. `app/google-services.json` is committed
+deliberately - the `api_key` in it is scoped to the package name and signing certificate, so it
+identifies the app rather than authorising anything, and the `google-services` plugin fails the
+build outright when the file is absent. The signing keystore is the secret, and `.gitignore`
+already covers it.
+
+No initialisation code: `firebase-common` contributes a ContentProvider that starts Crashlytics
+before `Application.onCreate`, early enough to catch a crash in `onCreate` itself.
+
+To prove the pipeline still works end to end (nothing in the app triggers a crash on purpose):
+
+```sh
+adb shell setprop log.tag.FirebaseCrashlytics DEBUG   # upload logs are DEBUG-level, off by default
+# add `throw RuntimeException("test")` to MainActivity.onCreate, then:
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:installDebug
+adb shell am start -n com.solewis.podcaster/.MainActivity   # expect "Handling uncaught exception"
+# revert the throw, reinstall, and launch again - the report uploads on the *next* start
+adb shell run-as com.solewis.podcaster ls files/.crashlytics.v3/com.solewis.podcaster/priority-reports
+```
+
+An empty `priority-reports` after that last launch is the confirmation: a fatal is queued there at
+crash time and only deleted once it has been sent, so a failed upload leaves the file behind.
+
+`adb shell am crash` is not a substitute - it throws `RemoteServiceException$CrashedByAdbException`
+from inside `ActivityThread`, which never reaches the uncaught-exception handler, so Crashlytics
+records nothing and the check silently proves the opposite of what it looks like.

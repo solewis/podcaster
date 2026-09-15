@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -34,6 +36,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            // Uploading a mapping file is only meaningful for an obfuscated build, and the upload
+            // runs on every assemble - so it is pure latency in the loop that gets built most.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
     }
 
@@ -125,6 +134,13 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+
+    implementation(platform(libs.firebase.bom))
+    // Crashlytics needs no initialization call: firebase-common contributes a ContentProvider
+    // that starts it before Application.onCreate, which is early enough to catch a crash in
+    // onCreate itself. Analytics is deliberately not included - Crashlytics does not need it,
+    // and leaving it out keeps the Play Data Safety declaration to crash logs alone.
+    implementation(libs.firebase.crashlytics)
 
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)

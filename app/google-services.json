@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "871147267233",
+    "project_id": "podcaster-b3b10",
+    "storage_bucket": "podcaster-b3b10.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:871147267233:android:c79dfb18e485645992fce0",
+        "android_client_info": {
+          "package_name": "com.solewis.podcaster"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjCz12wwI5Iw_6oQiKPLk-mRzyE_KBgJ0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
