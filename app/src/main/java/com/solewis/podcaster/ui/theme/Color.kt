@@ -117,3 +117,22 @@ val ErrorDark = Color(0xFFFFB4A8)
 val OnErrorDark = Color(0xFF5C130A)
 val ErrorContainerDark = Color(0xFF73342A)
 val OnErrorContainerDark = Color(0xFFFFDAD3)
+
+// Now playing - the one colour outside the slate-blue family, marking the episode currently loaded
+// in the player wherever it appears in a list.
+//
+// A separate hue because that is the entire job: inside a row, the accent is already spoken for
+// (every row's show name is primary), so a marker in the same blue reads as more of the same rather
+// than as a state. Green is the convention listeners already know from other players, and it is far
+// enough round the wheel (156 vs the palette's 219) to never be mistaken for the accent.
+//
+// Built to the same rule as the primary above - one hue at two tones, roughly 40 for light and 80
+// for dark - and measured against the surfaces it actually lands on rather than assumed:
+//
+//   #196B4A  hue 156, 6.22:1 on the light surface  (primary manages 6.06)
+//   #80D1B0  hue 156, 10.05:1 on the dark surface  (primary manages 9.97)
+//
+// So it carries the same contrast as the accent it sits beside, which matters because this is a
+// marker read at a glance from a moving list.
+val NowPlayingLight = Color(0xFF196B4A)
+val NowPlayingDark = Color(0xFF80D1B0)

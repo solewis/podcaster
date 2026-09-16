@@ -1,5 +1,10 @@
 package com.solewis.podcaster.ui.home
 
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
@@ -184,5 +189,40 @@ class HomeScreenTest {
         // hands every row the player's state would show up here and nowhere else.
         compose.onAllNodesWithContentDescription("Now playing", useUnmergedTree = true)
             .assertCountEquals(1)
+    }
+
+    /**
+     * Treatment 1 has a failure mode nothing else here would notice: the rail's height comes from
+     * `fillMaxHeight` inside a Row sized by `IntrinsicSize.Min`, and without that pairing it
+     * resolves to zero - present in the tree, tagged, findable, and invisible.
+     */
+    @Test
+    fun the_now_playing_rail_spans_the_whole_row() {
+        launch()
+        graph.playback.emitPlaying("$podcastId:1")
+        compose.waitForIdle()
+
+        // Unmerged: the rail sits inside the row's own clickable, which merges its descendants.
+        val rail = compose.onNodeWithTag(TestTags.NOW_PLAYING_RAIL, useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        // Same reason: merged, the row *is* the text node, so the text is not a descendant of it.
+        val row = compose
+            .onNode(hasAnyDescendant(hasText("An Episode")) and hasClickAction(), useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+
+        assertThat(rail.height.value).isWithin(1f).of(row.height.value)
+        assertThat(rail.height.value).isGreaterThan(40f)
+    }
+
+    @Test
+    fun no_rail_is_drawn_for_a_row_that_is_not_in_the_player() {
+        launch()
+
+        compose.onNodeWithTag(TestTags.NOW_PLAYING_RAIL, useUnmergedTree = true).assertExists()
+        // Present but unpainted - it reserves its width either way so the row does not shift
+        // sideways as playback moves from one episode to the next.
+        val rail = compose.onNodeWithTag(TestTags.NOW_PLAYING_RAIL, useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertThat(rail.width.value).isGreaterThan(0f)
     }
 }

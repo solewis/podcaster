@@ -1,6 +1,15 @@
 package com.solewis.podcaster.ui.common
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.player.Playback
+import com.solewis.podcaster.ui.theme.LocalNowPlayingColor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -88,3 +97,29 @@ fun Playback.listNowPlaying(): Flow<ListNowPlaying> =
  * [com.solewis.podcaster.player.Playback.progress] directly.
  */
 const val LIST_POSITION_STEP_MILLIS = 5_000L
+
+/**
+ * Treatment 1 of the three being trialled: a rail down the left edge of the row that is loaded in
+ * the player.
+ *
+ * Reserves its width whether or not it draws, so a row does not shift sideways as playback moves
+ * from one episode to the next - the marker appearing must not reflow the list under your thumb.
+ */
+@Composable
+fun NowPlayingRail(playbackState: RowPlaybackState, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .testTag(TestTags.NOW_PLAYING_RAIL)
+            .width(RailWidth)
+            // Paired with height(IntrinsicSize.Min) on the Row that holds it, which is what makes
+            // "as tall as the row" resolvable at all - a plain fillMaxHeight inside a Row whose
+            // height comes from its content resolves to zero, silently.
+            .fillMaxHeight()
+            .then(
+                if (playbackState == RowPlaybackState.Inactive) Modifier
+                else Modifier.background(LocalNowPlayingColor.current)
+            )
+    )
+}
+
+private val RailWidth = 3.dp

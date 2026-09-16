@@ -3,6 +3,9 @@ package com.solewis.podcaster.ui.show
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.unit.height
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.assertIsDisplayed
@@ -503,5 +506,26 @@ class ShowScreenTest {
         graph.playback.emitPlaying("$podcastId:1")
         compose.waitForIdle()
         compose.onNodeWithContentDescription("Now playing", useUnmergedTree = true).assertExists()
+    }
+
+    /**
+     * The show page wires the rail up separately from the Home feed, so it can collapse on its own
+     * - see the Home test of the same name for what silently goes wrong.
+     */
+    @Test
+    fun the_now_playing_rail_spans_the_whole_row_here_too() {
+        openShow()
+        scrollToFirstEpisode()
+        graph.playback.emitPlaying("$podcastId:1")
+        compose.waitForIdle()
+
+        val rail = compose.onNodeWithTag(TestTags.NOW_PLAYING_RAIL, useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        val row = compose
+            .onNode(hasAnyDescendant(hasText("Patient Zero")) and hasClickAction(), useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+
+        assertThat(rail.height.value).isWithin(1f).of(row.height.value)
+        assertThat(rail.height.value).isGreaterThan(40f)
     }
 }
