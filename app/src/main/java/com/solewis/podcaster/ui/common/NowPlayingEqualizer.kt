@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.math.sin
@@ -37,8 +38,12 @@ import kotlin.math.sin
  * coming out".
  */
 @Composable
-fun NowPlayingEqualizer(isPlaying: Boolean, modifier: Modifier = Modifier) {
-    val color = MaterialTheme.colorScheme.primary
+fun NowPlayingEqualizer(
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
+    size: Dp = GlyphSize
+) {
     val description = if (isPlaying) "Now playing" else "Paused here"
 
     // One animation driving all three bars, rather than three animations with staggered delays.
@@ -58,7 +63,7 @@ fun NowPlayingEqualizer(isPlaying: Boolean, modifier: Modifier = Modifier) {
 
     Canvas(
         modifier = modifier
-            .size(width = GlyphWidth, height = GlyphHeight)
+            .size(size)
             .semantics { contentDescription = description }
     ) {
         // `phase` is read here, inside the draw lambda, and deliberately not in the composable
@@ -104,6 +109,8 @@ private val PausedFractions = floatArrayOf(0.5f, 1f, 0.7f)
 
 private const val CYCLE_MILLIS = 900
 
-/** Sized against the `bodySmall` line it sits on, so it reads as punctuation on that line. */
-private val GlyphHeight = 10.dp
-private val GlyphWidth = 10.dp
+/**
+ * Default, for the glyph standing on its own. Callers drawing it over artwork pass something
+ * larger - the whole reason it sits there is to be seen from a moving list.
+ */
+private val GlyphSize = 18.dp

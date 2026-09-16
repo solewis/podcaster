@@ -72,18 +72,9 @@ fun EpisodeMetaAndProgressRow(
     progress: EpisodeProgressUi,
     isPlayed: Boolean,
     modifier: Modifier = Modifier,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    playbackState: RowPlaybackState = RowPlaybackState.Inactive
+    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        if (playbackState != RowPlaybackState.Inactive) {
-            NowPlayingEqualizer(
-                isPlaying = playbackState == RowPlaybackState.Playing,
-                // Leading the line rather than trailing it: this says which row you are looking
-                // at, so it belongs where the eye arrives, not after the date and duration.
-                modifier = Modifier.padding(end = 6.dp)
-            )
-        }
         EpisodeMetaLine(
             label = progress.label,
             isPlayed = isPlayed,

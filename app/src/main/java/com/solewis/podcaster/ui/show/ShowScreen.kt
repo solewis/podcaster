@@ -661,7 +661,8 @@ private fun EpisodeRow(
             // in both lists rather than showing art in one place and a bare row in the other.
             PodcastArtwork(
                 artworkUrl = episode.artworkUrl ?: podcastArtworkUrl,
-                modifier = Modifier.size(EpisodeArtworkSize)
+                modifier = Modifier.size(EpisodeArtworkSize),
+                playbackState = playbackState
             )
 
             Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
@@ -717,8 +718,7 @@ private fun EpisodeRow(
             isPlayed = episode.isPlayed,
             // This list keeps the default onSurface rather than the muted variant the Home feed
             // uses, so the tick's own line stays as legible as the titles above it.
-            color = MaterialTheme.colorScheme.onSurface,
-            playbackState = playbackState
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         // This row had no pause state at all before this - it always drew a play arrow and always

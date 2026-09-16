@@ -157,7 +157,8 @@ private fun FeedEpisodeRow(
         Row(verticalAlignment = Alignment.CenterVertically) {
             PodcastArtwork(
                 artworkUrl = episode.artworkUrl ?: episode.podcastArtworkUrl,
-                modifier = Modifier.size(EpisodeArtworkSize)
+                modifier = Modifier.size(EpisodeArtworkSize),
+                playbackState = playbackState
             )
             Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(
@@ -190,11 +191,7 @@ private fun FeedEpisodeRow(
             progress.label.takeIf { it.isNotEmpty() },
             downloadStatusLabel(download)
         ).joinToString(" · ")
-        EpisodeMetaAndProgressRow(
-            progress = progress.copy(label = label),
-            isPlayed = episode.isPlayed,
-            playbackState = playbackState
-        )
+        EpisodeMetaAndProgressRow(progress = progress.copy(label = label), isPlayed = episode.isPlayed)
 
         EpisodeActionRow(
             episodeTitle = episode.title,
