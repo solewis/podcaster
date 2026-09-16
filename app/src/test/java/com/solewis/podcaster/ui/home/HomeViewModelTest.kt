@@ -115,7 +115,7 @@ class HomeViewModelTest {
         assertThat(state.loadingEpisodeId).isEqualTo("$podcastId:1")
         // Nothing is playing yet - covering exactly this gap (controller connection, then
         // buffering) is the spinner's whole job, and a play button alone gives no sign of it.
-        assertThat(state.nowPlayingEpisodeId).isNull()
+        assertThat(vm.nowPlaying.value.episodeId).isNull()
     }
 
     @Test
@@ -156,7 +156,7 @@ class HomeViewModelTest {
         vm.state.awaitValue { it.loadingEpisodeId == null }
 
         graph.playback.emitPaused("$podcastId:1")
-        vm.state.awaitValue { it.nowPlayingEpisodeId == null }
+        vm.nowPlaying.awaitValue { it.episodeId == null }
         settle()
 
         // The shipped bug: the pending id was only masked while isPlaying held, so pausing
@@ -194,11 +194,14 @@ class HomeViewModelTest {
         val vm = loadedViewModel()
 
         graph.playback.emitPlaying("$podcastId:1")
-        assertThat(vm.state.awaitValue { it.nowPlayingEpisodeId != null }.nowPlayingEpisodeId)
+        assertThat(vm.nowPlaying.awaitValue { it.episodeId != null }.episodeId)
             .isEqualTo("$podcastId:1")
 
         graph.playback.emitPaused("$podcastId:1")
-        assertThat(vm.state.awaitValue { it.nowPlayingEpisodeId == null }.nowPlayingEpisodeId).isNull()
+        assertThat(vm.nowPlaying.awaitValue { it.episodeId == null }.episodeId).isNull()
+        // Still the loaded episode, though - that is what tells a row it is the active one even
+        // while paused, and it is a different question from whether it is making sound.
+        assertThat(vm.nowPlaying.value.loadedEpisodeId).isEqualTo("$podcastId:1")
     }
 
     @Test
@@ -208,8 +211,8 @@ class HomeViewModelTest {
 
         graph.playback.emitProgress(positionMillis = 30_000, durationMillis = 600_000)
 
-        val loaded = vm.state.awaitValue { it.nowPlayingPositionMillis == 30_000L }
-        assertThat(loaded.nowPlayingDurationMillis).isEqualTo(600_000)
+        val loaded = vm.nowPlaying.awaitValue { it.positionMillis == 30_000L }
+        assertThat(loaded.durationMillis).isEqualTo(600_000)
     }
 
     @Test

@@ -612,16 +612,26 @@ private fun EpisodeRow(
     onRemoveDownload: () -> Unit,
     onTogglePlayed: () -> Unit
 ) {
-    val backgroundColor by animateColorAsState(
-        targetValue = if (isHighlighted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
-        animationSpec = tween(durationMillis = 400),
-        label = "episodeHighlight"
-    )
+    // Only the highlighted row animates. Every row used to build an Animatable of its own for a
+    // fade that at most one row in the list is ever running - allocated afresh for each row a fling
+    // composes, to animate between a colour and itself.
+    val background = if (isHighlighted) {
+        val color by animateColorAsState(
+            targetValue = MaterialTheme.colorScheme.secondaryContainer,
+            animationSpec = tween(durationMillis = 400),
+            label = "episodeHighlight"
+        )
+        Modifier.background(color)
+    } else {
+        // Nothing painted at all rather than a fill in the surface colour: the surface behind the
+        // list is already that colour, so this was an opaque full-row overdraw to no effect.
+        Modifier
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(backgroundColor)
+            .then(background)
             .then(
                 if (isHighlighted) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier
             )

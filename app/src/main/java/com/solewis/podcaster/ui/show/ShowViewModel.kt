@@ -19,6 +19,8 @@ import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayedMarker
 import com.solewis.podcaster.ui.common.formatDuration
 import kotlinx.coroutines.flow.Flow
+import com.solewis.podcaster.ui.common.ListNowPlaying
+import com.solewis.podcaster.ui.common.listNowPlaying
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -78,21 +80,12 @@ class ShowViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
     /** Whatever is currently audible, so the row for it can move rather than step every 5s. */
-    data class NowPlaying(
-        val episodeId: String? = null,
-        val positionMillis: Long = 0,
-        val durationMillis: Long? = null
-    )
-
-    val nowPlaying: StateFlow<NowPlaying> = combine(playback.state, playback.progress) { state, progress ->
-        NowPlaying(
-            // See HomeViewModel: intent rather than audibility, so a seek does not flicker the
-            // row's icon or detach it from the live position.
-            episodeId = state.episodeId.takeIf { state.playWhenReady },
-            positionMillis = progress.positionMillis,
-            durationMillis = progress.durationMillis
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NowPlaying())
+    /**
+     * Kept out of [state] so a position tick does not recompose the episode list - see
+     * [listNowPlaying], which also coarsens the position to what a row can actually draw.
+     */
+    val nowPlaying: StateFlow<ListNowPlaying> =
+        playback.listNowPlaying().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ListNowPlaying())
 
     /** The episode waiting to become audible, so a tapped row can show it - see [PlaybackStarter]. */
     val pendingEpisodeId: StateFlow<String?> = playbackStarter.pendingEpisodeId

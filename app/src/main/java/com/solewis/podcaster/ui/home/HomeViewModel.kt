@@ -12,6 +12,8 @@ import com.solewis.podcaster.data.repo.QueueRepository
 import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
 import com.solewis.podcaster.player.PlayedMarker
+import com.solewis.podcaster.ui.common.ListNowPlaying
+import com.solewis.podcaster.ui.common.listNowPlaying
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -50,30 +52,27 @@ class HomeViewModel(
         /** Set the instant a row's play button is tapped, cleared once that episode is actually
          * audible - owned by [com.solewis.podcaster.player.PlaybackStarter], which also owns the
          * rule for clearing it, so every screen shows the same wait rather than only this one. */
-        val loadingEpisodeId: String? = null,
-        val nowPlayingEpisodeId: String? = null,
-        val nowPlayingPositionMillis: Long = 0,
-        val nowPlayingDurationMillis: Long? = null
+        val loadingEpisodeId: String? = null
     )
+
+    /**
+     * Kept out of [UiState] for the same reason [downloadStates] is: every position tick used to
+     * produce a whole new [UiState], which recomposed the entire feed once a second to move a bar
+     * by less than a pixel. See [listNowPlaying] for how far the position is coarsened.
+     */
+    val nowPlaying: StateFlow<ListNowPlaying> =
+        playback.listNowPlaying().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ListNowPlaying())
 
     val state: StateFlow<UiState> = combine(
         podcastRepository.observeHomeOrder(),
         episodeRepository.observeAllEpisodes(),
-        playback.state,
-        playback.progress,
         playbackStarter.pendingEpisodeId
-    ) { subscriptions, episodes, playback, progress, loading ->
+    ) { subscriptions, episodes, loading ->
         UiState(
             subscriptions = subscriptions,
             episodes = episodes,
             isLoading = false,
-            loadingEpisodeId = loading,
-            // playWhenReady, not isPlaying: this drives the row's pause icon *and* whether the
-            // row follows the live position, and a scrub briefly makes isPlaying false - which
-            // flicked the icon and dropped the row back to its stored position mid-drag.
-            nowPlayingEpisodeId = playback.episodeId.takeIf { playback.playWhenReady },
-            nowPlayingPositionMillis = progress.positionMillis,
-            nowPlayingDurationMillis = progress.durationMillis
+            loadingEpisodeId = loading
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
