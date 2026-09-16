@@ -139,6 +139,74 @@ class TimedSkipPlayerTest {
         assertThat(positionMillis()).isWithin(TOLERANCE_MILLIS).of(0)
     }
 
+    /**
+     * The car bug, reproduced at the layer it happens on.
+     *
+     * Read off a phone log across two drives: audio focus went to another app about ten seconds
+     * into each car connection, a stop landed a moment later, and `STATE_IDLE` is where an episode
+     * went to die - nothing in the app calls `prepare()` for a stop, because a stop leaves no error
+     * for [PlaybackErrorRetrier] to react to. One drive recovered only because the car happened to
+     * send a play afterwards, which Media3 prepares an idle player for.
+     */
+    @Test
+    fun a_stop_from_outside_pauses_instead_of_killing_the_episode() {
+        seekTo(START_MILLIS)
+        onMain { exoPlayer.play() }
+
+        onMain { sessionPlayer.stop() }
+
+        onMain {
+            // The wrapped player is what matters: this is the real thing that would have been
+            // torn down, and an idle player cannot be played, seeked or skipped.
+            assertThat(exoPlayer.playbackState).isNotEqualTo(Player.STATE_IDLE)
+            // The intent still lands - a stop is meant to stop sound, and it does.
+            assertThat(exoPlayer.playWhenReady).isFalse()
+        }
+        // Deliberately not asserting READY on the line above: the seek may still be buffering, and
+        // pinning the exact state there made this fail on timing rather than on behaviour. Waiting
+        // for ready is the stronger claim anyway - a stopped player never gets here without a
+        // prepare(), so arriving at all is the proof that the source survived.
+        awaitReady()
+        // And the position it was meant to protect survives, which is the entire point of the app.
+        assertThat(positionMillis()).isWithin(TOLERANCE_MILLIS).of(START_MILLIS)
+    }
+
+    /**
+     * The half that was actually reported: after the stop, the notification's play button did
+     * nothing. Pressing play has to work without anything re-preparing or re-seeding first.
+     */
+    @Test
+    fun the_episode_still_plays_after_an_outside_stop() {
+        seekTo(START_MILLIS)
+        onMain { sessionPlayer.stop() }
+
+        onMain { sessionPlayer.play() }
+
+        awaitPlayer("playing again after a stop") { onMain { exoPlayer.isPlaying } }
+        assertThat(positionMillis()).isAtLeast(START_MILLIS - TOLERANCE_MILLIS)
+    }
+
+    /**
+     * Whatever else changes, a stop has to leave a trace. The two drives above had to be inferred
+     * from an `IDLE` with no error beside it, which is a long way round to the obvious question of
+     * who sent what.
+     */
+    @Test
+    fun a_stop_is_recorded_with_whoever_asked_for_it() {
+        val logFile = java.io.File.createTempFile("stop-log", ".txt")
+        val log = PlaybackLog(logFile)
+        val logged = onMain {
+            TimedSkipPlayer(exoPlayer, log = log, requestingController = { "com.google.android.projection.gearhead" })
+        }
+
+        onMain { logged.stop() }
+
+        val text = log.snapshot()
+        assertThat(text).contains("SESSION_STOP")
+        assertThat(text).contains("com.google.android.projection.gearhead")
+        logFile.delete()
+    }
+
     private fun positionMillis(): Long = onMain { sessionPlayer.currentPosition }
 
     private fun seekTo(positionMillis: Long) {

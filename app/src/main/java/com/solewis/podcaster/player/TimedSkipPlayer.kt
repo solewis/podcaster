@@ -58,8 +58,52 @@ class TimedSkipPlayer(
      * 15-second jumps with no command beside them, because notification skips never touch
      * [PlayerConnection].
      */
-    private val log: PlaybackLog? = null
+    private val log: PlaybackLog? = null,
+    /**
+     * Who asked for the command currently being handled, for the log only - `null` when the app
+     * itself did, or when the caller cannot be identified.
+     *
+     * Late-bound through a lambda because the answer comes from the `MediaSession`, which cannot
+     * exist yet: the session is built *around* this player. Media3's own documentation points at
+     * `controllerInfo.packageName` for exactly this, noting you may want to treat a command
+     * differently depending on whether it came from Android Auto or a Bluetooth headset.
+     */
+    private val requestingController: () -> String? = { null }
 ) : ForwardingSimpleBasePlayer(player) {
+
+    /**
+     * An outside `stop()` becomes a pause.
+     *
+     * `stop()` is not a louder pause: it moves the player to `STATE_IDLE`, dropping the buffers and
+     * the audio track while keeping the playlist. An idle player is inert - `play()`, `seekTo()` and
+     * the skips are all no-ops on it, and only `prepare()` brings it back. That is the same dead end
+     * [PlaybackErrorRetrier] exists to rescue the player from after a network drop, except a stop
+     * leaves no error behind, so that class correctly ignores it and nothing else was watching.
+     *
+     * Confirmed from a phone log across two drives: audio focus was lost to another app about ten
+     * seconds into each car connection, a stop arrived a moment later, and the player sat idle. Once
+     * the car happened to send a play *after* the stop it recovered by itself, because Media3
+     * prepares an idle player on the way into `play()`; the drive where the play arrived *before* the
+     * stop stayed dead, and the notification's button could not revive it.
+     *
+     * Stop is a reasonable thing for a car to send - in the legacy session vocabulary Android Auto
+     * connects through, it sits right beside play and pause, and for a music app losing a track
+     * position costs nothing. For an app whose entire purpose is resuming where you left off it is
+     * destructive, so the intent ("stop making sound") is honoured and the means is not.
+     *
+     * Deliberately still *advertised* as available rather than removed from [getState]'s commands,
+     * which is the other documented way to refuse it. Removing it would make `stop()` return before
+     * reaching here, and this is the only place that can record that a stop happened at all - which
+     * is the one piece of evidence the two drives above had to be inferred from.
+     */
+    override fun handleStop(): ListenableFuture<*> {
+        log?.record("SESSION_STOP", "from=${requestingController() ?: "app"} converted=pause")
+        // Not `player.stop()`. Returns an already-completed future, which is what keeps the
+        // substitution invisible: SimpleBasePlayer.stop() only publishes its optimistic
+        // STATE_IDLE placeholder while the returned future is still pending, so completing
+        // synchronously means no controller ever observes an idle state that is not real.
+        return handleSetPlayWhenReady(false)
+    }
 
     override fun getState(): State {
         val state = super.getState()
