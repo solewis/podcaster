@@ -2,6 +2,8 @@ package com.solewis.podcaster.ui.home
 
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -57,6 +59,21 @@ class HomeScreenTest {
         container = graph.appContainer()
         compose.setContent { PodcasterTheme { PodcasterRoot(container = container) } }
         compose.awaitText("An Episode")
+    }
+
+    /** Two rows, so an assertion can tell "marks the right row" from "marks every row". */
+    private fun launchWithTwoEpisodes() {
+        runBlocking {
+            podcastId = graph.insertShow(title = "Radiolab")
+            graph.insertEpisodes(
+                episodeRow(podcastId, "1", title = "An Episode", pubDateMillis = 2_000),
+                episodeRow(podcastId, "2", title = "Another Episode", pubDateMillis = 1_000)
+            )
+        }
+        container = graph.appContainer()
+        compose.setContent { PodcasterTheme { PodcasterRoot(container = container) } }
+        compose.awaitText("An Episode")
+        compose.awaitText("Another Episode")
     }
 
     @Test
@@ -120,5 +137,52 @@ class HomeScreenTest {
             runBlocking { container.queueRepository.observeQueue().first() }
                 .any { it.episodeId == "$podcastId:1" }
         }
+    }
+
+    /**
+     * A paused episode used to be indistinguishable from one never opened: the button draws a play
+     * arrow either way, so the row you were half way through looked untouched. The glyph marks the
+     * row; the button still only says what tapping it will do.
+     */
+    @Test
+    fun the_episode_in_the_player_is_marked_even_while_it_is_paused() {
+        launch()
+        graph.playback.emitPaused("$podcastId:1")
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription("Paused here", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun the_mark_says_playing_once_it_is_making_sound() {
+        launch()
+        graph.playback.emitPlaying("$podcastId:1")
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription("Now playing", useUnmergedTree = true).assertExists()
+        compose.onAllNodesWithContentDescription("Paused here", useUnmergedTree = true)
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun a_row_the_player_has_never_touched_carries_no_mark() {
+        launch()
+
+        compose.onAllNodesWithContentDescription("Now playing", useUnmergedTree = true)
+            .assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("Paused here", useUnmergedTree = true)
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun only_the_active_row_is_marked_when_another_episode_is_playing() {
+        launchWithTwoEpisodes()
+        graph.playback.emitPlaying("$podcastId:1")
+        compose.waitForIdle()
+
+        // Exactly one, not one per row - the glyph is driven by the episode id, so a bug that
+        // hands every row the player's state would show up here and nowhere else.
+        compose.onAllNodesWithContentDescription("Now playing", useUnmergedTree = true)
+            .assertCountEquals(1)
     }
 }

@@ -83,6 +83,7 @@ import androidx.compose.material3.DropdownMenuItem
 import com.solewis.podcaster.ui.common.EpisodeActionRow
 import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
 import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
+import com.solewis.podcaster.ui.common.RowPlaybackState
 import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
@@ -234,6 +235,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                 onClick = { onOpenEpisode(episode.id) },
                                 isStarting = episode.id == pendingEpisodeId,
                                 isNowPlaying = episode.id == nowPlayingId,
+                                playbackState = nowPlaying.rowState(episode.id),
                                 livePositionMillis = livePosition.takeIf { episode.id == nowPlayingId },
                                 liveDurationMillis = liveDuration.takeIf { episode.id == nowPlayingId },
                                 onPlay = {
@@ -605,6 +607,7 @@ private fun EpisodeRow(
     livePositionMillis: Long?,
     liveDurationMillis: Long?,
     isNowPlaying: Boolean,
+    playbackState: RowPlaybackState,
     onPlay: () -> Unit,
     onEnqueue: () -> Unit,
     download: EpisodeDownload?,
@@ -714,7 +717,8 @@ private fun EpisodeRow(
             isPlayed = episode.isPlayed,
             // This list keeps the default onSurface rather than the muted variant the Home feed
             // uses, so the tick's own line stays as legible as the titles above it.
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            playbackState = playbackState
         )
 
         // This row had no pause state at all before this - it always drew a play arrow and always

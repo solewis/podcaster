@@ -43,6 +43,7 @@ import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
 import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.RowPlaybackState
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.TestTags
@@ -90,6 +91,7 @@ fun HomeScreen(
                             episode = episode,
                             isLoading = state.loadingEpisodeId == episode.id,
                             isNowPlaying = isNowPlaying,
+                            playbackState = nowPlaying.rowState(episode.id),
                             // Only the row being listened to gets the live position. Handing it to
                             // every row meant every row saw a changed argument on each tick and
                             // recomposed, only to discard the value it had just been given.
@@ -133,6 +135,7 @@ private fun FeedEpisodeRow(
     episode: EpisodeFeedItem,
     isLoading: Boolean,
     isNowPlaying: Boolean,
+    playbackState: RowPlaybackState,
     livePositionMillis: Long?,
     liveDurationMillis: Long?,
     onClick: () -> Unit,
@@ -187,7 +190,11 @@ private fun FeedEpisodeRow(
             progress.label.takeIf { it.isNotEmpty() },
             downloadStatusLabel(download)
         ).joinToString(" · ")
-        EpisodeMetaAndProgressRow(progress = progress.copy(label = label), isPlayed = episode.isPlayed)
+        EpisodeMetaAndProgressRow(
+            progress = progress.copy(label = label),
+            isPlayed = episode.isPlayed,
+            playbackState = playbackState
+        )
 
         EpisodeActionRow(
             episodeTitle = episode.title,

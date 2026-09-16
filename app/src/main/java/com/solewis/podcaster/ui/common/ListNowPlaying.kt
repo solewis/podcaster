@@ -33,6 +33,27 @@ data class ListNowPlaying(
 
     /** True only while that episode is actually meant to be making sound. */
     fun isPlaying(episodeId: String): Boolean = episodeId == this.episodeId
+
+    /** What a list row should show for this episode - see [NowPlayingEqualizer]. */
+    fun rowState(episodeId: String): RowPlaybackState = when {
+        isPlaying(episodeId) -> RowPlaybackState.Playing
+        isActive(episodeId) -> RowPlaybackState.Paused
+        else -> RowPlaybackState.Inactive
+    }
+}
+
+/**
+ * A row's relationship to the player, as three cases rather than two booleans - the pair was
+ * always read together and one of its four combinations ("playing but not loaded") is nonsense.
+ */
+enum class RowPlaybackState {
+    /** Not the episode in the player. Almost every row, almost always. */
+    Inactive,
+    Playing,
+
+    /** Loaded and paused - the case the row could not previously distinguish from [Inactive],
+     * since a paused episode draws the same play arrow as an untouched one. */
+    Paused
 }
 
 /**
