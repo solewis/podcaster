@@ -43,6 +43,7 @@ import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
 import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.RowPlaybackState
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.TestTags
@@ -56,6 +57,7 @@ fun HomeScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val downloadStates by viewModel.downloadStates.collectAsState()
+    val nowPlaying by viewModel.nowPlaying.collectAsState()
 
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).statusBarsPadding()) {
@@ -84,13 +86,17 @@ fun HomeScreen(
                         HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
                     }
                     items(state.episodes, key = { it.id }) { episode ->
-                        val isNowPlaying = state.nowPlayingEpisodeId == episode.id
+                        val isNowPlaying = nowPlaying.isPlaying(episode.id)
                         FeedEpisodeRow(
                             episode = episode,
                             isLoading = state.loadingEpisodeId == episode.id,
                             isNowPlaying = isNowPlaying,
-                            nowPlayingPositionMillis = state.nowPlayingPositionMillis,
-                            nowPlayingDurationMillis = state.nowPlayingDurationMillis,
+                            playbackState = nowPlaying.rowState(episode.id),
+                            // Only the row being listened to gets the live position. Handing it to
+                            // every row meant every row saw a changed argument on each tick and
+                            // recomposed, only to discard the value it had just been given.
+                            livePositionMillis = nowPlaying.positionMillis.takeIf { isNowPlaying },
+                            liveDurationMillis = nowPlaying.durationMillis.takeIf { isNowPlaying },
                             onClick = { onOpenEpisode(episode.id) },
                             onPlayOrToggle = { if (isNowPlaying) viewModel.togglePlayPause() else viewModel.play(episode) },
                             onEnqueue = { viewModel.enqueue(episode) },
@@ -129,8 +135,9 @@ private fun FeedEpisodeRow(
     episode: EpisodeFeedItem,
     isLoading: Boolean,
     isNowPlaying: Boolean,
-    nowPlayingPositionMillis: Long,
-    nowPlayingDurationMillis: Long?,
+    playbackState: RowPlaybackState,
+    livePositionMillis: Long?,
+    liveDurationMillis: Long?,
     onClick: () -> Unit,
     onPlayOrToggle: () -> Unit,
     onEnqueue: () -> Unit,
@@ -176,14 +183,18 @@ private fun FeedEpisodeRow(
             durationMillis = episode.durationMillis,
             positionMillis = episode.positionMillis,
             isPlayed = episode.isPlayed,
-            livePositionMillis = nowPlayingPositionMillis.takeIf { isNowPlaying },
-            liveDurationMillis = nowPlayingDurationMillis.takeIf { isNowPlaying }
+            livePositionMillis = livePositionMillis,
+            liveDurationMillis = liveDurationMillis
         )
         val label = listOfNotNull(
             progress.label.takeIf { it.isNotEmpty() },
             downloadStatusLabel(download)
         ).joinToString(" · ")
-        EpisodeMetaAndProgressRow(progress = progress.copy(label = label), isPlayed = episode.isPlayed)
+        EpisodeMetaAndProgressRow(
+            progress = progress.copy(label = label),
+            isPlayed = episode.isPlayed,
+            playbackState = playbackState
+        )
 
         EpisodeActionRow(
             episodeTitle = episode.title,

@@ -82,7 +82,10 @@ class PlaybackService : MediaLibraryService() {
             player,
             skipBackMillis = { container.settings.skipBack.millis },
             skipForwardMillis = { container.settings.skipForward.millis },
-            log = container.playbackLog
+            log = container.playbackLog,
+            // Safe to touch mediaSession from in here: this only runs while the session is
+            // dispatching a command, which cannot happen before the session is built.
+            requestingController = { mediaSession.getControllerForCurrentRequest()?.packageName }
         )
 
         val callback = PodcastLibrarySessionCallback(

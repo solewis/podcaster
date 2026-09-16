@@ -103,6 +103,15 @@ class ShowScreenTest {
      * and a LazyColumn has not composed it at all - so it cannot be found, let alone asserted on.
      */
     private fun scrollToFirstEpisode() {
+        // Waits for the list to exist, not merely for compose to fall idle. Arriving on the show
+        // screen and the show's own row arriving from Room are two separate events, and
+        // waitForIdle() only knows about the first: until the podcast loads the screen is a
+        // spinner with nothing scrollable on it anywhere. Seen once in a full-suite run as
+        // "could not find any node that satisfies: (ScrollBy is defined)", and not reproducible
+        // in isolation - which is the signature of this race rather than of a layout problem.
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Patient Zero", substring = true))
         compose.waitForIdle()
     }
@@ -459,5 +468,40 @@ class ShowScreenTest {
 
         compose.onNodeWithContentDescription("Play Patient Zero", useUnmergedTree = true)
             .assertExists()
+    }
+
+    /**
+     * Same marker as the Home feed, for the same reason - an episode should read the same wherever
+     * you meet it, and this list is the one you actually come back to mid-series.
+     */
+    @Test
+    fun the_episode_in_the_player_is_marked_here_too_while_paused() {
+        openShow()
+        scrollToFirstEpisode()
+        graph.playback.emitPaused("$podcastId:1")
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription("Paused here", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun the_mark_follows_the_episode_not_the_row() {
+        openShow()
+        scrollToFirstEpisode()
+
+        // Deliberately one row in the list and a different id in the player. Adding a second real
+        // episode makes this worse, not better: newest-first sorts it above Patient Zero, so it is
+        // on screen and correctly marked, and the count below stops being about the row under test.
+        // "Exactly one of two rows" is covered on the Home feed, which controls its own ordering.
+        graph.playback.emitPlaying("$podcastId:2")
+        compose.waitForIdle()
+
+        // Episode 1 is the row in view, and it is not the one playing.
+        compose.onAllNodesWithContentDescription("Now playing", useUnmergedTree = true)
+            .assertCountEquals(0)
+
+        graph.playback.emitPlaying("$podcastId:1")
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Now playing", useUnmergedTree = true).assertExists()
     }
 }

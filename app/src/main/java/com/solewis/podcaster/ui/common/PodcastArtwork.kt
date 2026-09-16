@@ -8,6 +8,10 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,16 +44,27 @@ fun PodcastArtwork(
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            Icons.Default.MusicNote,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.fillMaxSize(0.4f)
-        )
+        // Dropped once the image is actually up. The glyph used to stay composed, measured and
+        // drawn underneath every loaded thumbnail forever, where nothing could ever see it - one
+        // wasted vector draw per row, on a list where rows are the thing being scrolled.
+        var showGlyph by remember(artworkUrl) { mutableStateOf(true) }
+
+        if (showGlyph) {
+            Icon(
+                Icons.Default.MusicNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxSize(0.4f)
+            )
+        }
         AsyncImage(
             model = artworkUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            // Only success hides it. An error or an empty URL has to leave the glyph showing -
+            // that is the whole reason it is here, rather than a blank rounded rectangle.
+            onSuccess = { showGlyph = false },
+            onError = { showGlyph = true },
             modifier = Modifier.fillMaxSize()
         )
     }
