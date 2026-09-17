@@ -9,6 +9,8 @@ import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.domain.EpisodeIdentity
 import com.solewis.podcaster.domain.FeedToEpisodesMapper
 import com.solewis.podcaster.domain.HtmlToText
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -43,11 +45,24 @@ class SubscriptionRepository(
     private val feedFetcher: FeedFetcher = FeedFetcher(),
     private val now: () -> Long = System::currentTimeMillis
 ) {
+    /**
+     * Off the main thread for the same reason [refresh] is: a show's entire back catalogue is
+     * mapped and HTML-stripped here, and every caller is a Compose scope.
+     */
     suspend fun subscribe(
         feedUrl: String,
         itunesCollectionId: Long? = null,
         seedTitle: String? = null,
         seedArtworkUrl: String? = null
+    ): SubscribeResult = withContext(Dispatchers.IO) {
+        subscribeOnCallerThread(feedUrl, itunesCollectionId, seedTitle, seedArtworkUrl)
+    }
+
+    private suspend fun subscribeOnCallerThread(
+        feedUrl: String,
+        itunesCollectionId: Long?,
+        seedTitle: String?,
+        seedArtworkUrl: String?
     ): SubscribeResult {
         podcastDao.findByFeedUrl(feedUrl)?.let { return SubscribeResult.AlreadySubscribed(it.id) }
 
@@ -86,7 +101,24 @@ class SubscriptionRepository(
         return SubscribeResult.Success(podcastId)
     }
 
-    suspend fun refresh(podcastId: Long): RefreshResult {
+    suspend fun refresh(podcastId: Long): RefreshResult = withContext(Dispatchers.IO) {
+        refreshOnCallerThread(podcastId)
+    }
+
+    /**
+     * The refresh itself. Everything that reaches it comes through [refresh], which is what puts it
+     * on [Dispatchers.IO].
+     *
+     * That dispatcher is load-bearing rather than tidiness. The automatic refresh is launched from
+     * a Compose scope (see PodcasterRoot), whose dispatcher is the main thread, and nothing below
+     * here switched away from it - so parsing a feed's episodes into entities, stripping HTML from
+     * every description to build its preview, and writing every row all happened on the main
+     * thread. Reported as a one-to-two second delay before a fresh app would scroll at all, then
+     * settling once the refreshes finished a minute or two later. `FeedFetcher` was already on IO,
+     * which is exactly why this was easy to miss: the network call - the obvious slow part - was
+     * the one piece already off the main thread.
+     */
+    private suspend fun refreshOnCallerThread(podcastId: Long): RefreshResult {
         val podcast = podcastDao.getById(podcastId)
             ?: return RefreshResult.Failure("Show no longer exists")
 
@@ -120,27 +152,8 @@ class SubscriptionRepository(
         val newEntities = entities.filter { it.id !in existingIds }
         if (newEntities.isNotEmpty()) episodeDao.insertNew(newEntities)
 
-        entities.forEach { entity ->
-            episodeDao.updateMetadata(
-                id = entity.id,
-                title = entity.title,
-                descriptionHtml = entity.descriptionHtml,
-                descriptionPreview = entity.descriptionPreview,
-                pubDateMillis = entity.pubDateMillis,
-                enclosureUrl = entity.enclosureUrl,
-                enclosureBytes = entity.enclosureBytes,
-                enclosureMimeType = entity.enclosureMimeType,
-                artworkUrl = entity.artworkUrl,
-                itunesEpisodeNumber = entity.itunesEpisodeNumber,
-                itunesSeason = entity.itunesSeason,
-                episodeType = entity.episodeType,
-                webPageUrl = entity.webPageUrl,
-                feedPosition = entity.feedPosition,
-                chronoIndex = entity.chronoIndex,
-                displayNumber = entity.displayNumber,
-                durationMillis = entity.durationMillis
-            )
-        }
+        // One transaction, not one call per episode - see EpisodeDao.updateMetadataForFeed.
+        episodeDao.updateMetadataForFeed(entities)
 
         val vanishedIds = existingIds - entities.map { it.id }.toSet()
         if (vanishedIds.isNotEmpty()) episodeDao.deleteIfNeverPlayed(podcastId, vanishedIds.toList())

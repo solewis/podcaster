@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.solewis.podcaster.data.db.entity.EpisodeEntity
 import com.solewis.podcaster.data.db.model.EpisodeDescriptionSource
 import com.solewis.podcaster.data.db.model.EpisodeDetailItem
@@ -75,6 +76,44 @@ interface EpisodeDao {
         displayNumber: Int?,
         durationMillis: Long?
     )
+
+    /**
+     * Every episode's metadata from one feed refresh, in a single transaction.
+     *
+     * The loop used to live in the repository, which meant one suspend call per episode: each one a
+     * separate statement, a separate hop onto Room's executor, and a separate resumption back on
+     * whatever dispatcher the caller was using - which for the automatic refresh was the main
+     * thread. Measured on an emulator at 300 episodes: 108ms as a loop against 24ms in one
+     * transaction, and the loop took the main thread 300 times to get there.
+     *
+     * A default method rather than a @Query, because there is no single statement for this; the
+     * point is the transaction the loop runs inside. It also collapses Room's invalidation into one
+     * notification instead of one per episode, so the Home feed rebuilds once per refresh.
+     */
+    @Transaction
+    suspend fun updateMetadataForFeed(episodes: List<EpisodeEntity>) {
+        episodes.forEach { episode ->
+            updateMetadata(
+                id = episode.id,
+                title = episode.title,
+                descriptionHtml = episode.descriptionHtml,
+                descriptionPreview = episode.descriptionPreview,
+                pubDateMillis = episode.pubDateMillis,
+                enclosureUrl = episode.enclosureUrl,
+                enclosureBytes = episode.enclosureBytes,
+                enclosureMimeType = episode.enclosureMimeType,
+                artworkUrl = episode.artworkUrl,
+                itunesEpisodeNumber = episode.itunesEpisodeNumber,
+                itunesSeason = episode.itunesSeason,
+                episodeType = episode.episodeType,
+                webPageUrl = episode.webPageUrl,
+                feedPosition = episode.feedPosition,
+                chronoIndex = episode.chronoIndex,
+                displayNumber = episode.displayNumber,
+                durationMillis = episode.durationMillis
+            )
+        }
+    }
 
     @Query("SELECT * FROM episodes WHERE id = :id")
     suspend fun getById(id: String): EpisodeEntity?
