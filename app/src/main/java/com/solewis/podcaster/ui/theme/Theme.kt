@@ -6,9 +6,6 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryDark,
@@ -83,17 +80,6 @@ private val LightColorScheme = lightColorScheme(
 )
 
 /**
- * The now-playing marker colour for the current theme - see [NowPlayingLight].
- *
- * A composition local rather than a `colorScheme` role, because it is not one: Material has no slot
- * meaning "this is the item currently playing", and bending `tertiary` to hold it would leave any
- * component that reaches for that role by default wearing the marker colour.
- *
- * Static, since it only ever changes with the whole theme.
- */
-val LocalNowPlayingColor = staticCompositionLocalOf { NowPlayingLight }
-
-/**
  * Always the app's own slate-blue palette, deliberately never Android 12+ dynamic/wallpaper color -
  * a wallpaper-derived scheme would fight the calm, considered look this app wants (and could be
  * anything from neon to clashing, entirely outside the app's control).
@@ -103,14 +89,10 @@ fun PodcasterTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    CompositionLocalProvider(
-        LocalNowPlayingColor provides if (darkTheme) NowPlayingDark else NowPlayingLight
-    ) {
-        MaterialTheme(
-            colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
-            typography = Typography(),
-            shapes = PodcasterShapes,
-            content = content
-        )
-    }
+    MaterialTheme(
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+        typography = Typography(),
+        shapes = PodcasterShapes,
+        content = content
+    )
 }

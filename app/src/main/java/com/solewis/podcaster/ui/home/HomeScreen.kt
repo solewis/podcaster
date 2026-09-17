@@ -4,8 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,11 +42,10 @@ import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
 import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.downloadStatusLabel
-import com.solewis.podcaster.ui.common.NowPlayingEqualizer
-import com.solewis.podcaster.ui.common.NowPlayingRail
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.RowPlaybackState
-import com.solewis.podcaster.ui.theme.LocalNowPlayingColor
+import com.solewis.podcaster.ui.common.nowPlayingRail
+import com.solewis.podcaster.ui.common.nowPlayingSemantics
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.TestTags
@@ -151,14 +148,17 @@ private fun FeedEpisodeRow(
     onRemoveDownload: () -> Unit,
     onTogglePlayed: () -> Unit
 ) {
-    // Treatment 1: the rail is a sibling of the row's content, so it spans the row's full height
-    // whatever the content turns out to be, and the clickable still covers everything.
-    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable(onClick = onClick)) {
-        NowPlayingRail(playbackState)
-        Column(
-            modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+    Column(
+        // Tappable to open episode details; the trailing controls keep their own click targets,
+        // matching the nested-clickable pattern used elsewhere (e.g. MiniPlayer).
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .nowPlayingRail(playbackState, MaterialTheme.colorScheme.primary)
+            .nowPlayingSemantics(playbackState)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
         // Centred against the artwork for the same reason the show's own list is - and centred in
         // both so that a row does not sit differently depending on which list you reached it from.
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -166,16 +166,6 @@ private fun FeedEpisodeRow(
                 artworkUrl = episode.artworkUrl ?: episode.podcastArtworkUrl,
                 modifier = Modifier.size(EpisodeArtworkSize)
             )
-            // Treatment 2: beside the artwork rather than over it, full size and in the
-            // now-playing green.
-            if (playbackState != RowPlaybackState.Inactive) {
-                NowPlayingEqualizer(
-                    isPlaying = playbackState == RowPlaybackState.Playing,
-                    color = LocalNowPlayingColor.current,
-                    size = BesideArtworkGlyphSize,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
             Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(
                     episode.podcastTitle,
@@ -219,13 +209,7 @@ private fun FeedEpisodeRow(
             onDownload = onDownload,
             onRemoveDownload = onRemoveDownload,
             isPlayed = episode.isPlayed,
-            onTogglePlayed = onTogglePlayed,
-            // Treatment 3.
-            playbackState = playbackState
+            onTogglePlayed = onTogglePlayed
         )
-        }
     }
 }
-
-/** Treatment 2 keeps the size the artwork overlay used, which is what "big" meant there. */
-private val BesideArtworkGlyphSize = 22.dp

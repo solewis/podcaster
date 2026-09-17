@@ -1,6 +1,5 @@
 package com.solewis.podcaster.ui.common
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,7 +27,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.repo.EpisodeDownload
-import com.solewis.podcaster.ui.theme.LocalNowPlayingColor
 
 /**
  * The short excerpt under an episode's title on a list row - a preview, not the full show notes.
@@ -36,18 +34,24 @@ import com.solewis.podcaster.ui.theme.LocalNowPlayingColor
  * Nothing is drawn at all when there's no preview - an untruncated older row (predating the column
  * that stores this) or a feed with no description - rather than an empty two-line gap.
  *
- * Cut to [DISPLAY_CHARS] before being handed to [Text], which is the one thing here that is about
- * speed rather than looks. The stored column holds 200 characters, `maxLines = 2` can show roughly
- * half that, and text layout is the most expensive thing a list row does - so the rest was being
- * measured on every row of every fling purely to decide it did not fit. Kept comfortably above what
- * two lines can hold, so the ellipsis is still placed by the measured line break and not by this:
- * the constant only stops the tail of a paragraph being measured, it never decides the visible cut.
+ * The whole stored preview is handed to [Text], deliberately, even though only about two lines of
+ * it can be shown. Trimming it first looked like free performance and was not: the ellipsis only
+ * appears when the text genuinely overflows `maxLines`, so cutting the string to roughly what two
+ * lines hold made it *fit*, and the truncation stopped being visible at all. Reported as the
+ * ellipsis disappearing.
+ *
+ * There was no measured saving to weigh against that either. `maxLines` with an ellipsis stops the
+ * platform's line breaking once it knows a third line exists, so the tail beyond the second line
+ * was largely never being measured in the first place. If this ever does need bounding, the bound
+ * belongs on what gets *stored* - see
+ * [com.solewis.podcaster.data.repo.SubscriptionRepository.DESCRIPTION_PREVIEW_LENGTH] - where it
+ * can be reasoned about once rather than guessed against an unknown row width.
  */
 @Composable
 fun EpisodeDescriptionPreview(text: String?, modifier: Modifier = Modifier) {
     if (text.isNullOrBlank()) return
     Text(
-        text.take(DISPLAY_CHARS),
+        text,
         style = MaterialTheme.typography.bodySmall,
         // More muted than the meta line below it: this is flavour text you can skim past, not
         // information (a date, a duration, a played state) someone opened the list to read.
@@ -127,12 +131,7 @@ fun EpisodeActionRow(
     onRemoveDownload: () -> Unit,
     isPlayed: Boolean,
     onTogglePlayed: () -> Unit,
-    modifier: Modifier = Modifier,
-    /**
-     * Treatment 3 of the three being trialled: a ring around the play button on the row that is
-     * loaded in the player.
-     */
-    playbackState: RowPlaybackState = RowPlaybackState.Inactive
+    modifier: Modifier = Modifier
 ) {
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
         Row(
@@ -183,23 +182,7 @@ fun EpisodeActionRow(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
-                modifier = Modifier
-                    .size(PlayButtonSize)
-                    .then(
-                        if (playbackState == RowPlaybackState.Inactive) {
-                            Modifier
-                        } else {
-                            // Outside the fill, with a gap, rather than a border on the button
-                            // itself: drawn on the edge it would read as a heavy rim on the fill,
-                            // and the point is a ring *around* the control. The button keeps its
-                            // size, so nothing in the row moves when the ring appears.
-                            Modifier.border(
-                                width = RingWidth,
-                                color = LocalNowPlayingColor.current,
-                                shape = CircleShape
-                            )
-                        }
-                    )
+                modifier = Modifier.size(PlayButtonSize)
             ) {
                 when {
                     // A spinner in the button's own place, not beside it, so the row does not reflow -
@@ -228,12 +211,6 @@ fun EpisodeActionRow(
         }
     }
 }
-
-/** See [EpisodeDescriptionPreview] - a bound on what gets measured, not on what is shown. */
-private const val DISPLAY_CHARS = 120
-
-/** Enough to read as deliberate at arm's length without thickening the button's silhouette. */
-private val RingWidth = 2.dp
 
 private val ActionButtonSize = 40.dp
 private val ActionIconSize = 20.dp

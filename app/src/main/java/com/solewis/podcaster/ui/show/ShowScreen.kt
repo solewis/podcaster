@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -84,10 +83,9 @@ import androidx.compose.material3.DropdownMenuItem
 import com.solewis.podcaster.ui.common.EpisodeActionRow
 import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
 import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
-import com.solewis.podcaster.ui.common.NowPlayingEqualizer
-import com.solewis.podcaster.ui.common.NowPlayingRail
 import com.solewis.podcaster.ui.common.RowPlaybackState
-import com.solewis.podcaster.ui.theme.LocalNowPlayingColor
+import com.solewis.podcaster.ui.common.nowPlayingRail
+import com.solewis.podcaster.ui.common.nowPlayingSemantics
 import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
@@ -635,23 +633,19 @@ private fun EpisodeRow(
         Modifier
     }
 
-    // Treatment 1: the rail is a sibling of the row's content, so it spans the row's full height
-    // whatever the content turns out to be, and the clickable still covers everything.
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(IntrinsicSize.Min)
             .then(background)
             .then(
                 if (isHighlighted) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier
             )
             .clickable(onClick = onClick)
+            .nowPlayingRail(playbackState, MaterialTheme.colorScheme.primary)
+            .nowPlayingSemantics(playbackState)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        NowPlayingRail(playbackState)
-        Column(
-            modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
         // Centred against the artwork rather than top-aligned. The column beside it holds two short
         // lines to the artwork's 48dp, so aligning them to the top left the pair sitting high in the
         // row with the slack collecting underneath, which read as a misalignment.
@@ -673,16 +667,6 @@ private fun EpisodeRow(
                 artworkUrl = episode.artworkUrl ?: podcastArtworkUrl,
                 modifier = Modifier.size(EpisodeArtworkSize)
             )
-            // Treatment 2: beside the artwork rather than over it, full size and in the
-            // now-playing green.
-            if (playbackState != RowPlaybackState.Inactive) {
-                NowPlayingEqualizer(
-                    isPlaying = playbackState == RowPlaybackState.Playing,
-                    color = LocalNowPlayingColor.current,
-                    size = BesideArtworkGlyphSize,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
 
             Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                 // "Episode 1", not "Ep 1", and on a line of its own: this sits exactly where the
@@ -754,13 +738,7 @@ private fun EpisodeRow(
             onDownload = onDownload,
             onRemoveDownload = onRemoveDownload,
             isPlayed = episode.isPlayed,
-            onTogglePlayed = onTogglePlayed,
-            // Treatment 3.
-            playbackState = playbackState
+            onTogglePlayed = onTogglePlayed
         )
-        }
     }
 }
-
-/** Treatment 2 keeps the size the artwork overlay used, which is what "big" meant there. */
-private val BesideArtworkGlyphSize = 22.dp
