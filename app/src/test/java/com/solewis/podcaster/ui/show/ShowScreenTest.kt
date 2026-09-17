@@ -3,6 +3,10 @@ package com.solewis.podcaster.ui.show
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.assertIsDisplayed
@@ -471,17 +475,18 @@ class ShowScreenTest {
     }
 
     /**
-     * Same marker as the Home feed, for the same reason - an episode should read the same wherever
-     * you meet it, and this list is the one you actually come back to mid-series.
+     * The show page wires the marker up separately from the Home feed, so it can be missed on its
+     * own. The rail itself is a draw with no node to find; NowPlayingRailTest covers that it
+     * paints, and this covers that this screen asks for it.
      */
     @Test
-    fun the_episode_in_the_player_is_marked_here_too_while_paused() {
+    fun the_playing_row_is_marked_here_too() {
         openShow()
         scrollToFirstEpisode()
-        graph.playback.emitPaused("$podcastId:1")
+        graph.playback.emitPlaying("$podcastId:1")
         compose.waitForIdle()
 
-        compose.onNodeWithContentDescription("Paused here", useUnmergedTree = true).assertExists()
+        compose.onNode(hasStateDescription("Now playing"), useUnmergedTree = true).assertExists()
     }
 
     @Test
@@ -489,19 +494,16 @@ class ShowScreenTest {
         openShow()
         scrollToFirstEpisode()
 
-        // Deliberately one row in the list and a different id in the player. Adding a second real
-        // episode makes this worse, not better: newest-first sorts it above Patient Zero, so it is
-        // on screen and correctly marked, and the count below stops being about the row under test.
-        // "Exactly one of two rows" is covered on the Home feed, which controls its own ordering.
+        // Deliberately one row in the list and a different id in the player: adding a second real
+        // episode makes this worse, since newest-first sorts it above Patient Zero and it would be
+        // on screen and correctly marked, so the count would stop being about the row under test.
         graph.playback.emitPlaying("$podcastId:2")
         compose.waitForIdle()
-
-        // Episode 1 is the row in view, and it is not the one playing.
-        compose.onAllNodesWithContentDescription("Now playing", useUnmergedTree = true)
+        compose.onAllNodes(hasStateDescription("Now playing"), useUnmergedTree = true)
             .assertCountEquals(0)
 
         graph.playback.emitPlaying("$podcastId:1")
         compose.waitForIdle()
-        compose.onNodeWithContentDescription("Now playing", useUnmergedTree = true).assertExists()
+        compose.onNode(hasStateDescription("Now playing"), useUnmergedTree = true).assertExists()
     }
 }

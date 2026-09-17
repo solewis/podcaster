@@ -1,5 +1,12 @@
 package com.solewis.podcaster.ui.common
 
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.player.Playback
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -34,7 +41,7 @@ data class ListNowPlaying(
     /** True only while that episode is actually meant to be making sound. */
     fun isPlaying(episodeId: String): Boolean = episodeId == this.episodeId
 
-    /** What a list row should show for this episode - see [NowPlayingEqualizer]. */
+    /** What a list row should show for this episode - see [nowPlayingRail]. */
     fun rowState(episodeId: String): RowPlaybackState = when {
         isPlaying(episodeId) -> RowPlaybackState.Playing
         isActive(episodeId) -> RowPlaybackState.Paused
@@ -88,3 +95,40 @@ fun Playback.listNowPlaying(): Flow<ListNowPlaying> =
  * [com.solewis.podcaster.player.Playback.progress] directly.
  */
 const val LIST_POSITION_STEP_MILLIS = 5_000L
+
+/**
+ * Marks a list row as the episode loaded in the player: a rail down its left edge.
+ *
+ * A draw, not a layout. The first version was a real composable sized by `fillMaxHeight` inside a
+ * `Row(Modifier.height(IntrinsicSize.Min))`, and intrinsic sizing is not free - it measures the
+ * row's children an extra time before the real pass, which for text means laying it out twice. That
+ * went on *every* row, playing or not, and brought the scroll choppiness back within a day of it
+ * being fixed. Drawing behind the content costs one rect and no measurement at all.
+ *
+ * It lands inside the row's own horizontal padding, so nothing needs reserving and nothing shifts
+ * when it appears - the previous version had to reserve its width to avoid exactly that.
+ *
+ * Invisible to the semantics tree, being only a draw, so [nowPlayingSemantics] carries the same
+ * fact for screen readers and for anything asserting on it.
+ */
+fun Modifier.nowPlayingRail(playbackState: RowPlaybackState, color: Color): Modifier =
+    if (playbackState == RowPlaybackState.Inactive) {
+        this
+    } else {
+        drawBehind { drawRect(color, size = Size(width = RailWidth.toPx(), height = size.height)) }
+    }
+
+/**
+ * The same fact as [nowPlayingRail], said out loud.
+ *
+ * A state description rather than a content description: it describes the row it is applied to
+ * rather than naming a thing of its own, which is what stops a screen reader announcing a phantom
+ * element between the title and the date.
+ */
+fun Modifier.nowPlayingSemantics(playbackState: RowPlaybackState): Modifier = when (playbackState) {
+    RowPlaybackState.Inactive -> this
+    RowPlaybackState.Playing -> semantics { stateDescription = "Now playing" }
+    RowPlaybackState.Paused -> semantics { stateDescription = "Paused here" }
+}
+
+private val RailWidth = 3.dp

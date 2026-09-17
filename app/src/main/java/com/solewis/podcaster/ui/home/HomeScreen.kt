@@ -44,6 +44,8 @@ import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.PodcastArtwork
 import com.solewis.podcaster.ui.common.RowPlaybackState
+import com.solewis.podcaster.ui.common.nowPlayingRail
+import com.solewis.podcaster.ui.common.nowPlayingSemantics
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.ScreenTitle
 import com.solewis.podcaster.ui.common.TestTags
@@ -149,7 +151,12 @@ private fun FeedEpisodeRow(
     Column(
         // Tappable to open episode details; the trailing controls keep their own click targets,
         // matching the nested-clickable pattern used elsewhere (e.g. MiniPlayer).
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .nowPlayingRail(playbackState, MaterialTheme.colorScheme.primary)
+            .nowPlayingSemantics(playbackState)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         // Centred against the artwork for the same reason the show's own list is - and centred in
@@ -190,11 +197,7 @@ private fun FeedEpisodeRow(
             progress.label.takeIf { it.isNotEmpty() },
             downloadStatusLabel(download)
         ).joinToString(" · ")
-        EpisodeMetaAndProgressRow(
-            progress = progress.copy(label = label),
-            isPlayed = episode.isPlayed,
-            playbackState = playbackState
-        )
+        EpisodeMetaAndProgressRow(progress = progress.copy(label = label), isPlayed = episode.isPlayed)
 
         EpisodeActionRow(
             episodeTitle = episode.title,

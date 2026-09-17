@@ -34,6 +34,7 @@ object TestTags {
     /** The spinner that replaces the mini player's play/pause once playback has stalled. */
     const val MINI_PLAYER_SPINNER = "miniPlayerSpinner"
     const val RESUME_PILL = "resumePill"
+    const val NOW_PLAYING_RAIL = "nowPlayingRail"
     const val DOWNLOADS_LIST = "downloadsList"
     const val SETTINGS_SCREEN = "settingsScreen"
     const val SETTINGS_BUTTON = "settingsButton"

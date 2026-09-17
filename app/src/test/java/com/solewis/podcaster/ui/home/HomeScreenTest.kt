@@ -1,5 +1,11 @@
 package com.solewis.podcaster.ui.home
 
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasStateDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
@@ -139,38 +145,38 @@ class HomeScreenTest {
         }
     }
 
+
     /**
-     * A paused episode used to be indistinguishable from one never opened: the button draws a play
-     * arrow either way, so the row you were half way through looked untouched. The glyph marks the
-     * row; the button still only says what tapping it will do.
+     * The rail itself is a `drawBehind` with no layout node, so there is nothing in the tree to
+     * find - see [com.solewis.podcaster.ui.common.nowPlayingRail] for why it is a draw rather than
+     * a composable. This asserts the fact it stands for; that it actually paints is covered on
+     * device by NowPlayingRailTest, which can read pixels.
      */
     @Test
-    fun the_episode_in_the_player_is_marked_even_while_it_is_paused() {
-        launch()
-        graph.playback.emitPaused("$podcastId:1")
-        compose.waitForIdle()
-
-        compose.onNodeWithContentDescription("Paused here", useUnmergedTree = true).assertExists()
-    }
-
-    @Test
-    fun the_mark_says_playing_once_it_is_making_sound() {
+    fun the_playing_row_says_so_for_a_screen_reader() {
         launch()
         graph.playback.emitPlaying("$podcastId:1")
         compose.waitForIdle()
 
-        compose.onNodeWithContentDescription("Now playing", useUnmergedTree = true).assertExists()
-        compose.onAllNodesWithContentDescription("Paused here", useUnmergedTree = true)
-            .assertCountEquals(0)
+        compose.onNode(hasStateDescription("Now playing"), useUnmergedTree = true).assertExists()
     }
 
     @Test
-    fun a_row_the_player_has_never_touched_carries_no_mark() {
+    fun a_paused_row_is_still_marked_as_the_active_one() {
+        launch()
+        graph.playback.emitPaused("$podcastId:1")
+        compose.waitForIdle()
+
+        compose.onNode(hasStateDescription("Paused here"), useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun a_row_the_player_has_never_touched_is_not_marked() {
         launch()
 
-        compose.onAllNodesWithContentDescription("Now playing", useUnmergedTree = true)
+        compose.onAllNodes(hasStateDescription("Now playing"), useUnmergedTree = true)
             .assertCountEquals(0)
-        compose.onAllNodesWithContentDescription("Paused here", useUnmergedTree = true)
+        compose.onAllNodes(hasStateDescription("Paused here"), useUnmergedTree = true)
             .assertCountEquals(0)
     }
 
@@ -180,9 +186,9 @@ class HomeScreenTest {
         graph.playback.emitPlaying("$podcastId:1")
         compose.waitForIdle()
 
-        // Exactly one, not one per row - the glyph is driven by the episode id, so a bug that
-        // hands every row the player's state would show up here and nowhere else.
-        compose.onAllNodesWithContentDescription("Now playing", useUnmergedTree = true)
+        // Exactly one, not one per row - the marker is driven by the episode id, so a bug handing
+        // every row the player's state would show up here and nowhere else.
+        compose.onAllNodes(hasStateDescription("Now playing"), useUnmergedTree = true)
             .assertCountEquals(1)
     }
 }

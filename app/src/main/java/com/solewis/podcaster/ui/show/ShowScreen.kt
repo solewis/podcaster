@@ -84,6 +84,8 @@ import com.solewis.podcaster.ui.common.EpisodeActionRow
 import com.solewis.podcaster.ui.common.EpisodeDescriptionPreview
 import com.solewis.podcaster.ui.common.EpisodeMetaAndProgressRow
 import com.solewis.podcaster.ui.common.RowPlaybackState
+import com.solewis.podcaster.ui.common.nowPlayingRail
+import com.solewis.podcaster.ui.common.nowPlayingSemantics
 import com.solewis.podcaster.ui.common.downloadStatusLabel
 import com.solewis.podcaster.ui.common.EpisodeArtworkSize
 import com.solewis.podcaster.ui.common.PodcastArtwork
@@ -639,6 +641,8 @@ private fun EpisodeRow(
                 if (isHighlighted) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier
             )
             .clickable(onClick = onClick)
+            .nowPlayingRail(playbackState, MaterialTheme.colorScheme.primary)
+            .nowPlayingSemantics(playbackState)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -717,8 +721,7 @@ private fun EpisodeRow(
             isPlayed = episode.isPlayed,
             // This list keeps the default onSurface rather than the muted variant the Home feed
             // uses, so the tick's own line stays as legible as the titles above it.
-            color = MaterialTheme.colorScheme.onSurface,
-            playbackState = playbackState
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         // This row had no pause state at all before this - it always drew a play arrow and always

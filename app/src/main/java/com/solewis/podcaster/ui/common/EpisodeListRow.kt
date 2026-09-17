@@ -34,18 +34,24 @@ import com.solewis.podcaster.data.repo.EpisodeDownload
  * Nothing is drawn at all when there's no preview - an untruncated older row (predating the column
  * that stores this) or a feed with no description - rather than an empty two-line gap.
  *
- * Cut to [DISPLAY_CHARS] before being handed to [Text], which is the one thing here that is about
- * speed rather than looks. The stored column holds 200 characters, `maxLines = 2` can show roughly
- * half that, and text layout is the most expensive thing a list row does - so the rest was being
- * measured on every row of every fling purely to decide it did not fit. Kept comfortably above what
- * two lines can hold, so the ellipsis is still placed by the measured line break and not by this:
- * the constant only stops the tail of a paragraph being measured, it never decides the visible cut.
+ * The whole stored preview is handed to [Text], deliberately, even though only about two lines of
+ * it can be shown. Trimming it first looked like free performance and was not: the ellipsis only
+ * appears when the text genuinely overflows `maxLines`, so cutting the string to roughly what two
+ * lines hold made it *fit*, and the truncation stopped being visible at all. Reported as the
+ * ellipsis disappearing.
+ *
+ * There was no measured saving to weigh against that either. `maxLines` with an ellipsis stops the
+ * platform's line breaking once it knows a third line exists, so the tail beyond the second line
+ * was largely never being measured in the first place. If this ever does need bounding, the bound
+ * belongs on what gets *stored* - see
+ * [com.solewis.podcaster.data.repo.SubscriptionRepository.DESCRIPTION_PREVIEW_LENGTH] - where it
+ * can be reasoned about once rather than guessed against an unknown row width.
  */
 @Composable
 fun EpisodeDescriptionPreview(text: String?, modifier: Modifier = Modifier) {
     if (text.isNullOrBlank()) return
     Text(
-        text.take(DISPLAY_CHARS),
+        text,
         style = MaterialTheme.typography.bodySmall,
         // More muted than the meta line below it: this is flavour text you can skim past, not
         // information (a date, a duration, a played state) someone opened the list to read.
@@ -72,18 +78,9 @@ fun EpisodeMetaAndProgressRow(
     progress: EpisodeProgressUi,
     isPlayed: Boolean,
     modifier: Modifier = Modifier,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    playbackState: RowPlaybackState = RowPlaybackState.Inactive
+    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        if (playbackState != RowPlaybackState.Inactive) {
-            NowPlayingEqualizer(
-                isPlaying = playbackState == RowPlaybackState.Playing,
-                // Leading the line rather than trailing it: this says which row you are looking
-                // at, so it belongs where the eye arrives, not after the date and duration.
-                modifier = Modifier.padding(end = 6.dp)
-            )
-        }
         EpisodeMetaLine(
             label = progress.label,
             isPlayed = isPlayed,
@@ -214,9 +211,6 @@ fun EpisodeActionRow(
         }
     }
 }
-
-/** See [EpisodeDescriptionPreview] - a bound on what gets measured, not on what is shown. */
-private const val DISPLAY_CHARS = 120
 
 private val ActionButtonSize = 40.dp
 private val ActionIconSize = 20.dp
