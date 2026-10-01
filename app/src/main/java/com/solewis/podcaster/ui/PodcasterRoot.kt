@@ -68,6 +68,7 @@ import com.solewis.podcaster.ui.showpreview.ShowPreviewViewModel
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
@@ -141,7 +142,12 @@ fun PodcasterRoot(
                 }
             }
         )
-            .collect { snackbarHostState.showSnackbar(it) }
+            // Latest, not queued: showSnackbar suspends until its message is dismissed, so plain
+            // collect made each message wait its turn - tap "add" then "remove" and you read "Added
+            // to queue" for four seconds after it stopped being true. Cancelling a showing snackbar
+            // removes it, so the newest message replaces the old one at once and the bar always
+            // describes the last thing that happened.
+            .collectLatest { snackbarHostState.showSnackbar(it) }
     }
 
     val nowPlayingRequest by openNowPlayingRequests.collectAsState()
