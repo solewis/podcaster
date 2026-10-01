@@ -29,8 +29,7 @@ class PlaybackStarter(
     private val playback: Playback,
     private val downloads: Downloads,
     private val connectivity: Connectivity,
-    scope: CoroutineScope,
-    private val prefetcher: EpisodePrefetcher = NoOpEpisodePrefetcher
+    scope: CoroutineScope
 ) {
 
     private val _pendingEpisodeId = MutableStateFlow<String?>(null)
@@ -85,9 +84,6 @@ class PlaybackStarter(
             return
         }
         _pendingEpisodeId.value = episode.episodeId
-        // A downloaded episode is already fully on disk in its own store - prefetching it into the
-        // streaming cache as well would just spend data and space duplicating it.
-        if (!isDownloaded) prefetcher.prefetch(episode)
         playback.play(episode)
     }
 

@@ -21,12 +21,12 @@ import com.solewis.podcaster.data.repo.SearchRepository
 import com.solewis.podcaster.data.repo.ShowPreviewRepository
 import com.solewis.podcaster.data.repo.StreamCache
 import com.solewis.podcaster.data.repo.SubscriptionRepository
+import com.solewis.podcaster.data.settings.PrefetchMode
 import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.player.MediaStorage
 import com.solewis.podcaster.data.net.AndroidConnectivity
 import com.solewis.podcaster.data.net.Connectivity
-import com.solewis.podcaster.player.CacheEpisodePrefetcher
-import com.solewis.podcaster.player.EpisodePrefetcher
+import com.solewis.podcaster.player.StreamDownloader
 import com.solewis.podcaster.player.PlaybackLog
 import com.solewis.podcaster.player.PlaybackStarter
 import com.solewis.podcaster.player.Playback
@@ -122,21 +122,27 @@ class AppContainer(
      */
     val sleepTimer: SleepTimer by lazy { SleepTimer(playback, appScope) }
 
-    /** Lazy for the same reason [streamCacheInfo] touches the cache lazily - a test that never plays
-     * anything should never open it. */
-    private val episodePrefetcher: EpisodePrefetcher by lazy {
-        CacheEpisodePrefetcher(
-            streamCache,
-            DefaultHttpDataSource.Factory().setUserAgent(PlayerFactory.USER_AGENT),
-            settings,
-            connectivity,
-            appScope
+    /**
+     * The only thing that fetches a streamed episode - see [StreamDownloader]. Lazy for the same
+     * reason [streamCacheInfo] touches the cache lazily: a test that never plays anything should
+     * never open it.
+     */
+    val streamDownloader: StreamDownloader by lazy {
+        StreamDownloader(
+            cache = streamCache,
+            upstreamFactory = DefaultHttpDataSource.Factory().setUserAgent(PlayerFactory.USER_AGENT),
+            shouldThrottle = {
+                val current = settings.snapshot()
+                current.prefetchMode == PrefetchMode.CONSERVATIVE ||
+                    (current.prefetchWifiOnly && !connectivity.isOnWifi())
+            },
+            log = playbackLog
         )
     }
 
     /** The one way an episode gets started - see [PlaybackStarter] for why that is worth centralising. */
     val playbackStarter: PlaybackStarter by lazy {
-        PlaybackStarter(playback, downloads, connectivity, appScope, episodePrefetcher)
+        PlaybackStarter(playback, downloads, connectivity, appScope)
     }
 
     companion object {

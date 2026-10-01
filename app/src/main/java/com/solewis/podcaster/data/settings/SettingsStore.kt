@@ -23,15 +23,15 @@ enum class SkipAmount(val seconds: Int) {
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 /**
- * How much of an episode gets pulled onto the device as soon as it starts, before you've listened
- * far enough to need it.
+ * How far ahead of playback the episode's single download is allowed to run.
  *
- * [FULL_EPISODE] exists because of a reported bug: a dropped connection deep into an episode forced
- * a fresh, independent request to resume, and that request's own ad-insertion decision - unrelated
- * to the one the original request got - got written into the stream cache and played back forever
- * on every later listen. A dropped connection cannot force a reconnect over ground that is already
- * fully downloaded, so most episodes finish start to finish on one continuous fetch instead of
- * however many a connection happens to drop and pick back up.
+ * Either way an episode is fetched by one request, start to finish - that is what keeps a listen
+ * on one copy of a file whose ads change per request; see
+ * [com.solewis.podcaster.player.StreamDownloader]. [FULL_EPISODE] lets that request run at full
+ * speed, so the whole episode is on the device within a minute or two and a dropped connection
+ * later has nothing left to fetch. [CONSERVATIVE] holds it a little ahead of where you are
+ * listening, spending less data on episodes you do not finish - at the cost of an idle connection
+ * that is more likely to drop, and so to need its resumption checked.
  */
 enum class PrefetchMode { FULL_EPISODE, CONSERVATIVE }
 

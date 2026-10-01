@@ -56,7 +56,23 @@ object MediaStorage {
             File(context.applicationContext.cacheDir, "media"),
             LeastRecentlyUsedCacheEvictor(STREAM_CACHE_SIZE_BYTES),
             databaseProvider(context)
-        ).also { streamCache = it }
+        ).also {
+            discardCopiesFromBeforeSingleDownload(it, File(context.applicationContext.cacheDir, SINGLE_COPY_MARKER))
+            streamCache = it
+        }
+    }
+
+    /**
+     * Once, on the first open after [StreamDownloader] took over: everything cached before then
+     * was written by streaming and prefetching side by side, and can hold two differently stitched
+     * copies of one episode joined mid-file - one such join was found on a phone, at 70:24, that
+     * played as a seven-and-a-half-minute jump back. A copy cannot be checked for that without
+     * re-fetching it, and re-fetching it is all discarding costs.
+     */
+    internal fun discardCopiesFromBeforeSingleDownload(cache: SimpleCache, marker: File) {
+        if (marker.exists()) return
+        cache.keys.toList().forEach(cache::removeResource)
+        marker.createNewFile()
     }
 
     /**
@@ -98,5 +114,6 @@ object MediaStorage {
     }
 
     private const val STREAM_CACHE_SIZE_BYTES = 512L * 1024 * 1024
+    private const val SINGLE_COPY_MARKER = "media-single-copy-v1"
     private const val MAX_PARALLEL_DOWNLOADS = 3
 }

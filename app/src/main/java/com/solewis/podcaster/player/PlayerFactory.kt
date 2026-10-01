@@ -3,7 +3,6 @@ package com.solewis.podcaster.player
 import android.content.Context
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.ExoPlayer
@@ -24,8 +23,9 @@ object PlayerFactory {
 
 
     /**
-     * [downloadCache] is read first and never written, [streamCache] beneath it absorbs everything
-     * streamed. Nesting them this way is what makes a downloaded episode play from disk without
+     * [downloadCache] is read first and never written; beneath it, a streamed episode is read from
+     * [streamCache] alone, through [SingleCopyDataSource], with [downloader] the only thing that
+     * fetches it - see [StreamDownloader] for why one listen has to be one copy of the file. Nesting them this way is what makes a downloaded episode play from disk without
      * the playback path needing to know it was downloaded: the media id and `customCacheKey` are
      * the same either way (see [MediaItemMapper]), so the download either hits or it doesn't.
      *
@@ -37,15 +37,15 @@ object PlayerFactory {
     // No seek increments set here on purpose: they are fixed at build time and so cannot carry a
     // user setting. TimedSkipPlayer, which wraps this player for the session, owns them instead -
     // setting them in both places would just be a second source of truth for the same number.
-    fun create(context: Context, downloadCache: SimpleCache, streamCache: SimpleCache): ExoPlayer {
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory().setUserAgent(USER_AGENT)
-        val streamCacheFactory = CacheDataSource.Factory()
-            .setCache(streamCache)
-            .setUpstreamDataSourceFactory(httpDataSourceFactory)
-            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+    fun create(
+        context: Context,
+        downloadCache: SimpleCache,
+        streamCache: SimpleCache,
+        downloader: StreamDownloader
+    ): ExoPlayer {
         val cacheDataSourceFactory = CacheDataSource.Factory()
             .setCache(downloadCache)
-            .setUpstreamDataSourceFactory(streamCacheFactory)
+            .setUpstreamDataSourceFactory(SingleCopyDataSource.Factory(streamCache, downloader))
             .setCacheWriteDataSinkFactory(null)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
