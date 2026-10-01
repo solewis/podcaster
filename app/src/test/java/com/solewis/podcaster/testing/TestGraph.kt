@@ -89,7 +89,8 @@ class TestGraph : Closeable {
         playbackFactory = { playback },
         downloadsOverride = downloads,
         appScope = appScope,
-        connectivity = connectivity
+        connectivity = connectivity,
+        refreshClock = { clock }
     )
 
     private val viewModels = ViewModelHost()

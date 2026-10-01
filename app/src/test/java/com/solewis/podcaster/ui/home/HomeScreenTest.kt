@@ -138,12 +138,40 @@ class HomeScreenTest {
         launch()
 
         compose.onNodeWithTag(TestTags.enqueueButton("An Episode")).performClick()
-        compose.waitForIdle()
 
+        // Waits on the screen, not by polling the database from inside waitUntil: that blocked the
+        // main thread on a Room query each time round, and failed intermittently in full-suite
+        // runs - the one test in this class that waited that way, and the only one that did.
         compose.waitUntil(timeoutMillis = 10_000) {
-            runBlocking { container.queueRepository.observeQueue().first() }
-                .any { it.episodeId == "$podcastId:1" }
+            compose.onAllNodesWithContentDescription("Remove An Episode from queue", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
         }
+        assertThat(runBlocking { container.queueRepository.observeQueue().first() }.map { it.episodeId })
+            .containsExactly("$podcastId:1")
+    }
+
+    /**
+     * Shows in these tests are stamped as just refreshed by the test clock. Against the real clock
+     * they all looked stale, so every launch sent a live request to the made-up feed URL - network
+     * in a unit test, finishing at whatever moment the network chose.
+     */
+    @Test
+    fun opening_the_app_does_not_refresh_a_show_that_was_just_fetched() {
+        val requests = java.util.concurrent.atomic.AtomicInteger()
+        val client = okhttp3.OkHttpClient.Builder()
+            .addInterceptor { chain -> requests.incrementAndGet(); chain.proceed(chain.request()) }
+            .build()
+        runBlocking {
+            podcastId = graph.insertShow(title = "Radiolab")
+            graph.insertEpisodes(episodeRow(podcastId, "1", title = "An Episode"))
+        }
+        container = graph.appContainer(httpClient = client)
+        compose.setContent { PodcasterTheme { PodcasterRoot(container = container) } }
+        compose.awaitText("An Episode")
+        compose.waitForIdle()
+        Thread.sleep(500)
+
+        assertThat(requests.get()).isEqualTo(0)
     }
 
 
