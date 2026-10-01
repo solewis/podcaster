@@ -65,6 +65,9 @@ class PlaybackService : MediaLibraryService() {
         player.addListener(SpeedPersister(container.settings))
         // First, so the log records the player's own view of everything that follows.
         player.addListener(PlaybackLogListener(player, container.playbackLog))
+        // Before anything that acts on a position: a resume saved against a different-length copy
+        // of the file is moved into this one as soon as its length is known.
+        player.addListener(PositionRemapper(player, container.playbackLog))
         // The audio pipeline's own events, and a watch on the position itself - between them they
         // cover the reported repeat, which leaves no trace in any Player.Listener callback.
         player.addAnalyticsListener(AudioSinkLogListener(player, container.playbackLog))

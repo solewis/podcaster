@@ -146,6 +146,66 @@ class AutoAdvancerTest {
 
     private fun queuedIds() = runBlocking { db.queueDao().getAllOrdered().map { it.episodeId } }
 
+    /**
+     * Bug 3 from a phone log: a queued episode's saved position had landed past the end of a
+     * re-stitched copy 5 minutes shorter, so it "ended" 20ms after becoming ready and this class
+     * moved straight on to the next episode - 4.7 minutes skipped without a sound.
+     */
+    @Test
+    fun a_resume_past_the_end_rewinds_instead_of_skipping_to_the_next_episode() {
+        runBlocking { queueRepository.enqueue(secondEpisode) }
+
+        onMain {
+            // 10 minutes of audio, loaded at 10:10 - past the end, as the stale position was.
+            player.setMediaSource(silenceSource(firstEpisode, 600_000), 610_000)
+            player.prepare()
+            player.play()
+        }
+
+        // Back off the end by the fallback rewind, still on this episode, still playing.
+        awaitPlayer("rewound off the end") {
+            onMain { player.isPlaying && player.currentPosition in 299_000L..320_000L }
+        }
+        assertThat(onMain { player.currentMediaItem?.mediaId }).isEqualTo(firstEpisode)
+        assertThat(queuedIds()).containsExactly(secondEpisode)
+    }
+
+    /**
+     * Resuming with the outro still to go and skipping straight past it ends the episode within a
+     * moment of loading - exactly what a bad load looks like by the clock alone. It has to count as
+     * finishing, not as something to rewind five minutes from.
+     */
+    @Test
+    fun skipping_past_the_end_still_moves_on() {
+        runBlocking { queueRepository.enqueue(secondEpisode) }
+        onMain {
+            // Loaded with two seconds left, then skipped past them before they could play.
+            player.setMediaSource(silenceSource(firstEpisode, 600_000), 598_000)
+            player.prepare()
+            player.seekTo(600_000)
+            player.play()
+        }
+
+        awaitAdvancedTo(secondEpisode)
+    }
+
+    /**
+     * The rewind's own ending - the episode genuinely finishing five minutes later - must not look
+     * unheard again, or the episode would rewind forever.
+     */
+    @Test
+    fun the_rewind_happens_once_and_then_the_episode_can_finish() {
+        runBlocking { queueRepository.enqueue(secondEpisode) }
+        onMain {
+            // Short enough that the rewind lands at 0 and the real ending arrives in seconds.
+            player.setMediaSource(silenceSource(firstEpisode, 2_000), 5_000)
+            player.prepare()
+            player.play()
+        }
+
+        awaitAdvancedTo(secondEpisode)
+    }
+
     @Test
     fun finishing_an_episode_starts_the_next_one_in_the_queue() {
         runBlocking { queueRepository.enqueue(secondEpisode) }

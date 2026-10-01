@@ -1,6 +1,7 @@
 package com.solewis.podcaster.player
 
 import android.net.Uri
+import android.os.Bundle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import com.solewis.podcaster.data.repo.PlayableEpisode
@@ -20,6 +21,14 @@ object MediaItemMapper {
             .setIsBrowsable(false)
             .setIsPlayable(true)
             .apply { episode.artworkUrl?.let { setArtworkUri(Uri.parse(it)) } }
+            // Travels with the item rather than being looked up when the new copy reports its own
+            // length: the progress writer backfills the database with that new length the moment
+            // it arrives, so a lookup could read back the very value it is meant to compare with.
+            .apply {
+                episode.recordedDurationMillis?.let {
+                    setExtras(Bundle().apply { putLong(PositionRemapper.EXTRA_RECORDED_DURATION_MS, it) })
+                }
+            }
             .build()
 
         return MediaItem.Builder()
