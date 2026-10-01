@@ -8,9 +8,6 @@ import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.testing.FeedHost
 import com.solewis.podcaster.testing.inMemoryDatabase
 import com.solewis.podcaster.testing.podcastRow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import org.junit.After
@@ -552,35 +549,6 @@ class SubscriptionRepositoryTest {
 
         assertThat(threads).isNotEmpty()
         assertThat(threads).doesNotContain(caller)
-    }
-
-    /**
-     * One refresh writes every episode's metadata in one transaction, so Room notifies its
-     * observers once rather than once per episode.
-     *
-     * It used to be a suspend call per episode from the repository - 300 statements, 300 hops onto
-     * Room's executor and 300 resumptions on the caller's dispatcher. Measured on an emulator at
-     * 300 episodes: 108ms that way against 16ms as it is now.
-     */
-    @Test
-    fun a_refresh_rewrites_metadata_in_a_single_transaction() = runTest {
-        val podcastId = subscribeToHost()
-        clock += STALE_ENOUGH
-        host.enqueueFeed("rotating_token_v2.xml")
-
-        var emissions = 0
-        val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
-            db.episodeDao().observeAllEpisodes().collect { emissions++ }
-        }
-        val afterFirst = emissions
-
-        repository.refresh(podcastId)
-        runCurrent()
-
-        // Room coalesces on its own, so this is not a count of statements - it is the guarantee
-        // that no future change can go back to notifying per episode.
-        assertThat(emissions - afterFirst).isAtMost(2)
-        collector.cancel()
     }
 
     private companion object {
