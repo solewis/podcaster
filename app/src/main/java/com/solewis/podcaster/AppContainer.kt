@@ -71,7 +71,14 @@ class AppContainer(
     /** Substituted in tests, since a JVM test cannot arrange for the network to be absent. */
     /** Not private: [PlaybackService] needs it too, to decide whether a reconnect attempt is worth
      * making rather than merely re-failing against a connection that is still down. */
-    val connectivity: Connectivity = AndroidConnectivity(context)
+    val connectivity: Connectivity = AndroidConnectivity(context),
+    /**
+     * What the feed refreshes take to be the time, which decides whether a show is stale enough to
+     * refresh on its own. Substituted in tests: their shows are stamped against a test clock, so
+     * against the real one every show looks hours stale and each launch of the app's UI fired a
+     * live request at the show's made-up feed URL.
+     */
+    private val refreshClock: () -> Long = System::currentTimeMillis
 ) {
 
     private val appContext = context.applicationContext
@@ -79,7 +86,7 @@ class AppContainer(
     private val feedFetcher = FeedFetcher(httpClient)
 
     val searchRepository = SearchRepository(ItunesSearchApi(httpClient))
-    val subscriptionRepository = SubscriptionRepository(database.podcastDao(), database.episodeDao(), feedFetcher)
+    val subscriptionRepository = SubscriptionRepository(database.podcastDao(), database.episodeDao(), feedFetcher, refreshClock)
     val episodeRepository = EpisodeRepository(database.episodeDao(), database.podcastDao())
     val podcastRepository = PodcastRepository(database.podcastDao())
     val showPreviewRepository = ShowPreviewRepository(feedFetcher)
