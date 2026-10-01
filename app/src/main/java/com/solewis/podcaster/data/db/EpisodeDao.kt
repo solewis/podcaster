@@ -87,8 +87,8 @@ interface EpisodeDao {
      * transaction, and the loop took the main thread 300 times to get there.
      *
      * A default method rather than a @Query, because there is no single statement for this; the
-     * point is the transaction the loop runs inside. It also collapses Room's invalidation into one
-     * notification instead of one per episode, so the Home feed rebuilds once per refresh.
+     * point is the transaction the loop runs inside. It does not change how often the Home feed
+     * rebuilds: Room was already coalescing the loop's invalidations into one notification.
      */
     @Transaction
     suspend fun updateMetadataForFeed(episodes: List<EpisodeEntity>) {
