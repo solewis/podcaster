@@ -34,6 +34,11 @@ interface QueueDao {
     @Query("DELETE FROM queue WHERE id = :queueId")
     suspend fun deleteById(queueId: Long)
 
+    /** Removes the episode wherever it sits in the queue. Returns how many rows went - 0 or 1,
+     * given the unique index on [com.solewis.podcaster.data.db.entity.QueueEntity.episodeId]. */
+    @Query("DELETE FROM queue WHERE episodeId = :episodeId")
+    suspend fun deleteByEpisodeId(episodeId: String): Int
+
     @Query("SELECT * FROM queue ORDER BY position ASC LIMIT 1")
     suspend fun peekFront(): QueueEntity?
 

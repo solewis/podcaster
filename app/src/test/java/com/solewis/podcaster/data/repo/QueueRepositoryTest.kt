@@ -7,6 +7,7 @@ import com.solewis.podcaster.testing.episodeRow
 import com.solewis.podcaster.testing.inMemoryDatabase
 import com.solewis.podcaster.testing.podcastRow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -170,5 +171,44 @@ class QueueRepositoryTest {
 
         assertThat(repository.getPlayableQueue().map { it.title })
             .containsExactly("Episode 4", "Episode 2").inOrder()
+    }
+
+    @Test
+    fun toggling_adds_then_removes_and_reports_which() = runTest {
+        val first = repository.toggle("$podcastId:2")
+        assertThat(first).isEqualTo(QueueChange.Added("$podcastId:2"))
+        assertThat(repository.observeQueuedEpisodeIds().first()).containsExactly("$podcastId:2")
+
+        val second = repository.toggle("$podcastId:2")
+        assertThat(second).isEqualTo(QueueChange.Removed("$podcastId:2"))
+        assertThat(repository.observeQueuedEpisodeIds().first()).isEmpty()
+    }
+
+    @Test
+    fun removing_one_episode_leaves_the_rest_in_order() = runTest {
+        repository.enqueue("$podcastId:1")
+        repository.enqueue("$podcastId:2")
+        repository.enqueue("$podcastId:3")
+
+        repository.toggle("$podcastId:2")
+
+        assertThat(queuedTitles()).containsExactly("Episode 1", "Episode 3").inOrder()
+    }
+
+    /** What the app-wide snackbar collects - a toggle nobody hears about is the original bug. */
+    @Test
+    fun every_toggle_is_announced() = runTest {
+        val seen = mutableListOf<QueueChange>()
+        val collector = launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) {
+            repository.changes.collect { seen += it }
+        }
+
+        repository.toggle("$podcastId:1")
+        repository.toggle("$podcastId:1")
+
+        assertThat(seen).containsExactly(
+            QueueChange.Added("$podcastId:1"), QueueChange.Removed("$podcastId:1")
+        ).inOrder()
+        collector.cancel()
     }
 }

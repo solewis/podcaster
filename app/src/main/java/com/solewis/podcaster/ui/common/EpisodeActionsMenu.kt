@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.PlaylistRemove
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
@@ -62,6 +63,8 @@ fun EpisodeActionsMenu(
     /** Same reasoning as [includeDownload], for a row that already has its own standalone
      * add-to-queue button. */
     includeEnqueue: Boolean = true,
+    /** Flips the queue entry between adding and removing, matching [QueueButton]. */
+    isQueued: Boolean = false,
     /**
      * Unspecified leaves the trigger at the Material default. A list row passes explicit sizes so
      * it matches the buttons it sits in a line with - see [EpisodeActionRow]. Only the `⋮` trigger
@@ -97,8 +100,8 @@ fun EpisodeActionsMenu(
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (includeEnqueue) MenuItem(
-                text = "Add to queue",
-                icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                text = if (isQueued) "Remove from queue" else "Add to queue",
+                icon = if (isQueued) Icons.Default.PlaylistRemove else Icons.AutoMirrored.Filled.PlaylistAdd,
                 tag = TestTags.MENU_ENQUEUE
             ) {
                 open = false

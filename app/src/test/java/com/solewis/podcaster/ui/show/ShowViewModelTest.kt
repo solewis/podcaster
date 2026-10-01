@@ -275,10 +275,10 @@ class ShowViewModelTest {
     }
 
     @Test
-    fun enqueue_adds_to_the_queue() = runTest(mainDispatcher.dispatcher) {
+    fun toggling_adds_to_the_queue() = runTest(mainDispatcher.dispatcher) {
         val vm = loadedViewModel()
 
-        vm.enqueue("$podcastId:1")
+        vm.toggleQueued("$podcastId:1")
 
         awaitTrue("queue row written") { graph.db.queueDao().getAllOrdered().isNotEmpty() }
         assertThat(graph.db.queueDao().getAllOrdered().single().episodeId).isEqualTo("$podcastId:1")

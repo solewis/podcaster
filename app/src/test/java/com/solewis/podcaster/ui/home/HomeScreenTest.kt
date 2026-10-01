@@ -191,4 +191,27 @@ class HomeScreenTest {
         compose.onAllNodes(hasStateDescription("Now playing"), useUnmergedTree = true)
             .assertCountEquals(1)
     }
+
+    /**
+     * Reported: adding to the queue showed nothing, so there was no way to tell it had worked. The
+     * button now reads queued, says so out loud, and the app confirms each change.
+     */
+    @Test
+    fun the_queue_button_shows_and_toggles_the_queued_state() {
+        launch()
+
+        compose.onNodeWithTag(TestTags.enqueueButton("An Episode")).performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithContentDescription("Remove An Episode from queue", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Added to queue").assertExists()
+
+        compose.onNodeWithTag(TestTags.enqueueButton("An Episode")).performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithContentDescription("Add An Episode to queue", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        assertThat(runBlocking { container.queueRepository.observeQueue().first() }).isEmpty()
+    }
 }

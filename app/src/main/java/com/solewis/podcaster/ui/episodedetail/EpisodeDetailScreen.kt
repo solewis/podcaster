@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -47,6 +46,7 @@ import com.solewis.podcaster.ui.common.EpisodeActionsMenu
 import com.solewis.podcaster.ui.common.DetailTopBar
 import com.solewis.podcaster.ui.common.EpisodeProgressBar
 import com.solewis.podcaster.ui.common.PodcastArtwork
+import com.solewis.podcaster.ui.common.QueueButton
 import com.solewis.podcaster.ui.common.episodeProgressUi
 import com.solewis.podcaster.ui.common.htmlToAnnotatedString
 import androidx.compose.ui.platform.testTag
@@ -56,6 +56,7 @@ import com.solewis.podcaster.ui.common.TestTags
 @Composable
 fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
+    val isQueued by viewModel.isQueued.collectAsState()
 
     // Where the heading and the bar currently are on screen, so the bar can take the title over at
     // exactly the moment the heading goes behind it. Compared as on-screen bounds rather than
@@ -94,7 +95,8 @@ fun EpisodeDetailScreen(viewModel: EpisodeDetailViewModel, onBack: () -> Unit) {
                     livePositionMillis = state.livePositionMillis,
                     liveDurationMillis = state.liveDurationMillis,
                     onTogglePlay = viewModel::togglePlay,
-                    onEnqueue = viewModel::enqueue,
+                    isQueued = isQueued,
+                    onToggleQueued = viewModel::toggleQueued,
                     download = state.download,
                     onDownload = viewModel::download,
                     onRemoveDownload = viewModel::removeDownload,
@@ -118,7 +120,8 @@ private fun EpisodeDetailContent(
     livePositionMillis: Long?,
     liveDurationMillis: Long?,
     onTogglePlay: () -> Unit,
-    onEnqueue: () -> Unit,
+    isQueued: Boolean,
+    onToggleQueued: () -> Unit,
     download: EpisodeDownload?,
     onDownload: () -> Unit,
     onRemoveDownload: () -> Unit,
@@ -214,15 +217,7 @@ private fun EpisodeDetailContent(
             // outlined. Play is already a labelled, filled button taking the width the other three
             // leave; giving those three containers of their own as well made a row of four things
             // all claiming to be buttons of roughly equal standing.
-            IconButton(
-                onClick = onEnqueue,
-                modifier = Modifier.testTag(TestTags.enqueueButton(episode.title))
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.PlaylistAdd,
-                    contentDescription = "Add ${episode.title} to queue"
-                )
-            }
+            QueueButton(episodeTitle = episode.title, isQueued = isQueued, onToggle = onToggleQueued)
             DownloadButton(
                 episodeTitle = episode.title,
                 download = download,
@@ -237,7 +232,8 @@ private fun EpisodeDetailContent(
                 episodeTitle = episode.title,
                 isPlayed = episode.isPlayed,
                 download = download,
-                onEnqueue = onEnqueue,
+                onEnqueue = onToggleQueued,
+                isQueued = isQueued,
                 onDownload = onDownload,
                 onRemoveDownload = onRemoveDownload,
                 onTogglePlayed = onTogglePlayed

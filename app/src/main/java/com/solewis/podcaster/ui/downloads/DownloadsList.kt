@@ -46,6 +46,7 @@ fun DownloadsList(
 ) {
     val rows by viewModel.rows.collectAsState()
     val totalBytes by viewModel.totalBytes.collectAsState()
+    val queuedIds by viewModel.queuedIds.collectAsState()
 
     if (rows.isEmpty()) {
         // Names the menu, not an icon: downloading moved behind an episode row's overflow when the
@@ -110,7 +111,8 @@ fun DownloadsList(
                         episodeTitle = row.episode.title,
                         isPlayed = row.episode.isPlayed,
                         download = row.download,
-                        onEnqueue = { viewModel.enqueue(row.episode.id) },
+                        onEnqueue = { viewModel.toggleQueued(row.episode.id) },
+                        isQueued = row.episode.id in queuedIds,
                         onDownload = { viewModel.retry(row.episode.id) },
                         onRemoveDownload = { viewModel.remove(row.episode.id) },
                         onTogglePlayed = { viewModel.togglePlayed(row.episode) }

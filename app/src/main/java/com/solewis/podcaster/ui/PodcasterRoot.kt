@@ -44,6 +44,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.solewis.podcaster.AppContainer
 import com.solewis.podcaster.ui.activity.ActivityScreen
+import com.solewis.podcaster.data.repo.QueueChange
 import com.solewis.podcaster.ui.common.MiniPlayer
 import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.episodedetail.EpisodeDetailScreen
@@ -67,6 +68,7 @@ import com.solewis.podcaster.ui.showpreview.ShowPreviewViewModel
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
@@ -127,7 +129,18 @@ fun PodcasterRoot(
     // places, and a failure that only some of them could report would be silent from the others.
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
-        merge(container.playbackStarter.messages, container.playback.errors)
+        merge(
+            container.playbackStarter.messages,
+            container.playback.errors,
+            // The moment-of-tapping half of the queue feedback; the button's checked state covers
+            // every moment after. See QueueButton.
+            container.queueRepository.changes.map { change ->
+                when (change) {
+                    is QueueChange.Added -> "Added to queue"
+                    is QueueChange.Removed -> "Removed from queue"
+                }
+            }
+        )
             .collect { snackbarHostState.showSnackbar(it) }
     }
 

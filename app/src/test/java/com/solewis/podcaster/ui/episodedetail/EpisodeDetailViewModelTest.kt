@@ -175,13 +175,14 @@ class EpisodeDetailViewModelTest {
         }
 
     @Test
-    fun enqueue_adds_this_episode_to_the_queue() = runTest(mainDispatcher.dispatcher) {
+    fun toggling_adds_this_episode_to_the_queue() = runTest(mainDispatcher.dispatcher) {
         val vm = loadedViewModel()
 
-        vm.enqueue()
+        vm.toggleQueued()
 
         awaitTrue("queue row written") { graph.db.queueDao().getAllOrdered().isNotEmpty() }
         assertThat(graph.db.queueDao().getAllOrdered().single().episodeId).isEqualTo(episodeId)
+        assertThat(vm.isQueued.awaitValue { it }).isTrue()
     }
 
     @Test

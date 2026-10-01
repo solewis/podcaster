@@ -216,15 +216,35 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun enqueue_adds_the_episode_to_the_queue() = runTest(mainDispatcher.dispatcher) {
+    fun toggling_adds_the_episode_to_the_queue() = runTest(mainDispatcher.dispatcher) {
         seedShowWithEpisodes()
         val vm = viewModel()
 
-        vm.enqueue(feedItem("1"))
+        vm.toggleQueued(feedItem("1"))
 
         awaitTrue("queue row written") { graph.db.queueDao().getAllOrdered().isNotEmpty() }
         assertThat(graph.db.queueDao().getAllOrdered().map { it.episodeId })
             .containsExactly("$podcastId:1")
+        // What the row's button reads to draw itself checked.
+        assertThat(vm.queuedIds.awaitValue { it.isNotEmpty() }).containsExactly("$podcastId:1")
+    }
+
+    /**
+     * The second half of the toggle: a tap on a queued episode takes it back out. Before this, the
+     * button only ever added - and with no visible change after the first tap, tapping again "to make
+     * sure" was the natural reaction.
+     */
+    @Test
+    fun toggling_a_queued_episode_takes_it_back_out() = runTest(mainDispatcher.dispatcher) {
+        seedShowWithEpisodes()
+        val vm = viewModel()
+        vm.toggleQueued(feedItem("1"))
+        vm.queuedIds.awaitValue { it.isNotEmpty() }
+
+        vm.toggleQueued(feedItem("1"))
+
+        assertThat(vm.queuedIds.awaitValue { it.isEmpty() }).isEmpty()
+        assertThat(graph.db.queueDao().getAllOrdered()).isEmpty()
     }
 
     @Test
