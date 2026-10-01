@@ -48,6 +48,8 @@ class AutoAdvancerTest {
     /** Flipped by a test to close the gate; read on every ending, as production reads its settings. */
     private var gateOpen = true
 
+    private val log = PlaybackLog(java.io.File.createTempFile("advancer-log", ".txt"))
+
     private val firstEpisode get() = "$podcastId:one"
     private val secondEpisode get() = "$podcastId:two"
 
@@ -74,7 +76,7 @@ class AutoAdvancerTest {
             player = ExoPlayer.Builder(ApplicationProvider.getApplicationContext())
                 .setLooper(Looper.getMainLooper())
                 .build()
-            player.addListener(AutoAdvancer(player, queueRepository, scope) { gateOpen })
+            player.addListener(AutoAdvancer(player, queueRepository, scope, log) { gateOpen })
         }
     }
 
@@ -147,27 +149,22 @@ class AutoAdvancerTest {
     private fun queuedIds() = runBlocking { db.queueDao().getAllOrdered().map { it.episodeId } }
 
     /**
-     * Bug 3 from a phone log: a queued episode's saved position had landed past the end of a
-     * re-stitched copy 5 minutes shorter, so it "ended" 20ms after becoming ready and this class
-     * moved straight on to the next episode - 4.7 minutes skipped without a sound.
+     * A resume landing past the end of the file is recorded, not acted on - the remapper repairs
+     * the case it came from whenever both lengths are known, and a guessed rewind here was dropped.
+     * Without the remapper (as in this test) it behaves as an ending always did.
      */
     @Test
-    fun a_resume_past_the_end_rewinds_instead_of_skipping_to_the_next_episode() {
+    fun a_resume_past_the_end_is_recorded() {
         runBlocking { queueRepository.enqueue(secondEpisode) }
 
         onMain {
-            // 10 minutes of audio, loaded at 10:10 - past the end, as the stale position was.
             player.setMediaSource(silenceSource(firstEpisode, 600_000), 610_000)
             player.prepare()
             player.play()
         }
 
-        // Back off the end by the fallback rewind, still on this episode, still playing.
-        awaitPlayer("rewound off the end") {
-            onMain { player.isPlaying && player.currentPosition in 299_000L..320_000L }
-        }
-        assertThat(onMain { player.currentMediaItem?.mediaId }).isEqualTo(firstEpisode)
-        assertThat(queuedIds()).containsExactly(secondEpisode)
+        awaitAdvancedTo(secondEpisode)
+        assertThat(log.snapshot()).contains("ENDED_UNHEARD item=$firstEpisode")
     }
 
     /**
@@ -187,23 +184,8 @@ class AutoAdvancerTest {
         }
 
         awaitAdvancedTo(secondEpisode)
-    }
-
-    /**
-     * The rewind's own ending - the episode genuinely finishing five minutes later - must not look
-     * unheard again, or the episode would rewind forever.
-     */
-    @Test
-    fun the_rewind_happens_once_and_then_the_episode_can_finish() {
-        runBlocking { queueRepository.enqueue(secondEpisode) }
-        onMain {
-            // Short enough that the rewind lands at 0 and the real ending arrives in seconds.
-            player.setMediaSource(silenceSource(firstEpisode, 2_000), 5_000)
-            player.prepare()
-            player.play()
-        }
-
-        awaitAdvancedTo(secondEpisode)
+        // A skip is a choice, not a bad load.
+        assertThat(log.snapshot()).doesNotContain("ENDED_UNHEARD")
     }
 
     @Test
