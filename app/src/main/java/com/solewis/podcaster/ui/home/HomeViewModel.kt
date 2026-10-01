@@ -89,8 +89,17 @@ class HomeViewModel(
         viewModelScope.launch { playbackStarter.togglePlayPause() }
     }
 
-    fun enqueue(episode: EpisodeFeedItem) {
-        viewModelScope.launch { queueRepository.enqueue(episode.id) }
+
+    /**
+     * Which episodes are queued, so each row's queue button can show it. Kept out of the screen's
+     * state for the same reason the download states are: a queue change should redraw two icons,
+     * not rebuild the list.
+     */
+    val queuedIds: StateFlow<Set<String>> =
+        queueRepository.observeQueuedEpisodeIds().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    fun toggleQueued(episode: EpisodeFeedItem) {
+        viewModelScope.launch { queueRepository.toggle(episode.id) }
     }
 
 

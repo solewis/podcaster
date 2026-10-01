@@ -60,6 +60,7 @@ fun HomeScreen(
     val state by viewModel.state.collectAsState()
     val downloadStates by viewModel.downloadStates.collectAsState()
     val nowPlaying by viewModel.nowPlaying.collectAsState()
+    val queuedIds by viewModel.queuedIds.collectAsState()
 
     Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).statusBarsPadding()) {
@@ -101,7 +102,8 @@ fun HomeScreen(
                             liveDurationMillis = nowPlaying.durationMillis.takeIf { isNowPlaying },
                             onClick = { onOpenEpisode(episode.id) },
                             onPlayOrToggle = { if (isNowPlaying) viewModel.togglePlayPause() else viewModel.play(episode) },
-                            onEnqueue = { viewModel.enqueue(episode) },
+                            isQueued = episode.id in queuedIds,
+                            onToggleQueued = { viewModel.toggleQueued(episode) },
                             download = downloadStates[episode.id],
                             onDownload = { viewModel.download(episode.id) },
                             onRemoveDownload = { viewModel.removeDownload(episode.id) },
@@ -142,7 +144,8 @@ private fun FeedEpisodeRow(
     liveDurationMillis: Long?,
     onClick: () -> Unit,
     onPlayOrToggle: () -> Unit,
-    onEnqueue: () -> Unit,
+    isQueued: Boolean,
+    onToggleQueued: () -> Unit,
     download: EpisodeDownload?,
     onDownload: () -> Unit,
     onRemoveDownload: () -> Unit,
@@ -204,7 +207,8 @@ private fun FeedEpisodeRow(
             isPlaying = isNowPlaying,
             isLoading = isLoading,
             onPlayOrToggle = onPlayOrToggle,
-            onEnqueue = onEnqueue,
+            isQueued = isQueued,
+            onToggleQueued = onToggleQueued,
             download = download,
             onDownload = onDownload,
             onRemoveDownload = onRemoveDownload,

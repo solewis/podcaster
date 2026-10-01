@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -190,5 +191,49 @@ class HomeScreenTest {
         // every row the player's state would show up here and nowhere else.
         compose.onAllNodes(hasStateDescription("Now playing"), useUnmergedTree = true)
             .assertCountEquals(1)
+    }
+
+    /**
+     * Reported: adding to the queue showed nothing, so there was no way to tell it had worked. The
+     * button now reads queued, says so out loud, and the app confirms each change.
+     */
+    @Test
+    fun the_queue_button_shows_and_toggles_the_queued_state() {
+        launch()
+
+        compose.onNodeWithTag(TestTags.enqueueButton("An Episode")).performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithContentDescription("Remove An Episode from queue", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Added to queue").assertExists()
+
+        compose.onNodeWithTag(TestTags.enqueueButton("An Episode")).performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithContentDescription("Add An Episode to queue", useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        assertThat(runBlocking { container.queueRepository.observeQueue().first() }).isEmpty()
+    }
+
+    /**
+     * Reported: removing straight after adding left "Added to queue" up until it timed out, with the
+     * removal's message stuck behind it. The bar has to describe the latest action, at once.
+     */
+    @Test
+    fun a_new_queue_message_replaces_the_one_showing_instead_of_waiting_behind_it() {
+        launch()
+
+        compose.onNodeWithTag(TestTags.enqueueButton("An Episode")).performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText("Added to queue").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        compose.onNodeWithTag(TestTags.enqueueButton("An Episode")).performClick()
+
+        compose.waitUntil(timeoutMillis = 2_000) {
+            compose.onAllNodesWithText("Removed from queue").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Added to queue").assertDoesNotExist()
     }
 }

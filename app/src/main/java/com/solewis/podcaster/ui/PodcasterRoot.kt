@@ -44,6 +44,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.solewis.podcaster.AppContainer
 import com.solewis.podcaster.ui.activity.ActivityScreen
+import com.solewis.podcaster.data.repo.QueueChange
 import com.solewis.podcaster.ui.common.MiniPlayer
 import com.solewis.podcaster.ui.common.TestTags
 import com.solewis.podcaster.ui.episodedetail.EpisodeDetailScreen
@@ -67,6 +68,8 @@ import com.solewis.podcaster.ui.showpreview.ShowPreviewViewModel
 import com.solewis.podcaster.ui.subscriptions.SubscriptionsViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
@@ -127,8 +130,24 @@ fun PodcasterRoot(
     // places, and a failure that only some of them could report would be silent from the others.
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
-        merge(container.playbackStarter.messages, container.playback.errors)
-            .collect { snackbarHostState.showSnackbar(it) }
+        merge(
+            container.playbackStarter.messages,
+            container.playback.errors,
+            // The moment-of-tapping half of the queue feedback; the button's checked state covers
+            // every moment after. See QueueButton.
+            container.queueRepository.changes.map { change ->
+                when (change) {
+                    is QueueChange.Added -> "Added to queue"
+                    is QueueChange.Removed -> "Removed from queue"
+                }
+            }
+        )
+            // Latest, not queued: showSnackbar suspends until its message is dismissed, so plain
+            // collect made each message wait its turn - tap "add" then "remove" and you read "Added
+            // to queue" for four seconds after it stopped being true. Cancelling a showing snackbar
+            // removes it, so the newest message replaces the old one at once and the bar always
+            // describes the last thing that happened.
+            .collectLatest { snackbarHostState.showSnackbar(it) }
     }
 
     val nowPlayingRequest by openNowPlayingRequests.collectAsState()

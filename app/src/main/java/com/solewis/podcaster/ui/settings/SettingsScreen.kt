@@ -120,7 +120,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, onOpenStrea
             if (settings.prefetchMode == PrefetchMode.FULL_EPISODE) {
                 ToggleRow(
                     title = "Only on wifi",
-                    subtitle = "Wait for wifi before pulling in the rest of an episode, rather than using cellular data.",
+                    subtitle = "On cellular, only download a little ahead of where you're listening, as Conservative does.",
                     checked = settings.prefetchWifiOnly,
                     onCheckedChange = viewModel::setPrefetchWifiOnly,
                     testTag = TestTags.PREFETCH_WIFI_ONLY_SWITCH

@@ -48,6 +48,8 @@ class AutoAdvancerTest {
     /** Flipped by a test to close the gate; read on every ending, as production reads its settings. */
     private var gateOpen = true
 
+    private val log = PlaybackLog(java.io.File.createTempFile("advancer-log", ".txt"))
+
     private val firstEpisode get() = "$podcastId:one"
     private val secondEpisode get() = "$podcastId:two"
 
@@ -74,7 +76,7 @@ class AutoAdvancerTest {
             player = ExoPlayer.Builder(ApplicationProvider.getApplicationContext())
                 .setLooper(Looper.getMainLooper())
                 .build()
-            player.addListener(AutoAdvancer(player, queueRepository, scope) { gateOpen })
+            player.addListener(AutoAdvancer(player, queueRepository, scope, log) { gateOpen })
         }
     }
 
@@ -145,6 +147,46 @@ class AutoAdvancerTest {
     }
 
     private fun queuedIds() = runBlocking { db.queueDao().getAllOrdered().map { it.episodeId } }
+
+    /**
+     * A resume landing past the end of the file is recorded, not acted on - the remapper repairs
+     * the case it came from whenever both lengths are known, and a guessed rewind here was dropped.
+     * Without the remapper (as in this test) it behaves as an ending always did.
+     */
+    @Test
+    fun a_resume_past_the_end_is_recorded() {
+        runBlocking { queueRepository.enqueue(secondEpisode) }
+
+        onMain {
+            player.setMediaSource(silenceSource(firstEpisode, 600_000), 610_000)
+            player.prepare()
+            player.play()
+        }
+
+        awaitAdvancedTo(secondEpisode)
+        assertThat(log.snapshot()).contains("ENDED_UNHEARD item=$firstEpisode")
+    }
+
+    /**
+     * Resuming with the outro still to go and skipping straight past it ends the episode within a
+     * moment of loading - exactly what a bad load looks like by the clock alone. It has to count as
+     * finishing, not as something to rewind five minutes from.
+     */
+    @Test
+    fun skipping_past_the_end_still_moves_on() {
+        runBlocking { queueRepository.enqueue(secondEpisode) }
+        onMain {
+            // Loaded with two seconds left, then skipped past them before they could play.
+            player.setMediaSource(silenceSource(firstEpisode, 600_000), 598_000)
+            player.prepare()
+            player.seekTo(600_000)
+            player.play()
+        }
+
+        awaitAdvancedTo(secondEpisode)
+        // A skip is a choice, not a bad load.
+        assertThat(log.snapshot()).doesNotContain("ENDED_UNHEARD")
+    }
 
     @Test
     fun finishing_an_episode_starts_the_next_one_in_the_queue() {

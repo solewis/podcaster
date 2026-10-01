@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.foundation.shape.CircleShape
@@ -125,7 +124,8 @@ fun EpisodeActionRow(
     isPlaying: Boolean,
     isLoading: Boolean,
     onPlayOrToggle: () -> Unit,
-    onEnqueue: () -> Unit,
+    isQueued: Boolean,
+    onToggleQueued: () -> Unit,
     download: EpisodeDownload?,
     onDownload: () -> Unit,
     onRemoveDownload: () -> Unit,
@@ -143,16 +143,13 @@ fun EpisodeActionRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onEnqueue,
-                    modifier = Modifier.size(ActionButtonSize).testTag(TestTags.enqueueButton(episodeTitle))
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.PlaylistAdd,
-                        contentDescription = "Add $episodeTitle to queue",
-                        modifier = Modifier.size(ActionIconSize)
-                    )
-                }
+                QueueButton(
+                    episodeTitle = episodeTitle,
+                    isQueued = isQueued,
+                    onToggle = onToggleQueued,
+                    modifier = Modifier.size(ActionButtonSize),
+                    iconSize = ActionIconSize
+                )
                 DownloadButton(
                     episodeTitle = episodeTitle,
                     download = download,
@@ -165,7 +162,8 @@ fun EpisodeActionRow(
                     episodeTitle = episodeTitle,
                     isPlayed = isPlayed,
                     download = download,
-                    onEnqueue = onEnqueue,
+                    onEnqueue = onToggleQueued,
+                    isQueued = isQueued,
                     onDownload = onDownload,
                     onRemoveDownload = onRemoveDownload,
                     onTogglePlayed = onTogglePlayed,

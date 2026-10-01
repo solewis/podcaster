@@ -27,12 +27,46 @@ class AutoAdvancer(
     private val shouldAdvance: () -> Boolean = { true }
 ) : Player.Listener {
 
+    /** Where the current episode was loaded - see [endedWithoutBeingHeard]. */
+    private var loadedAtMs = 0L
+
+    /**
+     * Any seek since the load - the listener's or [PositionRemapper]'s - means an ending is no
+     * longer the load's doing. Without this, skipping straight past an outro on resume (which ends
+     * the episode instantly) would be logged as a bad load.
+     */
+    private var seekedSinceLoad = false
+
+    override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+        loadedAtMs = player.currentPosition
+        seekedSinceLoad = false
+    }
+
+    override fun onPositionDiscontinuity(
+        oldPosition: Player.PositionInfo,
+        newPosition: Player.PositionInfo,
+        reason: Int
+    ) {
+        if (reason == Player.DISCONTINUITY_REASON_SEEK) seekedSinceLoad = true
+    }
+
     override fun onPlaybackStateChanged(playbackState: Int) {
         if (playbackState != Player.STATE_ENDED) return
+        val endedEpisodeId = player.currentMediaItem?.mediaId ?: return
+
+        // Recorded, deliberately not acted on. An earlier version rewound five minutes here, but
+        // PositionRemapper already repairs the case that prompted it (a resume past the end of a
+        // shorter copy) whenever the earlier copy's length is known - which is every resume, since
+        // a position is only ever saved while playing, and playing measures the length. What is
+        // left is a host that never states a length, or a bug in the remapper; a guessed jump was a
+        // poor answer to either, so this only leaves the evidence for whoever reads the log.
+        if (endedWithoutBeingHeard()) {
+            log?.record("ENDED_UNHEARD", "item=$endedEpisodeId loadedAt=$loadedAtMs dur=${player.duration}")
+        }
+
         // Declining here *is* stopping: an episode reaching its end already leaves the player
         // stopped, so there is nothing further to pause. The queue is left intact either way.
         if (!shouldAdvance()) return
-        val endedEpisodeId = player.currentMediaItem?.mediaId ?: return
 
         scope.launch {
             val next = queueRepository.nextPlayable(endedEpisodeId) ?: return@launch
@@ -46,5 +80,17 @@ class AutoAdvancer(
             player.prepare()
             player.play()
         }
+    }
+
+    /**
+     * An episode that reached its end within moments of being loaded at a resume position, with no
+     * seek since - loaded somewhere past what this copy of the file holds, rather than listened to.
+     */
+    private fun endedWithoutBeingHeard(): Boolean =
+        !seekedSinceLoad && loadedAtMs > 0 && player.currentPosition - loadedAtMs < MIN_HEARD_MS
+
+    private companion object {
+        /** Less than this between loading and ending means nothing was heard. */
+        const val MIN_HEARD_MS = 3_000L
     }
 }

@@ -52,10 +52,10 @@ fun silenceSource(mediaId: String, durationMillis: Long): SilenceMediaSource =
  * Serves [seconds] of silent WAV over real HTTP, so a `MediaController` has something playable to
  * point at.
  *
- * HTTP rather than a `file://` URI in the cache directory, which would be simpler: the player's
- * data source chain is `CacheDataSource` over `DefaultHttpDataSource` (see `PlayerFactory`), with
- * no `DefaultDataSource` in it, so a file URI reaches an HTTP source and dies with a
- * `ClassCastException` rather than playing. Production only ever holds `http(s)` enclosure URLs -
+ * HTTP rather than a `file://` URI in the cache directory, which would be simpler: a streamed
+ * episode is fetched by `StreamDownloader` through `DefaultHttpDataSource` (see `PlayerFactory`),
+ * with no `DefaultDataSource` anywhere, so a file URI reaches an HTTP source and fails rather than
+ * playing. Production only ever holds `http(s)` enclosure URLs -
  * downloads are served from the cache keyed by that same URL - so nothing is being worked around
  * here beyond the test's own convenience.
  */

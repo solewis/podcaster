@@ -104,7 +104,8 @@ class EpisodeRepository(
             artworkUrl = entity.artworkUrl ?: podcastArtworkUrl,
             mediaUrl = entity.enclosureUrl,
             startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis,
-            durationMillis = entity.durationMillis
+            durationMillis = entity.durationMillis,
+            recordedDurationMillis = entity.durationMillis.takeIf { entity.durationIsExact }
         )
     }
 
@@ -123,7 +124,8 @@ class EpisodeRepository(
             artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
             mediaUrl = entity.enclosureUrl,
             startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis,
-            durationMillis = entity.durationMillis
+            durationMillis = entity.durationMillis,
+            recordedDurationMillis = entity.durationMillis.takeIf { entity.durationIsExact }
         )
     }
 
@@ -148,7 +150,8 @@ class EpisodeRepository(
                 artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
                 mediaUrl = entity.enclosureUrl,
                 startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis,
-                durationMillis = entity.durationMillis
+                durationMillis = entity.durationMillis,
+                recordedDurationMillis = entity.durationMillis.takeIf { entity.durationIsExact }
             )
         }
     }
@@ -169,7 +172,8 @@ class EpisodeRepository(
                 artworkUrl = entity.artworkUrl ?: podcast.artworkUrl,
                 mediaUrl = entity.enclosureUrl,
                 startPositionMillis = if (entity.isPlayed) 0L else entity.positionMillis,
-                durationMillis = entity.durationMillis
+                durationMillis = entity.durationMillis,
+                recordedDurationMillis = entity.durationMillis.takeIf { entity.durationIsExact }
             )
         }
     }

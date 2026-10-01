@@ -2,7 +2,9 @@ package com.solewis.podcaster.player
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.datasource.DataSourceBitmapLoader
 import androidx.media3.exoplayer.ExoPlayer
@@ -51,7 +53,10 @@ class PlaybackService : MediaLibraryService() {
     override fun onCreate() {
         super.onCreate()
         val container = (application as PodcasterApp).container
-        player = PlayerFactory.create(this, container.downloadCache, container.streamCache)
+        player = PlayerFactory.create(this, container.downloadCache, container.streamCache, container.streamDownloader)
+        // An interrupted download that resumed onto a different copy has thrown the old one away;
+        // playback has to move onto the new one, and PositionRemapper decides where in it.
+        container.streamDownloader.onCopyReplaced = { key, _, _ -> lifecycleScope.launch { reloadOntoNewCopy(key) } }
         // Here rather than at app startup: the stream cache is only actually open once playback
         // needs it, and a size limit alone lets it hold an episode nobody has any intention of
         // finishing indefinitely, as long as nothing bigger ever needs the room - see
@@ -65,6 +70,9 @@ class PlaybackService : MediaLibraryService() {
         player.addListener(SpeedPersister(container.settings))
         // First, so the log records the player's own view of everything that follows.
         player.addListener(PlaybackLogListener(player, container.playbackLog))
+        // Before anything that acts on a position: a resume saved against a different-length copy
+        // of the file is moved into this one as soon as its length is known.
+        player.addListener(PositionRemapper(player, container.playbackLog))
         // The audio pipeline's own events, and a watch on the position itself - between them they
         // cover the reported repeat, which leaves no trace in any Player.Listener callback.
         player.addAnalyticsListener(AudioSinkLogListener(player, container.playbackLog))
@@ -228,11 +236,34 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    /**
+     * Reloads the current episode at the current position, carrying the length of the copy it was
+     * just playing - so [PositionRemapper] compares the new copy against *that*, rather than
+     * against whatever the database last recorded before this listen began.
+     */
+    private fun reloadOntoNewCopy(key: String) {
+        val item = player.currentMediaItem?.takeIf { it.mediaId == key } ?: return
+        val position = player.currentPosition
+        val duration = player.duration
+        val metadata = item.mediaMetadata.buildUpon()
+            .setExtras(Bundle().apply {
+                if (duration != C.TIME_UNSET && duration > 0) putLong(PositionRemapper.EXTRA_RECORDED_DURATION_MS, duration)
+            })
+            .build()
+        (application as PodcasterApp).container.playbackLog
+            .record("COPY_RELOAD", "item=$key pos=$position dur=$duration")
+        player.setMediaItem(item.buildUpon().setMediaMetadata(metadata).build(), position)
+        player.prepare()
+    }
+
     override fun onDestroy() {
         // Recorded because a service dying and restarting mid-episode is one of the ways the
         // position could be reloaded from a stale row.
         (application as PodcasterApp).container.playbackLog.record("SERVICE_DESTROY")
         isRunning = false
+        // Nothing is playing to need it, and a paused episode nobody returns to should not keep
+        // pulling data down in the background.
+        (application as PodcasterApp).container.streamDownloader.cancel()
         progressWriter.flushBlocking()
         mediaSession.release()
         // Releases the wrapped ExoPlayer too, and detaches the listener the wrapper holds on it.

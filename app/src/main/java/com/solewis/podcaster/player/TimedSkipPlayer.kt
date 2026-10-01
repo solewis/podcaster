@@ -137,7 +137,14 @@ class TimedSkipPlayer(
         positionMs: Long,
         seekCommand: Int
     ): ListenableFuture<*> {
-        log?.record("SESSION_SEEK", "command=${seekCommandName(seekCommand)} to=$positionMs")
+        // Who asked, alongside what. The log could already tell an in-app press (preceded by a
+        // CMD_ line) from everything else, but "everything else" lumped together the notification,
+        // the lock screen, the car and a headset - and a walk's worth of unexplained seeks turned
+        // out to be the notification's buttons, which only the requester's package can say.
+        log?.record(
+            "SESSION_SEEK",
+            "command=${seekCommandName(seekCommand)} to=$positionMs from=${requestingController() ?: "app"}"
+        )
         return when (seekCommand) {
             Player.COMMAND_SEEK_FORWARD, Player.COMMAND_SEEK_TO_NEXT ->
                 seekBy(mediaItemIndex, skipForwardMillis())

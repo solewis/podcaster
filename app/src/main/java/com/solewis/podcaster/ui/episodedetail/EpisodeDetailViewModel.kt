@@ -13,6 +13,7 @@ import com.solewis.podcaster.player.PlayedMarker
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -76,9 +77,14 @@ class EpisodeDetailViewModel(
         }
     }
 
-    fun enqueue() {
-        viewModelScope.launch { queueRepository.enqueue(episodeId) }
+    fun toggleQueued() {
+        viewModelScope.launch { queueRepository.toggle(episodeId) }
     }
+
+    /** Whether this episode is queued - see [QueueRepository.observeQueuedEpisodeIds]. */
+    val isQueued: StateFlow<Boolean> = queueRepository.observeQueuedEpisodeIds()
+        .map { episodeId in it }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /**
      * Marks this episode played or unplayed by hand.

@@ -70,7 +70,15 @@ class LoadedControllerErrorRecoveryTest {
     private var connection: PlayerConnection? = null
 
     private lateinit var server: MockWebServer
-    private val serverOnline = AtomicBoolean(true)
+    /**
+     * Down from the start, except for the first request: that one is cut off halfway through, as a
+     * dropped connection does, and everything after it gets a 503 until a test brings the server
+     * back. Episodes are fetched by one request start to finish now (StreamDownloader), so "seek
+     * past what is buffered" no longer produces a request on its own - the only way to strand
+     * playback is for the download itself to die partway.
+     */
+    private val serverOnline = AtomicBoolean(false)
+    private val requests = java.util.concurrent.atomic.AtomicInteger()
     private val episodeId = "1:ep"
 
     @Before
@@ -78,8 +86,17 @@ class LoadedControllerErrorRecoveryTest {
         server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
-                if (!serverOnline.get()) return MockResponse().setResponseCode(503)
+                val first = requests.incrementAndGet() == 1
+                if (!first && !serverOnline.get()) return MockResponse().setResponseCode(503)
                 val body = silentWav(seconds = 300)
+                if (first) {
+                    return MockResponse()
+                        .setResponseCode(200)
+                        .setHeader("Content-Type", "audio/wav")
+                        .setHeader("Accept-Ranges", "bytes")
+                        .setBody(Buffer().write(body))
+                        .setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY)
+                }
                 val rangeHeader = Regex("bytes=([0-9]+)-([0-9]*)")
                 val match = request.getHeader("Range")?.let { rangeHeader.find(it) }
                     ?: return MockResponse()
@@ -155,11 +172,12 @@ class LoadedControllerErrorRecoveryTest {
 
     @Test
     fun a_manual_command_clears_a_lingering_error_that_the_offline_background_retrier_cannot() {
-        serverOnline.set(false)
-        // Past the default ~50s read-ahead buffer, to force a fresh request against the now-503ing
-        // server rather than being served from what is already loaded.
+        // Past the 150s the cut-off download got, so there is nothing to play there and nothing
+        // that can fetch it while the server is down.
         onMain { external.seekTo(200_000) }
-        awaitPlayer("a fatal error on the real session") { onMain { external.playerError } != null }
+        // Generous: the player retries a failing load a few times, with growing delays, before it
+        // gives up and reports a fatal error.
+        awaitPlayer("a fatal error on the real session", timeoutMillis = 30_000) { onMain { external.playerError } != null }
 
         serverOnline.set(true)
 

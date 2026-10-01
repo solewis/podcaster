@@ -4,6 +4,11 @@ import com.solewis.podcaster.data.db.QueueDao
 import com.solewis.podcaster.data.db.entity.QueueEntity
 import com.solewis.podcaster.data.db.model.QueueItem
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 
 /**
  * The personal, cross-show "play next" list. Deliberately not synchronized with ExoPlayer's own
@@ -19,6 +24,38 @@ class QueueRepository(
     private val now: () -> Long = System::currentTimeMillis
 ) {
     fun observeQueue(): Flow<List<QueueItem>> = queueDao.observeQueue()
+
+    /**
+     * Which episodes are in the queue, for a row to draw its queue button checked or not.
+     *
+     * Reported because adding to the queue showed nothing at all: the button looked the same
+     * before and after, so the only way to know it had worked was to go and look at the queue.
+     */
+    fun observeQueuedEpisodeIds(): Flow<Set<String>> =
+        observeQueue().map { items -> items.mapTo(HashSet()) { it.episodeId } }.distinctUntilChanged()
+
+    private val _changes = MutableSharedFlow<QueueChange>(extraBufferCapacity = 1)
+
+    /** Every toggle's outcome, so the app can confirm it - see PodcasterRoot's snackbar. */
+    val changes: SharedFlow<QueueChange> = _changes.asSharedFlow()
+
+    /**
+     * Adds the episode, or takes it out if it is already there - the queue button is a toggle, so
+     * a second tap is how you change your mind.
+     *
+     * Decided by whether the delete removed anything rather than by a separate lookup first, so
+     * there is no window in which two quick taps could both read "not queued" and both add.
+     */
+    suspend fun toggle(episodeId: String): QueueChange {
+        val change = if (queueDao.deleteByEpisodeId(episodeId) > 0) {
+            QueueChange.Removed(episodeId)
+        } else {
+            enqueue(episodeId)
+            QueueChange.Added(episodeId)
+        }
+        _changes.tryEmit(change)
+        return change
+    }
 
     suspend fun enqueue(episodeId: String) {
         val position = queueDao.nextPosition()
@@ -70,4 +107,11 @@ class QueueRepository(
         }
         return currentEpisodeId?.let { episodeRepository.getNextInShow(it) }
     }
+}
+
+/** What a queue toggle did, so a confirmation can say which. */
+sealed interface QueueChange {
+    val episodeId: String
+    data class Added(override val episodeId: String) : QueueChange
+    data class Removed(override val episodeId: String) : QueueChange
 }

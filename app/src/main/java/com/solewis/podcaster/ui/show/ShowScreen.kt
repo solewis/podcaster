@@ -106,6 +106,7 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val refreshError by viewModel.refreshError.collectAsState()
     val downloadStates by viewModel.downloadStates.collectAsState()
+    val queuedIds by viewModel.queuedIds.collectAsState()
     val pendingEpisodeId by viewModel.pendingEpisodeId.collectAsState()
     val nowPlaying by viewModel.nowPlaying.collectAsState()
     val nowPlayingId = nowPlaying.episodeId
@@ -244,7 +245,8 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                                     if (episode.id == nowPlayingId) viewModel.togglePlayPause()
                                     else viewModel.play(episode.id)
                                 },
-                                onEnqueue = { viewModel.enqueue(episode.id) },
+                                isQueued = episode.id in queuedIds,
+                                onToggleQueued = { viewModel.toggleQueued(episode.id) },
                                 download = downloadStates[episode.id],
                                 onDownload = { viewModel.download(episode.id) },
                                 onRemoveDownload = { viewModel.removeDownload(episode.id) },
@@ -611,7 +613,8 @@ private fun EpisodeRow(
     isNowPlaying: Boolean,
     playbackState: RowPlaybackState,
     onPlay: () -> Unit,
-    onEnqueue: () -> Unit,
+    isQueued: Boolean,
+    onToggleQueued: () -> Unit,
     download: EpisodeDownload?,
     onDownload: () -> Unit,
     onRemoveDownload: () -> Unit,
@@ -733,7 +736,8 @@ private fun EpisodeRow(
             isPlaying = isNowPlaying,
             isLoading = isStarting,
             onPlayOrToggle = onPlay,
-            onEnqueue = onEnqueue,
+            isQueued = isQueued,
+            onToggleQueued = onToggleQueued,
             download = download,
             onDownload = onDownload,
             onRemoveDownload = onRemoveDownload,
