@@ -207,6 +207,21 @@ class TimedSkipPlayerTest {
         logFile.delete()
     }
 
+    /** Notification and car seeks reach the session alike; only the requester's package tells them apart. */
+    @Test
+    fun a_seek_is_recorded_with_whoever_asked_for_it() {
+        val log = PlaybackLog(java.io.File.createTempFile("seek-log", ".txt"))
+        val logged = onMain {
+            TimedSkipPlayer(exoPlayer, log = log, requestingController = { "com.android.systemui" })
+        }
+        seekTo(START_MILLIS)
+
+        onMain { logged.seekForward() }
+
+        assertThat(log.snapshot()).contains("command=SEEK_FORWARD")
+        assertThat(log.snapshot()).contains("from=com.android.systemui")
+    }
+
     private fun positionMillis(): Long = onMain { sessionPlayer.currentPosition }
 
     private fun seekTo(positionMillis: Long) {
