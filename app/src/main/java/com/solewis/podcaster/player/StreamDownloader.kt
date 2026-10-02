@@ -77,6 +77,13 @@ class StreamDownloader(
     @Volatile
     var onCopyReplaced: ((key: String, oldLength: Long, newLength: Long) -> Unit)? = null
 
+    init {
+        // Playback can only read committed fragments, so a budget under a fragment would hold the
+        // download back before it had committed anything playback could read - and playback,
+        // having read nothing, would never let it go.
+        require(aheadBudgetBytes >= 2 * FRAGMENT_BYTES) { "aheadBudgetBytes must cover at least two fragments" }
+    }
+
     private val lock = Any()
     private var job: Job? = null
 
@@ -152,7 +159,18 @@ class StreamDownloader(
                         CacheDataSource.FLAG_BLOCK_ON_CACHE,
                         null
                     )
-                    val newWriter = CacheWriter(dataSource, DataSpec.Builder().setUri(uri).setKey(key).build(), null, null)
+                    // FLAG_ALLOW_CACHE_FRAGMENTATION is what makes CacheDataSink honour FRAGMENT_BYTES at all;
+                    // without it the sink writes one file and commits it only when the download ends.
+                    // Playback can read nothing until a fragment is committed, so the whole episode
+                    // had to arrive before a note played - and a throttled download, holding back
+                    // because playback had read nothing, never arrived. Reported on the phone as a
+                    // spinner on every episode while on cellular with "only on wifi".
+                    val spec = DataSpec.Builder()
+                        .setUri(uri)
+                        .setKey(key)
+                        .setFlags(DataSpec.FLAG_ALLOW_CACHE_FRAGMENTATION)
+                        .build()
+                    val newWriter = CacheWriter(dataSource, spec, null, null)
                     writer = newWriter
                     if (cancelled) return
                     log?.record("DOWNLOAD_START", "item=$key cached=${cache.getCachedBytes(key, 0, C.LENGTH_UNSET.toLong())}")

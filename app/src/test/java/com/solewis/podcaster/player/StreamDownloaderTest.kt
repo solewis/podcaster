@@ -193,7 +193,7 @@ class StreamDownloaderTest {
     @Test
     fun a_throttled_download_stays_a_little_ahead_of_playback() {
         throttled = true
-        downloader = newDownloader(aheadBudget = 256L * 1024)
+        downloader = newDownloader(aheadBudget = 1024L * 1024)
         host.serve(copyA)
         downloader.ensure(KEY, URI)
         downloader.reportReadPosition(KEY, 0)
@@ -202,13 +202,56 @@ class StreamDownloaderTest {
 
         // Held back near the budget - allowing for one fragment being written as it stopped.
         assertThat(cache.getCachedBytes(KEY, 0, C.LENGTH_UNSET.toLong()))
-            .isAtMost(256L * 1024 + StreamDownloader.FRAGMENT_BYTES)
+            .isAtMost(1024L * 1024 + StreamDownloader.FRAGMENT_BYTES)
         assertThat(downloader.stateOf(KEY)).isEqualTo(StreamDownloader.State.Running)
 
         // And let go as playback catches up.
         downloader.reportReadPosition(KEY, copyA.size.toLong())
         awaitState(StreamDownloader.State.Complete)
         assertThat(cachedBytes()).isEqualTo(copyA)
+    }
+
+    /**
+     * Reported: on cellular with "only on wifi", every episode sat on a spinner. Playback can only
+     * read what the download has committed to the cache, and it was committing nothing until the
+     * whole file had arrived - so a throttled download, holding back because playback had read
+     * nothing, waited on playback while playback waited on it. Unthrottled, the same fault cost a
+     * wait for the entire file before the first note.
+     */
+    @Test
+    fun playback_starts_from_a_throttled_download_long_before_it_finishes() {
+        throttled = true
+        downloader = newDownloader(aheadBudget = 1024L * 1024)
+        host.serve(copyA)
+
+        val whole = java.util.concurrent.Executors.newSingleThreadExecutor().submit<ByteArray> { readAll(at = 0) }
+
+        assertThat(whole.get(10, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(copyA)
+    }
+
+    /**
+     * Reported: on cellular with "only on wifi", skipping to the end of an episode left it on a
+     * spinner, and nothing played again. The throttle measured "ahead" from the last byte playback
+     * had *read*, but a seek moves playback without reading anything - so a seek past the download
+     * left playback waiting for bytes the download would not fetch until playback read more. Each
+     * waited on the other, forever.
+     */
+    @Test
+    fun a_seek_past_a_throttled_download_is_not_left_waiting_on_it() {
+        throttled = true
+        downloader = newDownloader(aheadBudget = 1024L * 1024)
+        host.serve(copyA)
+        // Playing from the start, as far as the throttle lets the download get ahead.
+        downloader.ensure(KEY, URI)
+        downloader.reportReadPosition(KEY, 0)
+        Thread.sleep(300)
+
+        val tail = java.util.concurrent.Executors.newSingleThreadExecutor().submit<ByteArray> {
+            readAll(at = copyA.size - 100_000L)
+        }
+
+        assertThat(tail.get(10, java.util.concurrent.TimeUnit.SECONDS))
+            .isEqualTo(copyA.copyOfRange(copyA.size - 100_000, copyA.size))
     }
 
     @Test

@@ -50,6 +50,12 @@ class SingleCopyDataSource(
         key = dataSpec.key ?: dataSpec.uri.toString()
         position = dataSpec.position
         downloader.ensure(key, dataSpec.uri)
+        // Where playback now wants to read, before a byte of it has been read. A throttled download
+        // measures how far ahead it is from this, and a seek moves it without reading anything: left
+        // at the last byte read, a seek past the download had playback waiting on the download and
+        // the download - "far enough ahead" of a position playback had left - waiting on playback.
+        // Reported on the phone as a skip to the end that never played again, and nothing after it.
+        downloader.reportReadPosition(key, position)
 
         val total = awaitContentLength()
         bytesRemaining = when {
@@ -100,6 +106,9 @@ class SingleCopyDataSource(
                 null -> downloader.ensure(key, dataSpec!!.uri)
                 StreamDownloader.State.Running -> Unit
             }
+            // Again while waiting, in case the ensure() above started a fresh download that has
+            // not heard where playback is.
+            downloader.reportReadPosition(key, position)
             pause()
         }
     }

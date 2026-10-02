@@ -47,6 +47,8 @@ class SingleCopyPlaybackTest {
     private lateinit var downloader: StreamDownloader
     private lateinit var player: ExoPlayer
 
+    @Volatile private var throttled = false
+
     private val copyA = wav(Random(1))
     private val copyB = wav(Random(2))
 
@@ -72,7 +74,13 @@ class SingleCopyPlaybackTest {
         val database = StandaloneDatabaseProvider(context)
         downloadCache = SimpleCache(File(root, "downloads"), NoOpCacheEvictor(), database)
         streamCache = SimpleCache(File(root, "media"), NoOpCacheEvictor(), database)
-        downloader = StreamDownloader(streamCache, DefaultHttpDataSource.Factory())
+        downloader = StreamDownloader(
+            streamCache,
+            DefaultHttpDataSource.Factory(),
+            shouldThrottle = { throttled },
+            // The smallest budget allowed, so the episodes here are several budgets long.
+            aheadBudgetBytes = 2 * StreamDownloader.FRAGMENT_BYTES
+        )
         onMain {
             player = PlayerFactory.create(context, downloadCache, streamCache, downloader)
             // Android 15 refuses audio focus to a process with no foreground activity or service,
@@ -120,6 +128,42 @@ class SingleCopyPlaybackTest {
         assertThat(cached()).isEqualTo(copyA)
     }
 
+    /**
+     * What the phone does on cellular with "only on wifi": the download held to a little ahead of
+     * playback. Reported as a spinner on every episode, and nothing playing again - first because
+     * nothing the download fetched could be read until it had all arrived, and then because a skip
+     * past the download left each waiting on the other. Driven through the moves that broke it:
+     * start, skip to the end, then another episode resumed partway in.
+     */
+    @Test
+    fun a_throttled_download_plays_from_the_start_after_a_skip_to_the_end_and_from_a_resume_point() {
+        throttled = true
+        val first = MediaItem.Builder().setMediaId(KEY).setCustomCacheKey(KEY)
+            .setUri(server.url("/episode.wav").toString()).build()
+        onMain {
+            player.setMediaItem(first)
+            player.prepare()
+            player.play()
+        }
+        awaitPlayer("playing from the start") { onMain { player.isPlaying && player.currentPosition > 500 } }
+
+        onMain { player.seekTo(SECONDS * 1_000L - 5_000) }
+        awaitPlayer("playing after the skip to the end") {
+            onMain { player.isPlaying && player.currentPosition > SECONDS * 1_000L - 5_000 }
+        }
+
+        val second = MediaItem.Builder().setMediaId("ep-second").setCustomCacheKey("ep-second")
+            .setUri(server.url("/second.wav").toString()).build()
+        onMain {
+            player.setMediaItem(second, /* startPositionMs = */ SECONDS * 1_000L / 2)
+            player.prepare()
+            player.play()
+        }
+        awaitPlayer("playing the next episode from where it was left") {
+            onMain { player.isPlaying && player.currentPosition > SECONDS * 1_000L / 2 }
+        }
+    }
+
     private fun cached(): ByteArray {
         val length = streamCache.getCachedBytes(KEY, 0, C.LENGTH_UNSET.toLong()).toInt()
         val source = CacheDataSource(streamCache, PlaceholderDataSource.INSTANCE)
@@ -146,6 +190,6 @@ class SingleCopyPlaybackTest {
 
     private companion object {
         const val KEY = "ep-single-copy"
-        const val SECONDS = 120
+        const val SECONDS = 600
     }
 }
