@@ -71,7 +71,6 @@ class SingleCopyDataSource(
                 if (read != C.RESULT_END_OF_INPUT) {
                     position += read
                     if (bytesRemaining != C.LENGTH_UNSET.toLong()) bytesRemaining -= read
-                    downloader.reportReadPosition(key, position)
                     bytesTransferred(read)
                     return read
                 }

@@ -45,7 +45,6 @@ class StreamDownloaderTest {
     private lateinit var cache: SimpleCache
     private val host = FakeHost()
     private val log = PlaybackLog(File.createTempFile("downloader-log", ".txt"))
-    private var throttled = false
     private lateinit var downloader: StreamDownloader
 
     private val copyA = Random(1).nextBytes(3 * 1024 * 1024)
@@ -69,13 +68,11 @@ class StreamDownloaderTest {
         cache.release()
     }
 
-    private fun newDownloader(aheadBudget: Long = StreamDownloader.THROTTLED_AHEAD_BYTES) = StreamDownloader(
+    private fun newDownloader() = StreamDownloader(
         cache = cache,
         upstreamFactory = host,
-        shouldThrottle = { throttled },
         log = log,
-        retryDelaysMillis = listOf(20L),
-        aheadBudgetBytes = aheadBudget
+        retryDelaysMillis = listOf(20L)
     )
 
     @Test
@@ -190,25 +187,21 @@ class StreamDownloaderTest {
         assertThat(cachedBytes()).isEqualTo(copyA)
     }
 
+    /**
+     * Playback reads only what the download has committed to the cache, and it was committing
+     * nothing until the whole file had arrived - so every streamed episode waited for its entire
+     * download before the first note. Found when a download being held back (a since-removed
+     * setting) never arrived at all, leaving every episode on a spinner.
+     */
     @Test
-    fun a_throttled_download_stays_a_little_ahead_of_playback() {
-        throttled = true
-        downloader = newDownloader(aheadBudget = 256L * 1024)
-        host.serve(copyA)
-        downloader.ensure(KEY, URI)
-        downloader.reportReadPosition(KEY, 0)
+    fun playback_starts_long_before_the_download_finishes() {
+        // About four seconds for the whole file.
+        host.serve(copyA, bytesPerRead = 16 * 1024, pauseMillis = 20)
 
-        Thread.sleep(500)
+        val start = readFirst(64 * 1024)
 
-        // Held back near the budget - allowing for one fragment being written as it stopped.
-        assertThat(cache.getCachedBytes(KEY, 0, C.LENGTH_UNSET.toLong()))
-            .isAtMost(256L * 1024 + StreamDownloader.FRAGMENT_BYTES)
+        assertThat(start).isEqualTo(copyA.copyOfRange(0, 64 * 1024))
         assertThat(downloader.stateOf(KEY)).isEqualTo(StreamDownloader.State.Running)
-
-        // And let go as playback catches up.
-        downloader.reportReadPosition(KEY, copyA.size.toLong())
-        awaitState(StreamDownloader.State.Complete)
-        assertThat(cachedBytes()).isEqualTo(copyA)
     }
 
     @Test
@@ -244,6 +237,19 @@ class StreamDownloaderTest {
             source.close()
         }
         return out.toByteArray()
+    }
+
+    private fun readFirst(count: Int): ByteArray {
+        val source = SingleCopyDataSource(cache, downloader, pollMillis = 5)
+        source.open(DataSpec.Builder().setUri(URI).setKey(KEY).build())
+        val bytes = ByteArray(count)
+        var read = 0
+        try {
+            while (read < count) read += source.read(bytes, read, count - read)
+        } finally {
+            source.close()
+        }
+        return bytes
     }
 
     private fun cachedBytes(): ByteArray {

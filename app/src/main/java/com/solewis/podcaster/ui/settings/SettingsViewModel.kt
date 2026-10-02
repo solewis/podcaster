@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.repo.Downloads
 import com.solewis.podcaster.data.repo.StreamCache
 import com.solewis.podcaster.data.settings.AppSettings
-import com.solewis.podcaster.data.settings.PrefetchMode
 import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.data.settings.SkipAmount
 import com.solewis.podcaster.player.PlaybackLog
@@ -56,14 +55,6 @@ class SettingsViewModel(
 
     fun setAutoAdvance(enabled: Boolean) {
         store.autoAdvance = enabled
-    }
-
-    fun setPrefetchMode(mode: PrefetchMode) {
-        store.prefetchMode = mode
-    }
-
-    fun setPrefetchWifiOnly(enabled: Boolean) {
-        store.prefetchWifiOnly = enabled
     }
 
     /**

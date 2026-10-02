@@ -28,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.solewis.podcaster.data.settings.PrefetchMode
 import com.solewis.podcaster.data.settings.SkipAmount
 import com.solewis.podcaster.data.settings.ThemeMode
 import com.solewis.podcaster.ui.common.DetailTopBar
@@ -96,36 +95,6 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, onOpenStrea
                 testTag = TestTags.AUTO_ADVANCE_SWITCH
             )
             HorizontalDivider()
-            SettingSection("Downloading while you listen") {
-                Text(
-                    "Full episode pulls the rest of an episode in as soon as it starts, so a " +
-                        "dropped connection later has nothing left to fetch. Conservative only " +
-                        "downloads a little ahead at a time, using less data for episodes you " +
-                        "don't finish.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PrefetchMode.entries.forEach { mode ->
-                        FilterChip(
-                            selected = settings.prefetchMode == mode,
-                            onClick = { viewModel.setPrefetchMode(mode) },
-                            label = { Text(mode.label()) },
-                            colors = accentChipColors(),
-                            modifier = Modifier.testTag(TestTags.prefetchChoice(mode))
-                        )
-                    }
-                }
-            }
-            if (settings.prefetchMode == PrefetchMode.FULL_EPISODE) {
-                ToggleRow(
-                    title = "Only on wifi",
-                    subtitle = "On cellular, only download a little ahead of where you're listening, as Conservative does.",
-                    checked = settings.prefetchWifiOnly,
-                    onCheckedChange = viewModel::setPrefetchWifiOnly,
-                    testTag = TestTags.PREFETCH_WIFI_ONLY_SWITCH
-                )
-            }
             HorizontalDivider()
             StorageSection(
                 title = "Streaming cache",
@@ -257,11 +226,6 @@ private fun ThemeMode.label(): String = when (this) {
     ThemeMode.SYSTEM -> "System"
     ThemeMode.LIGHT -> "Light"
     ThemeMode.DARK -> "Dark"
-}
-
-private fun PrefetchMode.label(): String = when (this) {
-    PrefetchMode.FULL_EPISODE -> "Full episode"
-    PrefetchMode.CONSERVATIVE -> "Conservative"
 }
 
 /** Shared shape for the two "how much is on disk, and how do I get rid of it" sections. */

@@ -21,7 +21,6 @@ import com.solewis.podcaster.data.repo.SearchRepository
 import com.solewis.podcaster.data.repo.ShowPreviewRepository
 import com.solewis.podcaster.data.repo.StreamCache
 import com.solewis.podcaster.data.repo.SubscriptionRepository
-import com.solewis.podcaster.data.settings.PrefetchMode
 import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.player.MediaStorage
 import com.solewis.podcaster.data.net.AndroidConnectivity
@@ -138,11 +137,6 @@ class AppContainer(
         StreamDownloader(
             cache = streamCache,
             upstreamFactory = DefaultHttpDataSource.Factory().setUserAgent(PlayerFactory.USER_AGENT),
-            shouldThrottle = {
-                val current = settings.snapshot()
-                current.prefetchMode == PrefetchMode.CONSERVATIVE ||
-                    (current.prefetchWifiOnly && !connectivity.isOnWifi())
-            },
             log = playbackLog
         )
     }

@@ -51,15 +51,8 @@ import kotlin.math.min
 class StreamDownloader(
     private val cache: Cache,
     private val upstreamFactory: DataSource.Factory,
-    /**
-     * True when the download should stay only a little ahead of where playback is reading - the
-     * "Conservative" setting, or "only on wifi" while on cellular. Read on every chunk, so changing
-     * network or setting takes effect mid-download.
-     */
-    private val shouldThrottle: () -> Boolean = { false },
     private val log: PlaybackLog? = null,
     private val retryDelaysMillis: List<Long> = DEFAULT_RETRY_DELAYS_MILLIS,
-    private val aheadBudgetBytes: Long = THROTTLED_AHEAD_BYTES,
     private val executor: ExecutorService = Executors.newCachedThreadPool { runnable ->
         Thread(runnable, "stream-download").apply { isDaemon = true }
     }
@@ -107,11 +100,6 @@ class StreamDownloader(
     /** What the download for [key] is doing, or null when nothing is downloading it. */
     fun stateOf(key: String): State? = synchronized(lock) { job?.takeIf { it.key == key && !it.cancelled }?.state }
 
-    /** Where playback is reading [key], so a throttled download can stay just ahead of it. */
-    fun reportReadPosition(key: String, position: Long) {
-        synchronized(lock) { job }?.let { if (it.key == key) it.readPosition = position }
-    }
-
     fun cancel() {
         synchronized(lock) {
             job?.cancel()
@@ -127,7 +115,6 @@ class StreamDownloader(
     private inner class Job(val key: String, val uri: Uri) : Runnable {
         @Volatile var cancelled = false
         @Volatile var state: State = State.Running
-        @Volatile var readPosition = 0L
         @Volatile private var writer: CacheWriter? = null
         var future: Future<*>? = null
 
@@ -152,7 +139,18 @@ class StreamDownloader(
                         CacheDataSource.FLAG_BLOCK_ON_CACHE,
                         null
                     )
-                    val newWriter = CacheWriter(dataSource, DataSpec.Builder().setUri(uri).setKey(key).build(), null, null)
+                    // FLAG_ALLOW_CACHE_FRAGMENTATION is what makes CacheDataSink honour FRAGMENT_BYTES at all;
+                    // without it the sink writes one file and commits it only when the download ends.
+                    // Playback can read nothing until a fragment is committed, so the whole episode
+                    // had to arrive before a note played. Found when a download that was being held
+                    // back - a since-removed setting - never arrived at all: a spinner on every
+                    // episode.
+                    val spec = DataSpec.Builder()
+                        .setUri(uri)
+                        .setKey(key)
+                        .setFlags(DataSpec.FLAG_ALLOW_CACHE_FRAGMENTATION)
+                        .build()
+                    val newWriter = CacheWriter(dataSource, spec, null, null)
                     writer = newWriter
                     if (cancelled) return
                     log?.record("DOWNLOAD_START", "item=$key cached=${cache.getCachedBytes(key, 0, C.LENGTH_UNSET.toLong())}")
@@ -195,28 +193,18 @@ class StreamDownloader(
                 cache.removeResource(key)
             }
         }
-
-        /** True while a throttled download is further ahead of playback than it needs to be. */
-        fun tooFarAhead(writePosition: Long): Boolean =
-            shouldThrottle() && writePosition - readPosition > aheadBudgetBytes
     }
 
-    /**
-     * The upstream for the single download: checks the join when resuming, and holds back when
-     * throttled.
-     */
+    /** The upstream for the single download: checks the join when resuming. */
     private inner class JoinCheckingDataSource(
         private val upstream: DataSource,
         private val job: Job
     ) : DataSource by upstream {
 
-        private var writePosition = 0L
-
         /** Bytes still owed to the cache, when it asked for a bounded range; otherwise unset. */
         private var remaining = C.LENGTH_UNSET.toLong()
 
         override fun open(dataSpec: DataSpec): Long {
-            writePosition = dataSpec.position
             remaining = C.LENGTH_UNSET.toLong()
             if (dataSpec.position == 0L) return upstream.open(dataSpec)
 
@@ -251,20 +239,9 @@ class StreamDownloader(
 
         override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
             if (remaining == 0L) return C.RESULT_END_OF_INPUT
-            while (job.tooFarAhead(writePosition)) {
-                if (job.cancelled) throw InterruptedIOException("cancelled while throttled")
-                try {
-                    Thread.sleep(THROTTLE_POLL_MILLIS)
-                } catch (e: InterruptedException) {
-                    throw InterruptedIOException("interrupted while throttled")
-                }
-            }
             val wanted = if (remaining == C.LENGTH_UNSET.toLong()) length else min(length.toLong(), remaining).toInt()
             val read = upstream.read(buffer, offset, wanted)
-            if (read > 0) {
-                writePosition += read
-                if (remaining != C.LENGTH_UNSET.toLong()) remaining -= read
-            }
+            if (read > 0 && remaining != C.LENGTH_UNSET.toLong()) remaining -= read
             return read
         }
 
@@ -309,10 +286,6 @@ class StreamDownloader(
          */
         const val FRAGMENT_BYTES = 512L * 1024
 
-        /** How far ahead of playback a throttled download runs - minutes of audio at any bitrate. */
-        const val THROTTLED_AHEAD_BYTES = 16L * 1024 * 1024
-
-        private const val THROTTLE_POLL_MILLIS = 250L
         val DEFAULT_RETRY_DELAYS_MILLIS = listOf(2_000L, 4_000L, 8_000L, 15_000L, 30_000L)
     }
 }

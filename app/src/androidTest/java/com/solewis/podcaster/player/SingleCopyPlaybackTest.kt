@@ -47,6 +47,9 @@ class SingleCopyPlaybackTest {
     private lateinit var downloader: StreamDownloader
     private lateinit var player: ExoPlayer
 
+    /** Serve each file at about a megabyte a second - roughly ten seconds for an episode. */
+    @Volatile private var slow = false
+
     private val copyA = wav(Random(1))
     private val copyB = wav(Random(2))
 
@@ -59,12 +62,14 @@ class SingleCopyPlaybackTest {
                 val body = if (requests.incrementAndGet() == 1) copyA else copyB
                 val range = request.getHeader("Range")?.let { Regex("bytes=(\\d+)-(\\d*)").find(it) }
                     ?: return MockResponse().setResponseCode(200).setBody(okio.Buffer().write(body))
+                    .apply { if (slow) throttleBody(64 * 1024, 64, java.util.concurrent.TimeUnit.MILLISECONDS) }
                 val start = range.groupValues[1].toInt()
                 val end = range.groupValues[2].toIntOrNull() ?: (body.size - 1)
                 return MockResponse()
                     .setResponseCode(206)
                     .setHeader("Content-Range", "bytes $start-$end/${body.size}")
                     .setBody(okio.Buffer().write(body.copyOfRange(start, end + 1)))
+                    .apply { if (slow) throttleBody(64 * 1024, 64, java.util.concurrent.TimeUnit.MILLISECONDS) }
             }
         }
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
@@ -120,6 +125,46 @@ class SingleCopyPlaybackTest {
         assertThat(cached()).isEqualTo(copyA)
     }
 
+    /**
+     * Reported as a spinner on every episode: nothing the download fetched could be read until it
+     * had all arrived, so playback waited for the whole file - and a download that was being held
+     * back (a since-removed setting) never arrived at all. Driven through the moves that broke it -
+     * start, skip to the end, another episode resumed partway - against a host slow enough that
+     * waiting for the whole file shows.
+     */
+    @Test
+    fun playback_starts_before_the_download_finishes_and_survives_a_skip_and_a_resume() {
+        slow = true
+        val first = MediaItem.Builder().setMediaId(KEY).setCustomCacheKey(KEY)
+            .setUri(server.url("/episode.wav").toString()).build()
+        onMain {
+            player.setMediaItem(first)
+            player.prepare()
+            player.play()
+        }
+        awaitPlayer("playing from the start", timeoutMillis = 5_000) {
+            onMain { player.isPlaying && player.currentPosition > 500 }
+        }
+        assertThat(downloader.stateOf(KEY)).isEqualTo(StreamDownloader.State.Running)
+
+        // Past what has arrived, so this waits for the download - the agreed price of one copy.
+        onMain { player.seekTo(SECONDS * 1_000L - 5_000) }
+        awaitPlayer("playing after the skip to the end", timeoutMillis = 30_000) {
+            onMain { player.isPlaying && player.currentPosition > SECONDS * 1_000L - 5_000 }
+        }
+
+        val second = MediaItem.Builder().setMediaId("ep-second").setCustomCacheKey("ep-second")
+            .setUri(server.url("/second.wav").toString()).build()
+        onMain {
+            player.setMediaItem(second, /* startPositionMs = */ SECONDS * 1_000L / 2)
+            player.prepare()
+            player.play()
+        }
+        awaitPlayer("playing the next episode from where it was left", timeoutMillis = 30_000) {
+            onMain { player.isPlaying && player.currentPosition > SECONDS * 1_000L / 2 }
+        }
+    }
+
     private fun cached(): ByteArray {
         val length = streamCache.getCachedBytes(KEY, 0, C.LENGTH_UNSET.toLong()).toInt()
         val source = CacheDataSource(streamCache, PlaceholderDataSource.INSTANCE)
@@ -146,6 +191,6 @@ class SingleCopyPlaybackTest {
 
     private companion object {
         const val KEY = "ep-single-copy"
-        const val SECONDS = 120
+        const val SECONDS = 600
     }
 }
