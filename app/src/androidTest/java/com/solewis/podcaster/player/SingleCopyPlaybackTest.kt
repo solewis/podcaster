@@ -47,7 +47,8 @@ class SingleCopyPlaybackTest {
     private lateinit var downloader: StreamDownloader
     private lateinit var player: ExoPlayer
 
-    @Volatile private var throttled = false
+    /** Serve each file at about a megabyte a second - roughly ten seconds for an episode. */
+    @Volatile private var slow = false
 
     private val copyA = wav(Random(1))
     private val copyB = wav(Random(2))
@@ -61,12 +62,14 @@ class SingleCopyPlaybackTest {
                 val body = if (requests.incrementAndGet() == 1) copyA else copyB
                 val range = request.getHeader("Range")?.let { Regex("bytes=(\\d+)-(\\d*)").find(it) }
                     ?: return MockResponse().setResponseCode(200).setBody(okio.Buffer().write(body))
+                    .apply { if (slow) throttleBody(64 * 1024, 64, java.util.concurrent.TimeUnit.MILLISECONDS) }
                 val start = range.groupValues[1].toInt()
                 val end = range.groupValues[2].toIntOrNull() ?: (body.size - 1)
                 return MockResponse()
                     .setResponseCode(206)
                     .setHeader("Content-Range", "bytes $start-$end/${body.size}")
                     .setBody(okio.Buffer().write(body.copyOfRange(start, end + 1)))
+                    .apply { if (slow) throttleBody(64 * 1024, 64, java.util.concurrent.TimeUnit.MILLISECONDS) }
             }
         }
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
@@ -74,13 +77,7 @@ class SingleCopyPlaybackTest {
         val database = StandaloneDatabaseProvider(context)
         downloadCache = SimpleCache(File(root, "downloads"), NoOpCacheEvictor(), database)
         streamCache = SimpleCache(File(root, "media"), NoOpCacheEvictor(), database)
-        downloader = StreamDownloader(
-            streamCache,
-            DefaultHttpDataSource.Factory(),
-            shouldThrottle = { throttled },
-            // The smallest budget allowed, so the episodes here are several budgets long.
-            aheadBudgetBytes = 2 * StreamDownloader.FRAGMENT_BYTES
-        )
+        downloader = StreamDownloader(streamCache, DefaultHttpDataSource.Factory())
         onMain {
             player = PlayerFactory.create(context, downloadCache, streamCache, downloader)
             // Android 15 refuses audio focus to a process with no foreground activity or service,
@@ -129,15 +126,15 @@ class SingleCopyPlaybackTest {
     }
 
     /**
-     * What the phone does on cellular with "only on wifi": the download held to a little ahead of
-     * playback. Reported as a spinner on every episode, and nothing playing again - first because
-     * nothing the download fetched could be read until it had all arrived, and then because a skip
-     * past the download left each waiting on the other. Driven through the moves that broke it:
-     * start, skip to the end, then another episode resumed partway in.
+     * Reported as a spinner on every episode: nothing the download fetched could be read until it
+     * had all arrived, so playback waited for the whole file - and a download that was being held
+     * back (a since-removed setting) never arrived at all. Driven through the moves that broke it -
+     * start, skip to the end, another episode resumed partway - against a host slow enough that
+     * waiting for the whole file shows.
      */
     @Test
-    fun a_throttled_download_plays_from_the_start_after_a_skip_to_the_end_and_from_a_resume_point() {
-        throttled = true
+    fun playback_starts_before_the_download_finishes_and_survives_a_skip_and_a_resume() {
+        slow = true
         val first = MediaItem.Builder().setMediaId(KEY).setCustomCacheKey(KEY)
             .setUri(server.url("/episode.wav").toString()).build()
         onMain {
@@ -145,10 +142,14 @@ class SingleCopyPlaybackTest {
             player.prepare()
             player.play()
         }
-        awaitPlayer("playing from the start") { onMain { player.isPlaying && player.currentPosition > 500 } }
+        awaitPlayer("playing from the start", timeoutMillis = 5_000) {
+            onMain { player.isPlaying && player.currentPosition > 500 }
+        }
+        assertThat(downloader.stateOf(KEY)).isEqualTo(StreamDownloader.State.Running)
 
+        // Past what has arrived, so this waits for the download - the agreed price of one copy.
         onMain { player.seekTo(SECONDS * 1_000L - 5_000) }
-        awaitPlayer("playing after the skip to the end") {
+        awaitPlayer("playing after the skip to the end", timeoutMillis = 30_000) {
             onMain { player.isPlaying && player.currentPosition > SECONDS * 1_000L - 5_000 }
         }
 
@@ -159,7 +160,7 @@ class SingleCopyPlaybackTest {
             player.prepare()
             player.play()
         }
-        awaitPlayer("playing the next episode from where it was left") {
+        awaitPlayer("playing the next episode from where it was left", timeoutMillis = 30_000) {
             onMain { player.isPlaying && player.currentPosition > SECONDS * 1_000L / 2 }
         }
     }

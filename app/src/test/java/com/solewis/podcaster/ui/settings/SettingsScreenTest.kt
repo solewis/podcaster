@@ -14,7 +14,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
-import com.solewis.podcaster.data.settings.PrefetchMode
 import com.solewis.podcaster.data.settings.SettingsStore
 import com.solewis.podcaster.data.settings.SkipAmount
 import com.solewis.podcaster.data.settings.ThemeMode
@@ -143,36 +142,6 @@ class SettingsScreenTest {
 
         assertThat(store.autoAdvance).isFalse()
         compose.onNodeWithTag(TestTags.AUTO_ADVANCE_SWITCH).assertIsOff()
-    }
-
-    @Test
-    fun full_episode_prefetch_is_selected_by_default() {
-        launch()
-
-        compose.onNodeWithTag(TestTags.prefetchChoice(PrefetchMode.FULL_EPISODE)).assertIsSelected()
-        // Only meaningful for full-episode prefetch, so it has nothing to show otherwise.
-        compose.onNodeWithTag(TestTags.PREFETCH_WIFI_ONLY_SWITCH).performScrollTo().assertIsOff()
-    }
-
-    @Test
-    fun switching_to_conservative_hides_the_wifi_only_toggle() {
-        launch()
-
-        compose.onNodeWithTag(TestTags.prefetchChoice(PrefetchMode.CONSERVATIVE)).performScrollTo().performClick()
-        compose.waitForIdle()
-
-        assertThat(store.prefetchMode).isEqualTo(PrefetchMode.CONSERVATIVE)
-        compose.onNodeWithTag(TestTags.PREFETCH_WIFI_ONLY_SWITCH).assertDoesNotExist()
-    }
-
-    @Test
-    fun turning_on_wifi_only_stores_it() {
-        launch()
-
-        compose.onNodeWithTag(TestTags.PREFETCH_WIFI_ONLY_SWITCH).performScrollTo().performClick()
-        compose.waitForIdle()
-
-        assertThat(store.prefetchWifiOnly).isTrue()
     }
 
     @Test

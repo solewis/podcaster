@@ -1,7 +1,6 @@
 package com.solewis.podcaster.ui.common
 
 import com.solewis.podcaster.data.repo.DownloadStatus
-import com.solewis.podcaster.data.settings.PrefetchMode
 import com.solewis.podcaster.data.settings.SkipAmount
 import com.solewis.podcaster.data.settings.ThemeMode
 
@@ -58,7 +57,6 @@ object TestTags {
     const val SLEEP_TIMER_OFF = "sleepTimerOff"
     const val SLEEP_TIMER_END_OF_EPISODE = "sleepTimerEndOfEpisode"
     const val NOW_PLAYING_INFO = "nowPlayingInfo"
-    const val PREFETCH_WIFI_ONLY_SWITCH = "prefetchWifiOnlySwitch"
     const val CLEAR_STREAM_CACHE = "clearStreamCache"
     const val REMOVE_ALL_DOWNLOADS = "removeAllDownloads"
     const val VIEW_CACHED_EPISODES = "viewCachedEpisodes"
@@ -81,7 +79,6 @@ object TestTags {
 
     fun themeChoice(mode: ThemeMode) = "themeChoice:${mode.name}"
 
-    fun prefetchChoice(mode: PrefetchMode) = "prefetchChoice:${mode.name}"
 
     fun sleepPreset(minutes: Int) = "sleepPreset:$minutes"
 

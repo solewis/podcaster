@@ -12,13 +12,6 @@ import android.net.NetworkCapabilities
  */
 interface Connectivity {
     fun isOnline(): Boolean
-
-    /**
-     * Specifically wifi, not merely online - what a "only on wifi" setting means. A metered
-     * hotspot reported as wifi by the OS still counts: the distinction users mean by "wifi only" is
-     * the transport, not the billing plan.
-     */
-    fun isOnWifi(): Boolean
 }
 
 class AndroidConnectivity(context: Context) : Connectivity {
@@ -36,8 +29,6 @@ class AndroidConnectivity(context: Context) : Connectivity {
         it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
             it.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     } ?: false
-
-    override fun isOnWifi(): Boolean = capabilities()?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ?: false
 
     private fun capabilities(): NetworkCapabilities? =
         connectivityManager?.getNetworkCapabilities(connectivityManager.activeNetwork)
