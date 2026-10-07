@@ -49,7 +49,14 @@ class ShowViewModel(
         val episodes: List<EpisodeListItem> = emptyList(),
         val jump: JumpPillUi? = null,
         val filter: EpisodeFilter = EpisodeFilter.ALL,
-        val isLoading: Boolean = true
+        val isLoading: Boolean = true,
+        /**
+         * For a show whose feed has never loaded - one subscribed moments ago, its episodes still
+         * on their way, or one whose first load failed. Either way the list is empty for a reason
+         * worth saying, rather than looking like a show with no episodes.
+         */
+        val isLoadingEpisodes: Boolean = false,
+        val episodesError: String? = null
     )
 
     /**
@@ -74,9 +81,10 @@ class ShowViewModel(
         podcastRepository.observeById(podcastId),
         episodeRepository.observeEpisodes(podcastId),
         _filter,
-        downloadedIds
-    ) { podcast, episodes, filter, downloaded ->
-        buildUiState(podcast, episodes, filter, downloaded)
+        downloadedIds,
+        subscriptionRepository.loading.map { podcastId in it }.distinctUntilChanged()
+    ) { podcast, episodes, filter, downloaded, fetching ->
+        buildUiState(podcast, episodes, filter, downloaded, fetching)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
     /** Whatever is currently audible, so the row for it can move rather than step every 5s. */
@@ -216,10 +224,12 @@ class ShowViewModel(
         podcast: PodcastEntity?,
         episodes: List<EpisodeListItem>,
         filter: EpisodeFilter,
-        downloadedIds: Set<String>
+        downloadedIds: Set<String>,
+        fetching: Boolean
     ): UiState {
         if (podcast == null) return UiState(podcast = null, isLoading = episodes.isEmpty())
 
+        val neverLoaded = podcast.lastRefreshedAt == null && episodes.isEmpty()
         val visible = episodes.filter { filter.accepts(it, downloadedIds) }
         val sorted = sortEpisodes(visible, podcast.sortOrder)
         // Resolved against the whole show, not the filtered view - which episode you were last on
@@ -234,7 +244,11 @@ class ShowViewModel(
             episodes = sorted,
             jump = jump,
             filter = filter,
-            isLoading = false
+            isLoading = false,
+            // No retry button: a show that has never loaded counts as stale, so opening it again
+            // - or opening the app - tries again on its own (see the refreshIfStale above).
+            isLoadingEpisodes = neverLoaded && (fetching || podcast.lastRefreshError == null),
+            episodesError = podcast.lastRefreshError.takeIf { neverLoaded && !fetching }
         )
     }
 

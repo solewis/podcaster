@@ -189,16 +189,19 @@ class SearchViewModelTest {
         }
 
     @Test
-    fun a_failed_subscribe_reports_why_and_stops_the_spinner() = runTest(mainDispatcher.dispatcher) {
-        host.enqueueStatus(500)
+    fun subscribing_does_not_wait_for_the_episodes_to_load() = runTest(mainDispatcher.dispatcher) {
+        // Held open far longer than the wait below, so the subscribe cannot have waited for it.
+        host.enqueueFeed("rotating_token_v1.xml", delayMillis = 5_000)
+        val feedUrl = host.feedUrl()
         val vm = viewModel()
         keepHot(vm.state)
 
-        vm.subscribe(PodcastSearchResult(7, "Broken", null, host.feedUrl(), null, null))
+        vm.subscribe(PodcastSearchResult(7, "Rotating Token Show", null, feedUrl, null, null))
 
-        val state = vm.state.awaitValue { it.error != null }
-        assertThat(state.subscribingFeedUrl).isNull()
-        assertThat(state.error).contains("500")
+        val state = vm.state.awaitValue(timeoutMillis = 3_000) {
+            it.subscribedFeedUrls.containsKey(feedUrl) && it.subscribingFeedUrl == null
+        }
+        assertThat(state.error).isNull()
     }
 
     @Test

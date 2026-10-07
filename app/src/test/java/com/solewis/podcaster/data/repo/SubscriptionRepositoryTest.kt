@@ -8,6 +8,13 @@ import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.testing.FeedHost
 import com.solewis.podcaster.testing.inMemoryDatabase
 import com.solewis.podcaster.testing.podcastRow
+import com.solewis.podcaster.testing.subscribeAndLoad
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import org.junit.After
@@ -40,19 +47,23 @@ class SubscriptionRepositoryTest {
             podcastDao = db.podcastDao(),
             episodeDao = db.episodeDao(),
             feedFetcher = FeedFetcher(),
+            loadScope = loadScope,
             now = { clock }
         )
     }
 
     @After
     fun tearDown() {
+        runBlocking { loadScope.coroutineContext.job.cancelAndJoin() }
         host.close()
         db.close()
     }
 
+    private val loadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private suspend fun subscribeToHost(): Long {
         host.enqueueFeed("rotating_token_v1.xml")
-        return (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        return (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
     }
 
     @Test
@@ -125,7 +136,7 @@ class SubscriptionRepositoryTest {
     fun subscribe_imports_the_show_and_all_of_its_episodes() = runTest {
         host.enqueueFeed("serial_with_episode_numbers.xml")
 
-        val result = repository.subscribe(host.feedUrl())
+        val result = repository.subscribeAndLoad(host.feedUrl())
 
         assertThat(result).isInstanceOf(SubscribeResult.Success::class.java)
         val podcastId = (result as SubscribeResult.Success).podcastId
@@ -140,7 +151,7 @@ class SubscriptionRepositoryTest {
     fun subscribe_derives_oldest_first_ordering_for_a_serial_show() = runTest {
         host.enqueueFeed("serial_with_episode_numbers.xml")
 
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
 
         // A serial is meant to be started at chapter one, so the show screen must not default to
         // the newest-first ordering every other kind of feed wants.
@@ -151,7 +162,7 @@ class SubscriptionRepositoryTest {
     fun subscribe_defaults_to_newest_first_for_an_ordinary_show() = runTest {
         host.enqueueFeed("nyt_daily_slice.xml")
 
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
 
         assertThat(db.podcastDao().getById(podcastId)?.sortOrder).isEqualTo(SortOrder.NEWEST_FIRST)
     }
@@ -160,7 +171,7 @@ class SubscriptionRepositoryTest {
     fun subscribe_stores_the_caching_headers_so_the_next_refresh_can_be_conditional() = runTest {
         host.enqueueFeed("rotating_token_v1.xml", etag = "\"abc123\"", lastModified = "Wed, 01 Jan 2025 00:00:00 GMT")
 
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
 
         val podcast = db.podcastDao().getById(podcastId)
         assertThat(podcast?.httpEtag).isEqualTo("\"abc123\"")
@@ -170,9 +181,9 @@ class SubscriptionRepositoryTest {
     @Test
     fun subscribing_twice_to_the_same_feed_does_not_duplicate_anything() = runTest {
         host.enqueueFeed("serial_with_episode_numbers.xml")
-        val first = repository.subscribe(host.feedUrl()) as SubscribeResult.Success
+        val first = repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success
 
-        val second = repository.subscribe(host.feedUrl())
+        val second = repository.subscribeAndLoad(host.feedUrl())
 
         assertThat(second).isEqualTo(SubscribeResult.AlreadySubscribed(first.podcastId))
         assertThat(db.podcastDao().getAllIds()).hasSize(1)
@@ -181,24 +192,103 @@ class SubscriptionRepositoryTest {
     }
 
     @Test
-    fun subscribe_writes_nothing_when_the_host_returns_an_error() = runTest {
-        host.enqueueStatus(500)
+    fun subscribe_adds_the_show_before_its_episodes_have_loaded() = runTest {
+        // Held open, so the load is certainly still under way when subscribe returns. Subscribe
+        // used to wait for it - for a big feed on cellular, well over ten seconds of spinner.
+        host.enqueueFeed("serial_with_episode_numbers.xml", delayMillis = 2_000)
 
-        val result = repository.subscribe(host.feedUrl())
+        val result = repository.subscribe(host.feedUrl(), seedTitle = "From Search")
 
-        assertThat(result).isInstanceOf(SubscribeResult.Failure::class.java)
-        assertThat(db.podcastDao().getAllIds()).isEmpty()
+        val podcastId = (result as SubscribeResult.Success).podcastId
+        assertThat(db.podcastDao().getById(podcastId)?.title).isEqualTo("From Search")
+        assertThat(db.episodeDao().getAllForPodcast(podcastId)).isEmpty()
+        assertThat(repository.loading.value).contains(podcastId)
+
+        repository.awaitLoad(podcastId)
+
+        // The feed's own details replace the placeholders from the search result.
+        assertThat(db.podcastDao().getById(podcastId)?.title).isEqualTo("A Serial Audio Drama")
+        assertThat(db.episodeDao().getAllForPodcast(podcastId)).isNotEmpty()
+        assertThat(repository.loading.value).doesNotContain(podcastId)
     }
 
     @Test
-    fun subscribe_fails_cleanly_on_a_soft_404_that_returns_200_with_an_error_document() = runTest {
+    fun subscribing_with_a_feed_already_fetched_does_not_fetch_it_again() = runTest {
+        // What the show preview hands over: it downloaded the whole feed to show the episodes.
+        host.enqueueFeed("serial_with_episode_numbers.xml", etag = "\"v1\"")
+        val fetched = FeedFetcher().fetch(host.feedUrl(), etag = null, lastModified = null)
+
+        val podcastId = (repository.subscribe(host.feedUrl(), feed = fetched) as SubscribeResult.Success).podcastId
+        repository.awaitLoad(podcastId)
+
+        assertThat(host.requestCount).isEqualTo(1)
+        assertThat(db.episodeDao().getAllForPodcast(podcastId)).isNotEmpty()
+        // Kept, so the next refresh is a conditional request rather than another full download.
+        assertThat(db.podcastDao().getById(podcastId)?.httpEtag).isEqualTo("\"v1\"")
+    }
+
+    @Test
+    fun opening_a_show_while_it_is_still_loading_joins_that_load_instead_of_starting_another() = runTest {
+        host.enqueueFeed("serial_with_episode_numbers.xml", delayMillis = 1_000)
+        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+
+        // What the show page does on opening: the show has never loaded, so it counts as stale.
+        val result = repository.refreshIfStale(podcastId)
+
+        assertThat(result).isInstanceOf(RefreshResult.Success::class.java)
+        assertThat(host.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun a_show_whose_episodes_fail_to_load_stays_subscribed_with_the_failure_recorded() = runTest {
+        host.enqueueStatus(500)
+
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
+
+        val podcast = db.podcastDao().getById(podcastId)
+        assertThat(podcast?.lastRefreshError).contains("500")
+        // Never loaded, so still stale: opening the show or the app is the retry.
+        assertThat(podcast?.lastRefreshedAt).isNull()
+        assertThat(db.podcastDao().getStaleIds(clock)).contains(podcastId)
+    }
+
+    @Test
+    fun a_failed_first_load_is_retried_by_the_next_refresh() = runTest {
+        host.enqueueStatus(500)
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
+        host.enqueueFeed("serial_with_episode_numbers.xml")
+
+        repository.refreshIfStale(podcastId)
+
+        val podcast = db.podcastDao().getById(podcastId)
+        assertThat(podcast?.lastRefreshError).isNull()
+        assertThat(podcast?.title).isEqualTo("A Serial Audio Drama")
+        assertThat(podcast?.sortOrder).isEqualTo(SortOrder.OLDEST_FIRST)
+        assertThat(db.episodeDao().getAllForPodcast(podcastId)).isNotEmpty()
+    }
+
+    @Test
+    fun a_soft_404_that_returns_200_with_an_error_document_is_recorded_as_a_failure() = runTest {
         // A real pattern: the host answers 200 with an XML error body instead of a feed. Parsing
-        // has to reject it rather than creating a subscription with no episodes.
+        // has to reject it rather than treating it as a show with no episodes.
         host.enqueueFeed("soft_404_error_page.xml")
 
-        val result = repository.subscribe(host.feedUrl())
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
 
-        assertThat(result).isInstanceOf(SubscribeResult.Failure::class.java)
+        assertThat(db.podcastDao().getById(podcastId)?.lastRefreshError).isNotNull()
+        assertThat(db.podcastDao().getById(podcastId)?.lastRefreshedAt).isNull()
+    }
+
+    @Test
+    fun unsubscribing_while_the_episodes_are_still_loading_does_not_fail_the_load_loudly() = runTest {
+        host.enqueueFeed("serial_with_episode_numbers.xml", delayMillis = 500)
+        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+
+        db.podcastDao().delete(podcastId)
+
+        // The episodes now have no show to belong to. Reported, not thrown - nobody is waiting on
+        // a load started by subscribing, so a throw would have nowhere to go.
+        assertThat(repository.awaitLoad(podcastId)).isInstanceOf(RefreshResult.Failure::class.java)
         assertThat(db.podcastDao().getAllIds()).isEmpty()
     }
 
@@ -206,7 +296,7 @@ class SubscriptionRepositoryTest {
     fun subscribe_falls_back_to_the_search_result_title_when_the_feed_has_none() = runTest {
         host.enqueueBody("""<?xml version="1.0"?><rss version="2.0"><channel><title></title></channel></rss>""", "application/xml")
 
-        val result = repository.subscribe(host.feedUrl(), seedTitle = "From Search")
+        val result = repository.subscribeAndLoad(host.feedUrl(), seedTitle = "From Search")
 
         val podcastId = (result as SubscribeResult.Success).podcastId
         assertThat(db.podcastDao().getById(podcastId)?.title).isEqualTo("From Search")
@@ -217,7 +307,7 @@ class SubscriptionRepositoryTest {
     @Test
     fun refresh_sends_the_stored_validators_and_treats_304_as_no_change() = runTest {
         host.enqueueFeed("rotating_token_v1.xml", etag = "\"v1\"")
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         host.takeRequest()
         host.enqueueNotModified()
         clock = 5_000L
@@ -236,7 +326,7 @@ class SubscriptionRepositoryTest {
     @Test
     fun refresh_reports_how_many_episodes_are_genuinely_new() = runTest {
         host.enqueueFeed("serial_with_episode_numbers.xml")
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         val originalCount = db.episodeDao().getAllForPodcast(podcastId).size
         host.enqueueFeed("serial_with_episode_numbers.xml")
 
@@ -249,7 +339,7 @@ class SubscriptionRepositoryTest {
     @Test
     fun refresh_preserves_playback_progress_through_the_whole_fetch_and_update_path() = runTest {
         host.enqueueFeed("serial_with_episode_numbers.xml")
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         val episode = db.episodeDao().getAllForPodcast(podcastId).first()
         db.episodeDao().setProgress(episode.id, positionMillis = 90_000, isPlayed = false, now = 2_000L)
         host.enqueueFeed("serial_with_episode_numbers.xml")
@@ -268,7 +358,7 @@ class SubscriptionRepositoryTest {
         // from the *normalized* URL, so the row must be recognised as the same episode - updated
         // in place, not re-inserted as a duplicate and not reset.
         host.enqueueFeed("rotating_token_v1.xml")
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         val episode = db.episodeDao().getAllForPodcast(podcastId).single()
         db.episodeDao().setProgress(episode.id, positionMillis = 45_000, isPlayed = false, now = 2_000L)
         host.enqueueFeed("rotating_token_v2.xml")
@@ -285,7 +375,7 @@ class SubscriptionRepositoryTest {
     @Test
     fun refresh_applies_changed_metadata_to_an_existing_episode() = runTest {
         host.enqueueFeed("rotating_token_v1.xml")
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         val episodeId = db.episodeDao().getAllForPodcast(podcastId).single().id
         host.enqueueBody(
             Fixture.renamedRotatingTokenFeed(newTitle = "Episode One (Remastered)"),
@@ -300,7 +390,7 @@ class SubscriptionRepositoryTest {
     @Test
     fun refresh_drops_a_vanished_episode_that_was_never_played() = runTest {
         host.enqueueFeed("rotating_token_v1.xml")
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         assertThat(db.episodeDao().getAllForPodcast(podcastId)).hasSize(1)
         host.enqueueBody(Fixture.emptyFeed(), "application/xml")
 
@@ -312,7 +402,7 @@ class SubscriptionRepositoryTest {
     @Test
     fun refresh_keeps_a_vanished_episode_that_has_listening_history() = runTest {
         host.enqueueFeed("rotating_token_v1.xml")
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         val episode = db.episodeDao().getAllForPodcast(podcastId).single()
         db.episodeDao().setProgress(episode.id, positionMillis = 10_000, isPlayed = false, now = 2_000L)
         host.enqueueBody(Fixture.emptyFeed(), "application/xml")
@@ -327,7 +417,7 @@ class SubscriptionRepositoryTest {
     @Test
     fun refresh_records_the_failure_on_the_show_rather_than_throwing() = runTest {
         host.enqueueFeed("rotating_token_v1.xml", etag = "\"keep-me\"")
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         host.enqueueStatus(503)
         clock = 9_000L
 
@@ -354,9 +444,9 @@ class SubscriptionRepositoryTest {
     @Test
     fun refreshAll_visits_every_subscription() = runTest {
         host.enqueueFeed("rotating_token_v1.xml")
-        repository.subscribe(host.feedUrl("/one.xml"))
+        repository.subscribeAndLoad(host.feedUrl("/one.xml"))
         host.enqueueFeed("serial_with_episode_numbers.xml")
-        repository.subscribe(host.feedUrl("/two.xml"))
+        repository.subscribeAndLoad(host.feedUrl("/two.xml"))
         host.enqueueNotModified()
         host.enqueueNotModified()
 
@@ -439,11 +529,11 @@ class SubscriptionRepositoryTest {
     }
 
     @Test
-    fun subscribing_with_no_connection_reports_a_failure_instead_of_throwing() = runTest {
-        val result = repository.subscribe(unresolvableFeedUrl())
+    fun subscribing_with_no_connection_adds_the_show_and_records_why_its_episodes_are_missing() = runTest {
+        val result = repository.subscribeAndLoad(unresolvableFeedUrl())
 
-        assertThat(result).isInstanceOf(SubscribeResult.Failure::class.java)
-        assertThat((result as SubscribeResult.Failure).message).isEqualTo("No connection")
+        val podcastId = (result as SubscribeResult.Success).podcastId
+        assertThat(db.podcastDao().getById(podcastId)?.lastRefreshError).isEqualTo("No connection")
     }
 
     @Test
@@ -502,7 +592,7 @@ class SubscriptionRepositoryTest {
             contentType = "application/rss+xml"
         )
 
-        val podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
 
         val episode = db.episodeDao().getAllForPodcast(podcastId).single()
         assertThat(episode.descriptionHtml).isEqualTo("<p>Real <b>show notes</b> go here.</p>")
@@ -542,7 +632,7 @@ class SubscriptionRepositoryTest {
         host.enqueueFeed("rotating_token_v1.xml")
         val caller = Thread.currentThread().name
 
-        val podcastId = (probed.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        val podcastId = (probed.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         clock += STALE_ENOUGH
         host.enqueueFeed("rotating_token_v2.xml")
         probed.refresh(podcastId)

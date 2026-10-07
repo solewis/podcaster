@@ -70,6 +70,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.db.model.EpisodeListItem
@@ -230,6 +231,11 @@ fun ShowScreen(viewModel: ShowViewModel, onBack: () -> Unit, onOpenEpisode: (Str
                     }
 
                     if (selectedTab == 0) {
+                        if (state.isLoadingEpisodes || state.episodesError != null) {
+                            item(key = EPISODES_STATUS_KEY) {
+                                EpisodesStatus(isLoading = state.isLoadingEpisodes, error = state.episodesError)
+                            }
+                        }
                         items(state.episodes, key = { it.id }) { episode ->
                             EpisodeRow(
                                 episode = episode,
@@ -566,9 +572,38 @@ private fun OptionRow(label: String, selected: Boolean, testTag: String, onClick
 private val TabLabelStyle: TextStyle
     @Composable get() = MaterialTheme.typography.titleMedium
 
+/** Where the episodes go while a show's feed has never loaded - see [ShowViewModel.UiState]. */
+@Composable
+private fun EpisodesStatus(isLoading: Boolean, error: String?) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator()
+            Text(
+                "Loading episodes…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+        } else if (error != null) {
+            Text("Couldn't load episodes", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "$error. They'll load the next time you open this show.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
 private const val HEADER_KEY = "showHeader"
 private const val TABS_KEY = "showTabs"
 private const val ABOUT_KEY = "about"
+private const val EPISODES_STATUS_KEY = "episodesStatus"
 
 /** The header and the pinned block (tabs plus list controls) sit ahead of the episodes. */
 private const val EPISODES_LEADING_ITEMS = 2

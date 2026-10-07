@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.solewis.podcaster.data.repo.PodcastRepository
 import com.solewis.podcaster.data.repo.PodcastSearchResult
 import com.solewis.podcaster.data.repo.SearchRepository
-import com.solewis.podcaster.data.repo.SubscribeResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -74,18 +73,15 @@ class SearchViewModel(
     fun subscribe(result: PodcastSearchResult) {
         viewModelScope.launch {
             _state.value = _state.value.copy(subscribingFeedUrl = result.feedUrl, error = null)
-            val outcome = subscriptionRepository.subscribe(
+            // Returns once the show is added - its episodes load in the background. The button's
+            // Subscribed state itself comes from the observeSubscribedFeedUrls collector above.
+            subscriptionRepository.subscribe(
                 feedUrl = result.feedUrl,
                 itunesCollectionId = result.itunesCollectionId,
                 seedTitle = result.title,
                 seedArtworkUrl = result.artworkUrl
             )
-            // subscribedFeedUrls itself updates via the observeSubscribedFeedUrls collector above.
-            _state.value = when (outcome) {
-                is SubscribeResult.Success, is SubscribeResult.AlreadySubscribed ->
-                    _state.value.copy(subscribingFeedUrl = null)
-                is SubscribeResult.Failure -> _state.value.copy(subscribingFeedUrl = null, error = outcome.message)
-            }
+            _state.value = _state.value.copy(subscribingFeedUrl = null)
         }
     }
 

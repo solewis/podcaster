@@ -79,6 +79,30 @@ interface PodcastDao {
     )
     suspend fun recordRefreshFailure(podcastId: Long, failedAt: Long, error: String?)
 
+    @Query(
+        """
+        UPDATE podcasts SET
+            title = :title,
+            author = :author,
+            description = :description,
+            artworkUrl = :artworkUrl,
+            websiteUrl = :websiteUrl,
+            feedKind = :feedKind,
+            sortOrder = :sortOrder
+        WHERE id = :podcastId
+        """
+    )
+    suspend fun applyFeedDetails(
+        podcastId: Long,
+        title: String,
+        author: String?,
+        description: String?,
+        artworkUrl: String?,
+        websiteUrl: String?,
+        feedKind: String?,
+        sortOrder: SortOrder
+    )
+
     @Query("UPDATE podcasts SET sortOrder = :sortOrder WHERE id = :podcastId")
     suspend fun setSortOrder(podcastId: Long, sortOrder: SortOrder)
 

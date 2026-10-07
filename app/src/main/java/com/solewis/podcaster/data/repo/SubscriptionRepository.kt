@@ -5,11 +5,21 @@ import com.solewis.podcaster.data.db.PodcastDao
 import com.solewis.podcaster.data.db.entity.EpisodeEntity
 import com.solewis.podcaster.data.db.entity.PodcastEntity
 import com.solewis.podcaster.data.db.model.SortOrder
+import androidx.annotation.VisibleForTesting
+import com.solewis.podcaster.data.remote.FeedFetchResult
 import com.solewis.podcaster.data.remote.FeedFetcher
+import com.solewis.podcaster.data.remote.ParsedFeed
 import com.solewis.podcaster.domain.EpisodeIdentity
 import com.solewis.podcaster.domain.FeedToEpisodesMapper
 import com.solewis.podcaster.domain.HtmlToText
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.ConnectException
@@ -25,7 +35,6 @@ import kotlinx.coroutines.sync.withPermit
 sealed class SubscribeResult {
     data class Success(val podcastId: Long) : SubscribeResult()
     data class AlreadySubscribed(val podcastId: Long) : SubscribeResult()
-    data class Failure(val message: String) : SubscribeResult()
 }
 
 sealed class RefreshResult {
@@ -35,79 +44,112 @@ sealed class RefreshResult {
 }
 
 /**
- * Owns the two operations that turn a feed URL into rows in Room: the initial subscribe (a full
- * fetch + parse + import) and a later refresh (conditional GET, then a metadata-only update that
- * never touches playback columns - see the warning on [EpisodeEntity]).
+ * Owns the two operations that turn a feed URL into rows in Room: subscribing, which adds the show
+ * at once and loads its episodes in the background, and refreshing - a conditional GET, then a
+ * metadata-only update that never touches playback columns (see the warning on [EpisodeEntity]).
  */
 class SubscriptionRepository(
     private val podcastDao: PodcastDao,
     private val episodeDao: EpisodeDao,
     private val feedFetcher: FeedFetcher = FeedFetcher(),
+    /**
+     * Where feed loads run, so that one outlives the screen that started it: subscribing returns
+     * as soon as the show is added, and leaving Search mid-load must not abandon its episodes.
+     * Injectable so a test can stop that work before closing its database.
+     */
+    private val loadScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val now: () -> Long = System::currentTimeMillis
 ) {
+    /** Guarded by itself, together with [_loading], so the two never disagree. */
+    private val inFlight = HashMap<Long, Deferred<RefreshResult>>()
+    private val _loading = MutableStateFlow<Set<Long>>(emptySet())
+
+    /** The shows whose feed is being fetched right now, so a show page can say it is loading. */
+    val loading: StateFlow<Set<Long>> = _loading.asStateFlow()
+
     /**
-     * Off the main thread for the same reason [refresh] is: a show's entire back catalogue is
-     * mapped and HTML-stripped here, and every caller is a Compose scope.
+     * Adds the show and returns straight away, with its episodes still loading in the background.
+     *
+     * The load used to come first, so Subscribe waited on the whole feed - for Rotoviz Radio that
+     * is 25MB and 3,610 episodes, well over ten seconds on a phone on cellular. [feed] is the one a
+     * show preview already fetched, if there is one, so subscribing from there downloads nothing.
+     *
+     * A load that fails leaves the show where it is, with the failure recorded on it. Never having
+     * been refreshed, it counts as stale, so the next automatic refresh - opening the app, or
+     * opening the show - is the retry.
      */
     suspend fun subscribe(
         feedUrl: String,
         itunesCollectionId: Long? = null,
         seedTitle: String? = null,
-        seedArtworkUrl: String? = null
+        seedArtworkUrl: String? = null,
+        feed: FeedFetchResult? = null
     ): SubscribeResult = withContext(Dispatchers.IO) {
-        subscribeOnCallerThread(feedUrl, itunesCollectionId, seedTitle, seedArtworkUrl)
-    }
+        podcastDao.findByFeedUrl(feedUrl)?.let { return@withContext SubscribeResult.AlreadySubscribed(it.id) }
 
-    private suspend fun subscribeOnCallerThread(
-        feedUrl: String,
-        itunesCollectionId: Long?,
-        seedTitle: String?,
-        seedArtworkUrl: String?
-    ): SubscribeResult {
-        podcastDao.findByFeedUrl(feedUrl)?.let { return SubscribeResult.AlreadySubscribed(it.id) }
-
-        val fetchResult = try {
-            feedFetcher.fetch(feedUrl, etag = null, lastModified = null)
-        } catch (e: IOException) {
-            // IOException, not FeedFetchException: OkHttp throws UnknownHostException and its
-            // siblings straight out of execute(), and catching only our own wrapper let every one
-            // of them past. Subscribing with no connection killed the process.
-            return SubscribeResult.Failure(e.offlineMessage("Failed to fetch feed"))
-        }
-        val feed = fetchResult.feed
-            ?: return SubscribeResult.Failure("Feed returned no content") // fetchResult.notModified is impossible with no prior etag
-
-        val timestamp = now()
-        val podcast = PodcastEntity(
-            feedUrl = feedUrl,
-            itunesCollectionId = itunesCollectionId,
-            title = feed.channel.title?.takeIf(String::isNotBlank) ?: seedTitle ?: "(untitled show)",
-            author = feed.channel.author,
-            description = HtmlToText.toPlainText(feed.channel.description),
-            artworkUrl = feed.channel.imageUrl ?: seedArtworkUrl,
-            websiteUrl = feed.channel.link,
-            feedKind = feed.channel.itunesType,
-            subscribedAt = timestamp,
-            lastRefreshedAt = timestamp,
-            httpEtag = fetchResult.etag,
-            httpLastModified = fetchResult.lastModified,
-            sortOrder = if (feed.channel.itunesType == "serial") SortOrder.OLDEST_FIRST else SortOrder.NEWEST_FIRST
+        val podcastId = podcastDao.insert(
+            PodcastEntity(
+                feedUrl = feedUrl,
+                itunesCollectionId = itunesCollectionId,
+                // Placeholders until the feed arrives - see applyFeedDetails.
+                title = seedTitle?.takeIf(String::isNotBlank) ?: "(untitled show)",
+                artworkUrl = seedArtworkUrl,
+                subscribedAt = now()
+            )
         )
-        val podcastId = podcastDao.insert(podcast)
-
-        val entities = FeedToEpisodesMapper.map(feed.items).map { it.toEntity(podcastId, timestamp) }
-        episodeDao.insertNew(entities)
-
-        return SubscribeResult.Success(podcastId)
-    }
-
-    suspend fun refresh(podcastId: Long): RefreshResult = withContext(Dispatchers.IO) {
-        refreshOnCallerThread(podcastId)
+        load(podcastId, feed)
+        SubscribeResult.Success(podcastId)
     }
 
     /**
-     * The refresh itself. Everything that reaches it comes through [refresh], which is what puts it
-     * on [Dispatchers.IO].
+     * Fetches the show's feed and applies it. Joins a load of the same show that is already under
+     * way rather than starting a second - opening a show you have just subscribed to would
+     * otherwise download its whole feed again alongside the first.
+     */
+    suspend fun refresh(podcastId: Long): RefreshResult = load(podcastId, feed = null).await()
+
+    /** Waits for a load of [podcastId] already under way, if there is one - for tests. */
+    @VisibleForTesting
+    suspend fun awaitLoad(podcastId: Long): RefreshResult? = synchronized(inFlight) { inFlight[podcastId] }?.await()
+
+    private fun load(podcastId: Long, feed: FeedFetchResult?): Deferred<RefreshResult> = synchronized(inFlight) {
+        inFlight[podcastId]?.let { return it }
+
+        val load = loadScope.async(start = CoroutineStart.LAZY) {
+            withContext(Dispatchers.IO) { loadReportingFailure(podcastId, feed) }
+        }
+        inFlight[podcastId] = load
+        _loading.value = inFlight.keys.toSet()
+        load.invokeOnCompletion {
+            synchronized(inFlight) {
+                inFlight.remove(podcastId)
+                _loading.value = inFlight.keys.toSet()
+            }
+        }
+        load.start()
+        load
+    }
+
+    /**
+     * Reports rather than throws anything that is not a network failure - those are handled
+     * inside. That is a bug, or the show was unsubscribed mid-load and its episodes have nothing
+     * left to belong to. A load started by subscribing has nobody waiting on it to throw to, and
+     * the show page's refresh runs in a Compose scope, where an escaping exception kills the app.
+     */
+    private suspend fun loadReportingFailure(podcastId: Long, feed: FeedFetchResult?): RefreshResult =
+        try {
+            loadOnCallerThread(podcastId, feed)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val message = e.message ?: "Refresh failed"
+            if (podcastDao.getById(podcastId) != null) podcastDao.recordRefreshFailure(podcastId, now(), message)
+            RefreshResult.Failure(message)
+        }
+
+    /**
+     * The load itself. Everything reaches it through [load], which is what puts it on
+     * [Dispatchers.IO].
      *
      * That dispatcher is load-bearing rather than tidiness. The automatic refresh is launched from
      * a Compose scope (see PodcasterRoot), whose dispatcher is the main thread, and nothing below
@@ -118,17 +160,17 @@ class SubscriptionRepository(
      * which is exactly why this was easy to miss: the network call - the obvious slow part - was
      * the one piece already off the main thread.
      */
-    private suspend fun refreshOnCallerThread(podcastId: Long): RefreshResult {
+    private suspend fun loadOnCallerThread(podcastId: Long, feed: FeedFetchResult?): RefreshResult {
         val podcast = podcastDao.getById(podcastId)
             ?: return RefreshResult.Failure("Show no longer exists")
 
-        val fetchResult = try {
+        val fetchResult = feed ?: try {
             feedFetcher.fetch(podcast.feedUrl, podcast.httpEtag, podcast.httpLastModified)
         } catch (e: IOException) {
-            // See subscribe(): this is the one that actually crashed. The automatic refresh runs
-            // from a Compose scope on every foreground, so an UnknownHostException escaping here
-            // took the app down on launch with no connection - three times in twelve seconds,
-            // because each relaunch tried again.
+            // UnknownHostException and its siblings come straight out of OkHttp's execute(). The
+            // automatic refresh runs from a Compose scope on every foreground, so one escaping
+            // here took the app down on launch with no connection - three times in twelve
+            // seconds, because each relaunch tried again.
             val message = e.offlineMessage("Refresh failed")
             podcastDao.recordRefreshFailure(podcastId, now(), message)
             return RefreshResult.Failure(message)
@@ -140,13 +182,16 @@ class SubscriptionRepository(
             return RefreshResult.NotModified
         }
 
-        val feed = fetchResult.feed
-        if (feed == null) {
+        val parsed = fetchResult.feed
+        if (parsed == null) {
             podcastDao.recordRefreshFailure(podcastId, timestamp, "Feed returned no content")
             return RefreshResult.Failure("Feed returned no content")
         }
 
-        val entities = FeedToEpisodesMapper.map(feed.items).map { it.toEntity(podcastId, timestamp) }
+        // Before the episodes, so they arrive already in the order the show page will keep.
+        if (podcast.lastRefreshedAt == null) applyFeedDetails(podcast, parsed)
+
+        val entities = FeedToEpisodesMapper.map(parsed.items).map { it.toEntity(podcastId, timestamp) }
         val existingIds = episodeDao.getAllIdsForPodcast(podcastId).toSet()
 
         val newEntities = entities.filter { it.id !in existingIds }
@@ -160,6 +205,24 @@ class SubscriptionRepository(
 
         podcastDao.recordRefreshSuccess(podcastId, fetchResult.etag, fetchResult.lastModified, timestamp)
         return RefreshResult.Success(episodesAdded = newEntities.size)
+    }
+
+    /**
+     * Replaces the placeholders [subscribe] stored with what the feed says about itself, the first
+     * time it loads. Only then: the sort order is the user's to change from here on.
+     */
+    private suspend fun applyFeedDetails(podcast: PodcastEntity, feed: ParsedFeed) {
+        val channel = feed.channel
+        podcastDao.applyFeedDetails(
+            podcastId = podcast.id,
+            title = channel.title?.takeIf(String::isNotBlank) ?: podcast.title,
+            author = channel.author,
+            description = HtmlToText.toPlainText(channel.description),
+            artworkUrl = channel.imageUrl ?: podcast.artworkUrl,
+            websiteUrl = channel.link,
+            feedKind = channel.itunesType,
+            sortOrder = if (channel.itunesType == "serial") SortOrder.OLDEST_FIRST else SortOrder.NEWEST_FIRST
+        )
     }
 
     /**

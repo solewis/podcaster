@@ -1,6 +1,7 @@
 package com.solewis.podcaster.data.repo
 
 import java.io.IOException
+import com.solewis.podcaster.data.remote.FeedFetchResult
 import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.domain.FeedToEpisodesMapper
 import com.solewis.podcaster.domain.HtmlToText
@@ -14,7 +15,10 @@ data class ShowPreview(
      * default `sortOrder` choice on actual subscribe, so a preview doesn't reorder on you the
      * moment you subscribe. No toggle here: that's a commitment decision for a show you've
      * decided to follow, not one you're still browsing. */
-    val episodes: List<FeedToEpisodesMapper.MappedEpisode>
+    val episodes: List<FeedToEpisodesMapper.MappedEpisode>,
+    /** The fetch this came from, handed to [SubscriptionRepository.subscribe] so subscribing from
+     * the preview does not download the whole feed a second time. */
+    val feed: FeedFetchResult
 )
 
 /**
@@ -47,7 +51,8 @@ class ShowPreviewRepository(private val feedFetcher: FeedFetcher = FeedFetcher()
             author = feed.channel.author,
             description = HtmlToText.toPlainText(feed.channel.description),
             artworkUrl = feed.channel.imageUrl,
-            episodes = sorted
+            episodes = sorted,
+            feed = result
         )
     }
 }
