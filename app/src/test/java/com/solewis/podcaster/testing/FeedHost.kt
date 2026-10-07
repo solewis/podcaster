@@ -50,10 +50,11 @@ class FeedHost : Closeable {
         server.enqueue(MockResponse().setResponseCode(code).setBody(""))
     }
 
-    fun enqueueBody(body: String, contentType: String = "application/json") {
-        server.enqueue(
-            MockResponse().setResponseCode(200).setHeader("Content-Type", contentType).setBody(body)
-        )
+    /** [delayMillis] holds the response open, as [enqueueNotModified]'s does. */
+    fun enqueueBody(body: String, contentType: String = "application/json", delayMillis: Long = 0) {
+        val response = MockResponse().setResponseCode(200).setHeader("Content-Type", contentType).setBody(body)
+        if (delayMillis > 0) response.setHeadersDelay(delayMillis, TimeUnit.MILLISECONDS)
+        server.enqueue(response)
     }
 
     val requestCount: Int get() = server.requestCount

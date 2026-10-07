@@ -12,7 +12,10 @@ import com.solewis.podcaster.testing.awaitTrue
 import com.solewis.podcaster.testing.awaitValue
 import com.solewis.podcaster.testing.keepHot
 import com.solewis.podcaster.testing.settle
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -125,6 +128,32 @@ class SearchViewModelTest {
             val state = vm.state.awaitValue { it.error != null }
             assertThat(state.isSearching).isFalse()
             assertThat(state.error).contains("Rate limited")
+        }
+
+    @Test
+    fun typing_past_a_search_already_in_flight_does_not_report_it_as_an_error() =
+        runTest(mainDispatcher.dispatcher) {
+            // The first query's answer is still on its way when the second query is typed. Its job
+            // is cancelled, but the blocking HTTP call underneath runs to completion regardless and
+            // only then notices - by throwing CancellationException, which the catch-all used to
+            // take for a failed search and show as "StandaloneCoroutine was cancelled".
+            searchHost.enqueueBody(oneResult("Rotoviz", "https://feeds.example/a"), delayMillis = 500)
+            searchHost.enqueueBody(oneResult("Rotoviz Radio", "https://feeds.example/b"))
+            val vm = viewModel()
+            keepHot(vm.state)
+
+            vm.onQueryChange("Rotoviz")
+            advanceTimeBy(DEBOUNCE_MILLIS + 1)
+            awaitTrue("the first search to be in flight") { searchHost.requestCount == 1 }
+            vm.onQueryChange("Rotoviz Radio")
+            advanceTimeBy(DEBOUNCE_MILLIS + 1)
+
+            vm.state.awaitValue { it.results.isNotEmpty() }
+            // Past the point the first, abandoned request has answered and been noticed.
+            withContext(Dispatchers.Default) { delay(1_000) }
+            val state = vm.state.value
+            assertThat(state.error).isNull()
+            assertThat(state.results.single().title).isEqualTo("Rotoviz Radio")
         }
 
     @Test

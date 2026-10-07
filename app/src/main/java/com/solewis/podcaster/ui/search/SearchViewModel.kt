@@ -7,6 +7,7 @@ import com.solewis.podcaster.data.repo.PodcastSearchResult
 import com.solewis.podcaster.data.repo.SearchRepository
 import com.solewis.podcaster.data.repo.SubscribeResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,6 +60,11 @@ class SearchViewModel(
             try {
                 val results = searchRepository.search(query)
                 _state.value = _state.value.copy(results = results, isSearching = false)
+            } catch (e: CancellationException) {
+                // A newer keystroke replaced this search. The HTTP call underneath is blocking, so
+                // it runs to completion and only then throws this - after the newer search may
+                // already have answered. Reporting it showed "StandaloneCoroutine was cancelled".
+                throw e
             } catch (e: Exception) {
                 _state.value = _state.value.copy(isSearching = false, error = e.message ?: "Search failed")
             }
