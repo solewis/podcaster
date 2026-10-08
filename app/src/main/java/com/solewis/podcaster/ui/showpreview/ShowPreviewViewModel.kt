@@ -36,6 +36,9 @@ class ShowPreviewViewModel(
 ) : ViewModel() {
 
     data class UiState(
+        /** From the search result until the feed arrives, so the header shows straight away. */
+        val title: String? = null,
+        val artworkUrl: String? = null,
         val isLoading: Boolean = true,
         val error: String? = null,
         val preview: ShowPreview? = null,
@@ -43,7 +46,7 @@ class ShowPreviewViewModel(
         val subscribedPodcastId: Long? = null
     )
 
-    private val _state = MutableStateFlow(UiState())
+    private val _state = MutableStateFlow(UiState(title = seedTitle, artworkUrl = seedArtworkUrl))
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     init {
@@ -64,7 +67,12 @@ class ShowPreviewViewModel(
             _state.value = if (preview == null) {
                 _state.value.copy(isLoading = false, error = "Couldn't load this show")
             } else {
-                _state.value.copy(isLoading = false, preview = preview)
+                _state.value.copy(
+                    isLoading = false,
+                    preview = preview,
+                    title = preview.title,
+                    artworkUrl = preview.artworkUrl ?: seedArtworkUrl
+                )
             }
         }
     }
@@ -89,21 +97,26 @@ class ShowPreviewViewModel(
     fun descriptionFor(episode: FeedToEpisodesMapper.MappedEpisode): String? =
         HtmlToText.toPlainText(episode.descriptionHtml)
 
+    /**
+     * Available before the episodes have loaded - subscribing does not need them. When they have,
+     * the fetch they came from goes along, so the feed is not downloaded a second time.
+     */
     fun subscribe() {
-        val preview = _state.value.preview ?: return
         viewModelScope.launch {
-            _state.value = _state.value.copy(isSubscribing = true, error = null)
+            _state.value = _state.value.copy(isSubscribing = true)
+            val preview = _state.value.preview
             val outcome = subscriptionRepository.subscribe(
                 feedUrl = feedUrl,
                 itunesCollectionId = itunesCollectionId,
-                seedTitle = preview.title,
-                seedArtworkUrl = preview.artworkUrl
+                seedTitle = _state.value.title,
+                seedArtworkUrl = _state.value.artworkUrl,
+                feed = preview?.feed
             )
-            _state.value = when (outcome) {
-                is SubscribeResult.Success -> _state.value.copy(isSubscribing = false, subscribedPodcastId = outcome.podcastId)
-                is SubscribeResult.AlreadySubscribed -> _state.value.copy(isSubscribing = false, subscribedPodcastId = outcome.podcastId)
-                is SubscribeResult.Failure -> _state.value.copy(isSubscribing = false, error = outcome.message)
+            val podcastId = when (outcome) {
+                is SubscribeResult.Success -> outcome.podcastId
+                is SubscribeResult.AlreadySubscribed -> outcome.podcastId
             }
+            _state.value = _state.value.copy(isSubscribing = false, subscribedPodcastId = podcastId)
         }
     }
 }

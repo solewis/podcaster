@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.data.remote.FeedFetcher
+import com.solewis.podcaster.testing.subscribeAndLoad
 import com.solewis.podcaster.testing.FeedHost
 import com.solewis.podcaster.testing.MainDispatcherRule
 import com.solewis.podcaster.testing.TestGraph
@@ -71,7 +72,7 @@ class SubscriptionsViewModelTest {
             graph.db.podcastDao(), graph.db.episodeDao(), FeedFetcher()
         ) { 1_000L }
         host.enqueueFeed("rotating_token_v1.xml")
-        repository.subscribe(host.feedUrl())
+        repository.subscribeAndLoad(host.feedUrl())
         host.enqueueNotModified()
         val vm = graph.hosting(SubscriptionsViewModel(graph.podcastRepository, repository))
 
@@ -88,7 +89,7 @@ class SubscriptionsViewModelTest {
             graph.db.podcastDao(), graph.db.episodeDao(), FeedFetcher()
         ) { 1_000L }
         host.enqueueFeed("rotating_token_v1.xml")
-        repository.subscribe(host.feedUrl())
+        repository.subscribeAndLoad(host.feedUrl())
         val vm = graph.hosting(SubscriptionsViewModel(graph.podcastRepository, repository))
         // Held open so the second call below is unambiguously concurrent with the first, rather
         // than racing a refresh that may already have finished.

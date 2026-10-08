@@ -85,7 +85,7 @@ class AppContainer(
     private val feedFetcher = FeedFetcher(httpClient)
 
     val searchRepository = SearchRepository(ItunesSearchApi(httpClient))
-    val subscriptionRepository = SubscriptionRepository(database.podcastDao(), database.episodeDao(), feedFetcher, refreshClock)
+    val subscriptionRepository = SubscriptionRepository(database.podcastDao(), database.episodeDao(), feedFetcher, appScope, refreshClock)
     val episodeRepository = EpisodeRepository(database.episodeDao(), database.podcastDao())
     val podcastRepository = PodcastRepository(database.podcastDao())
     val showPreviewRepository = ShowPreviewRepository(feedFetcher)

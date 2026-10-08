@@ -15,6 +15,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import java.io.Closeable
 import java.util.concurrent.ExecutorService
@@ -58,8 +61,11 @@ class TestGraph : Closeable {
     val episodeRepository = EpisodeRepository(db.episodeDao(), db.podcastDao()) { clock }
     val podcastRepository = PodcastRepository(db.podcastDao())
     val queueRepository = QueueRepository(db.queueDao(), episodeRepository) { clock }
+    /** Where [subscriptionRepository] loads feeds - stopped, and waited for, before the database closes. */
+    private val loadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     val subscriptionRepository =
-        SubscriptionRepository(db.podcastDao(), db.episodeDao(), FeedFetcher()) { clock }
+        SubscriptionRepository(db.podcastDao(), db.episodeDao(), FeedFetcher(), loadScope) { clock }
 
     suspend fun insertShow(title: String = "Test Show", artworkUrl: String? = "https://example.com/show.png"): Long =
         db.podcastDao().insert(podcastRow(title = title, artworkUrl = artworkUrl))
@@ -106,6 +112,8 @@ class TestGraph : Closeable {
         // before the database they are reading from disappears underneath them.
         viewModels.close()
         appScope.cancel()
+        // A feed load outlives the screen that started it by design, so it has to be stopped here.
+        runBlocking { loadScope.coroutineContext.job.cancelAndJoin() }
         // Then wait for Room itself, because cancelling does not do that. A write already handed to
         // Room is not interruptible - it runs on Room's own executor, and the statement underneath
         // it is a blocking call - so closing here raced it, and the write landed on a shut

@@ -77,6 +77,27 @@ class SearchRepositoryTest {
     }
 
     @Test
+    fun a_show_listed_twice_under_the_same_feed_appears_once() = runTest {
+        // Real: "Rotoviz Radio" comes back as collections 899189559 and 1438840258, both pointing
+        // at the same Simplecast feed. Subscribing to either is the same subscription.
+        host.enqueueBody(
+            """
+            {"results":[
+              {"collectionId":899189559,"collectionName":"Rotoviz Radio","feedUrl":"https://feeds.simplecast.com/_VDMK4uh"},
+              {"collectionId":42,"collectionName":"Another Show","feedUrl":"https://f"},
+              {"collectionId":1438840258,"collectionName":"Rotoviz Radio","feedUrl":"https://feeds.simplecast.com/_VDMK4uh"}
+            ]}
+            """.trimIndent()
+        )
+
+        val results = repository.search("rotoviz radio")
+
+        assertThat(results.map { it.title }).containsExactly("Rotoviz Radio", "Another Show").inOrder()
+        // The first listing wins - iTunes orders by relevance.
+        assertThat(results.first().itunesCollectionId).isEqualTo(899189559)
+    }
+
+    @Test
     fun an_untitled_show_still_gets_a_label_rather_than_rendering_blank() = runTest {
         host.enqueueBody("""{"results":[{"feedUrl":"https://f"}]}""")
 

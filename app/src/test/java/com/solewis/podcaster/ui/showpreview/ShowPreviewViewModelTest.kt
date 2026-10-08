@@ -116,44 +116,49 @@ class ShowPreviewViewModelTest {
     }
 
     @Test
-    fun subscribing_hands_back_the_new_shows_id() = runTest(mainDispatcher.dispatcher) {
+    fun subscribing_from_the_preview_does_not_download_the_feed_again() = runTest(mainDispatcher.dispatcher) {
         host.enqueueFeed("serial_with_episode_numbers.xml")
         val vm = viewModel(host.feedUrl())
         vm.state.awaitValue { it.preview != null }
-        host.enqueueFeed("serial_with_episode_numbers.xml")
 
         vm.subscribe()
 
         val state = vm.state.awaitValue { it.subscribedPodcastId != null }
+        val podcastId = state.subscribedPodcastId!!
+        graph.subscriptionRepository.awaitLoad(podcastId)
         assertThat(state.isSubscribing).isFalse()
-        assertThat(graph.db.podcastDao().getById(state.subscribedPodcastId!!)?.title)
-            .isEqualTo("A Serial Audio Drama")
+        assertThat(graph.db.podcastDao().getById(podcastId)?.title).isEqualTo("A Serial Audio Drama")
+        assertThat(graph.db.episodeDao().getAllForPodcast(podcastId)).isNotEmpty()
+        // The preview's fetch was handed over. It used to be thrown away and the whole feed - 25MB
+        // for some shows - downloaded again.
+        assertThat(host.requestCount).isEqualTo(1)
     }
 
     @Test
-    fun a_failed_subscribe_reports_why_and_keeps_the_preview() = runTest(mainDispatcher.dispatcher) {
-        host.enqueueFeed("serial_with_episode_numbers.xml")
-        val vm = viewModel(host.feedUrl())
-        vm.state.awaitValue { it.preview != null }
-        host.enqueueStatus(500)
+    fun the_show_is_named_before_its_feed_arrives() = runTest(mainDispatcher.dispatcher) {
+        host.enqueueFeed("serial_with_episode_numbers.xml", delayMillis = 1_000)
 
-        vm.subscribe()
+        val vm = viewModel(host.feedUrl(), seedTitle = "From Search")
 
-        val state = vm.state.awaitValue { it.error != null }
-        assertThat(state.isSubscribing).isFalse()
-        assertThat(state.subscribedPodcastId).isNull()
-        // The preview survives, so the screen still shows the show rather than going blank.
-        assertThat(state.preview).isNotNull()
+        // Only the episode list waits on the feed; the header has what Search already knew.
+        val state = vm.state.value
+        assertThat(state.title).isEqualTo("From Search")
+        assertThat(state.isLoading).isTrue()
+        assertThat(vm.state.awaitValue { it.preview != null }.title).isEqualTo("A Serial Audio Drama")
     }
 
     @Test
-    fun subscribe_does_nothing_before_the_preview_has_loaded() = runTest(mainDispatcher.dispatcher) {
-        host.enqueueStatus(404)
-        val vm = viewModel(host.feedUrl())
-        vm.state.awaitValue { it.error != null }
+    fun subscribing_does_not_wait_for_the_episodes() = runTest(mainDispatcher.dispatcher) {
+        host.enqueueFeed("serial_with_episode_numbers.xml", delayMillis = 2_000)
+        host.enqueueFeed("serial_with_episode_numbers.xml", delayMillis = 2_000)
+        val vm = viewModel(host.feedUrl(), seedTitle = "From Search")
 
         vm.subscribe()
 
-        awaitTrue("no subscription attempted") { graph.db.podcastDao().getAllIds().isEmpty() }
+        val state = vm.state.awaitValue { it.subscribedPodcastId != null }
+        // Still nothing from the feed: the show was added with what Search knew, and its episodes
+        // are loading in the background.
+        assertThat(state.preview).isNull()
+        assertThat(graph.db.podcastDao().getById(state.subscribedPodcastId!!)?.title).isEqualTo("From Search")
     }
 }

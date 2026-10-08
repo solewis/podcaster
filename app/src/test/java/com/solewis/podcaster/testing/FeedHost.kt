@@ -24,11 +24,13 @@ class FeedHost : Closeable {
     /** Pass this as the podcast's feed URL. Queued responses are served in FIFO order. */
     fun feedUrl(path: String = "/feed.xml"): String = server.url(path).toString()
 
-    fun enqueueFeed(fixture: String, etag: String? = null, lastModified: String? = null) {
+    /** [delayMillis] holds the response open, as [enqueueNotModified]'s does. */
+    fun enqueueFeed(fixture: String, etag: String? = null, lastModified: String? = null, delayMillis: Long = 0) {
         val response = MockResponse()
             .setResponseCode(200)
             .setHeader("Content-Type", "application/rss+xml")
             .setBody(Fixtures.feedText(fixture))
+        if (delayMillis > 0) response.setHeadersDelay(delayMillis, TimeUnit.MILLISECONDS)
         etag?.let { response.setHeader("ETag", it) }
         lastModified?.let { response.setHeader("Last-Modified", it) }
         server.enqueue(response)
@@ -50,10 +52,11 @@ class FeedHost : Closeable {
         server.enqueue(MockResponse().setResponseCode(code).setBody(""))
     }
 
-    fun enqueueBody(body: String, contentType: String = "application/json") {
-        server.enqueue(
-            MockResponse().setResponseCode(200).setHeader("Content-Type", contentType).setBody(body)
-        )
+    /** [delayMillis] holds the response open, as [enqueueNotModified]'s does. */
+    fun enqueueBody(body: String, contentType: String = "application/json", delayMillis: Long = 0) {
+        val response = MockResponse().setResponseCode(200).setHeader("Content-Type", contentType).setBody(body)
+        if (delayMillis > 0) response.setHeadersDelay(delayMillis, TimeUnit.MILLISECONDS)
+        server.enqueue(response)
     }
 
     val requestCount: Int get() = server.requestCount

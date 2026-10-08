@@ -8,6 +8,7 @@ import com.solewis.podcaster.data.remote.FeedFetcher
 import com.solewis.podcaster.data.repo.SubscribeResult
 import com.solewis.podcaster.data.repo.SubscriptionRepository
 import com.solewis.podcaster.domain.JumpTargetResolver
+import com.solewis.podcaster.testing.subscribeAndLoad
 import com.solewis.podcaster.testing.FeedHost
 import com.solewis.podcaster.testing.MainDispatcherRule
 import com.solewis.podcaster.testing.TestGraph
@@ -15,6 +16,7 @@ import com.solewis.podcaster.testing.awaitTrue
 import com.solewis.podcaster.testing.awaitValue
 import com.solewis.podcaster.testing.episodeRow
 import com.solewis.podcaster.testing.keepHot
+import com.solewis.podcaster.testing.podcastRow
 import com.solewis.podcaster.testing.settle
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -288,7 +290,7 @@ class ShowViewModelTest {
     fun a_failed_refresh_surfaces_the_reason_and_stops_the_spinner() = runTest(mainDispatcher.dispatcher) {
         val repository = SubscriptionRepository(graph.db.podcastDao(), graph.db.episodeDao(), FeedFetcher()) { 1_000L }
         host.enqueueFeed("rotating_token_v1.xml")
-        podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         val vm = viewModel(repository)
         keepHot(vm.state)
         host.enqueueStatus(503)
@@ -303,7 +305,7 @@ class ShowViewModelTest {
     fun a_second_refresh_while_one_is_running_is_ignored() = runTest(mainDispatcher.dispatcher) {
         val repository = SubscriptionRepository(graph.db.podcastDao(), graph.db.episodeDao(), FeedFetcher()) { 1_000L }
         host.enqueueFeed("rotating_token_v1.xml")
-        podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         val vm = viewModel(repository)
         keepHot(vm.state)
         host.enqueueNotModified(delayMillis = 300)
@@ -316,12 +318,44 @@ class ShowViewModelTest {
         assertThat(host.requestCount).isEqualTo(2)
     }
 
+    @Test
+    fun a_show_subscribed_moments_ago_says_its_episodes_are_loading() = runTest(mainDispatcher.dispatcher) {
+        host.enqueueFeed("rotating_token_v1.xml", delayMillis = 1_000)
+        podcastId = (graph.subscriptionRepository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+
+        val vm = viewModel()
+        keepHot(vm.state)
+
+        // Not a show with no episodes: they are on their way, and the screen says so.
+        vm.state.awaitValue { it.podcast != null && it.isLoadingEpisodes && it.episodes.isEmpty() }
+        val loaded = vm.state.awaitValue { it.episodes.isNotEmpty() }
+        assertThat(loaded.isLoadingEpisodes).isFalse()
+        assertThat(loaded.episodesError).isNull()
+        // Opening the show joined the load subscribing started rather than fetching again.
+        assertThat(host.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun a_show_whose_episodes_never_loaded_says_why() = runTest(mainDispatcher.dispatcher) {
+        // Unresolvable by definition (RFC 2606), so the retry on opening fails too.
+        podcastId = graph.db.podcastDao().insert(
+            podcastRow(feedUrl = "http://podcaster-does-not-exist.invalid/feed.xml", lastRefreshedAt = null)
+        )
+
+        val vm = viewModel()
+        keepHot(vm.state)
+
+        val state = vm.state.awaitValue { it.episodesError != null }
+        assertThat(state.episodesError).isEqualTo("No connection")
+        assertThat(state.isLoadingEpisodes).isFalse()
+    }
+
     /** A host-backed subscription, so requests to it can be counted. */
     private suspend fun subscribedToHost(): SubscriptionRepository {
         val repository =
             SubscriptionRepository(graph.db.podcastDao(), graph.db.episodeDao(), FeedFetcher()) { graph.clock }
         host.enqueueFeed("rotating_token_v1.xml")
-        podcastId = (repository.subscribe(host.feedUrl()) as SubscribeResult.Success).podcastId
+        podcastId = (repository.subscribeAndLoad(host.feedUrl()) as SubscribeResult.Success).podcastId
         return repository
     }
 

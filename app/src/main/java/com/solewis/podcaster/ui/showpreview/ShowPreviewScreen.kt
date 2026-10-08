@@ -79,39 +79,39 @@ fun ShowPreviewScreen(
             Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.statusBarsPadding()) {
                     BackButtonRow(onBack)
-                    preview?.let {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    it.title,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                it.author?.let { author ->
-                                    Text(
-                                        author,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 2.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            PodcastArtwork(artworkUrl = it.artworkUrl, modifier = Modifier.size(72.dp))
-                        }
-                        Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
-                            SubscribeButton(
-                                isSubscribed = isSubscribed,
-                                isBusy = state.isSubscribing,
-                                enabled = !isSubscribed,
-                                onClick = viewModel::subscribe
+                    // Not waiting on the feed: the name and artwork came with the search result,
+                    // and subscribing does not need the episodes. Only the list below waits.
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                state.title ?: "",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
+                            preview?.author?.let { author ->
+                                Text(
+                                    author,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
                         }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        PodcastArtwork(artworkUrl = state.artworkUrl, modifier = Modifier.size(72.dp))
+                    }
+                    Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+                        SubscribeButton(
+                            isSubscribed = isSubscribed,
+                            isBusy = state.isSubscribing,
+                            enabled = !isSubscribed,
+                            onClick = viewModel::subscribe
+                        )
                     }
                 }
             }
