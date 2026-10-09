@@ -1,6 +1,10 @@
 package com.solewis.podcaster.player
 
+import android.content.Intent
+import android.view.KeyEvent
+import androidx.core.content.IntentCompat
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.SessionError
@@ -34,10 +38,43 @@ class PodcastLibrarySessionCallback(
     episodeRepository: EpisodeRepository,
     queueRepository: QueueRepository,
     private val scope: CoroutineScope,
-    log: PlaybackLog? = null
+    private val log: PlaybackLog? = null
 ) : MediaLibrarySession.Callback {
 
     private val tree = PodcastLibraryTree(podcastRepository, episodeRepository, queueRepository, log)
+
+    // ---- who is talking to the session ----
+    //
+    // A morning drive had nine minutes where the car's skip buttons did nothing, right after
+    // getting back in, and the log could not say why: it showed no skip arriving at all, but
+    // everything from outside the app was attributed to the app's own package, so it could not
+    // tell the car from the notification, nor say whether the car was connected. These four
+    // record every controller arriving and leaving and everything each one asks for, so the next
+    // time a button goes dead the log says whether the press reached the session, and from what.
+
+    override fun onConnect(session: MediaSession, controller: ControllerInfo): MediaSession.ConnectionResult {
+        log?.record("CONTROLLER_CONNECT", describe(controller))
+        return super.onConnect(session, controller)
+    }
+
+    override fun onDisconnected(session: MediaSession, controller: ControllerInfo) {
+        log?.record("CONTROLLER_DISCONNECT", describe(controller))
+    }
+
+    override fun onPlayerCommandRequest(session: MediaSession, controller: ControllerInfo, playerCommand: Int): Int {
+        log?.record("SESSION_COMMAND", "command=${commandName(playerCommand)} ${describe(controller)}")
+        return super.onPlayerCommandRequest(session, controller, playerCommand)
+    }
+
+    /** Hardware and Bluetooth buttons - the steering wheel included - arrive as these. */
+    override fun onMediaButtonEvent(session: MediaSession, controller: ControllerInfo, intent: Intent): Boolean {
+        val event = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
+        log?.record(
+            "MEDIA_BUTTON",
+            "key=${event?.let { KeyEvent.keyCodeToString(it.keyCode) }} action=${event?.action} ${describe(controller)}"
+        )
+        return super.onMediaButtonEvent(session, controller, intent)
+    }
 
     override fun onGetLibraryRoot(
         session: MediaLibrarySession,
@@ -106,5 +143,42 @@ class PodcastLibrarySessionCallback(
         startPositionMs: Long
     ): ListenableFuture<MediaItemsWithStartPosition> = scope.future {
         tree.resolveForPlayback(mediaItems, startIndex, startPositionMs)
+    }
+
+    internal companion object {
+        /**
+         * Package and uid, plus whether it came through the platform session - how Android Auto,
+         * Bluetooth and the system UI usually reach a Media3 session, and why they can show up
+         * under a placeholder package rather than their own.
+         */
+        fun describe(controller: ControllerInfo): String = buildString {
+            append("from=").append(controller.packageName)
+            append(" uid=").append(controller.uid)
+            if (controller.controllerVersion == ControllerInfo.LEGACY_CONTROLLER_VERSION) append(" legacy")
+            if (!controller.isTrusted) append(" untrusted")
+        }
+
+        fun commandName(command: Int): String = when (command) {
+            Player.COMMAND_PLAY_PAUSE -> "PLAY_PAUSE"
+            Player.COMMAND_PREPARE -> "PREPARE"
+            Player.COMMAND_STOP -> "STOP"
+            Player.COMMAND_SEEK_TO_DEFAULT_POSITION -> "SEEK_TO_DEFAULT_POSITION"
+            Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM -> "SEEK_IN_CURRENT_ITEM"
+            Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> "SEEK_TO_PREVIOUS_ITEM"
+            Player.COMMAND_SEEK_TO_PREVIOUS -> "SEEK_TO_PREVIOUS"
+            Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> "SEEK_TO_NEXT_ITEM"
+            Player.COMMAND_SEEK_TO_NEXT -> "SEEK_TO_NEXT"
+            Player.COMMAND_SEEK_TO_MEDIA_ITEM -> "SEEK_TO_MEDIA_ITEM"
+            Player.COMMAND_SEEK_BACK -> "SEEK_BACK"
+            Player.COMMAND_SEEK_FORWARD -> "SEEK_FORWARD"
+            Player.COMMAND_SET_SPEED_AND_PITCH -> "SET_SPEED"
+            Player.COMMAND_SET_MEDIA_ITEM -> "SET_MEDIA_ITEM"
+            Player.COMMAND_CHANGE_MEDIA_ITEMS -> "CHANGE_MEDIA_ITEMS"
+            Player.COMMAND_SET_REPEAT_MODE -> "SET_REPEAT_MODE"
+            Player.COMMAND_SET_SHUFFLE_MODE -> "SET_SHUFFLE_MODE"
+            Player.COMMAND_SET_VOLUME -> "SET_VOLUME"
+            Player.COMMAND_RELEASE -> "RELEASE"
+            else -> "COMMAND_$command"
+        }
     }
 }
